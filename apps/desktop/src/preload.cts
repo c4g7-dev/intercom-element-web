@@ -35,6 +35,8 @@ const CHANNELS = [
     "homeserverUrl",
     "serverSupportedVersions",
     "showToast",
+    // InterCom: a call action from a global shortcut or a second instance's command line
+    "intercomCallAction",
 ];
 
 contextBridge.exposeInMainWorld("electron", {

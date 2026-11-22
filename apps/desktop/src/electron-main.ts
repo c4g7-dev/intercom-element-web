@@ -52,6 +52,7 @@ import { type ConfigOptions, loadConfig } from "./config.js";
 import { configureChromium, grantDisplayMedia, WINDOW_BACKGROUND } from "./intercom.js";
 import { initDiagnostics, labelDiagnosticsWindow, logDiagnostics } from "./intercom-diagnostics.js";
 import { initShareAudio } from "./intercom-share-audio.js";
+import { handleSecondInstanceCallAction, initCallShortcuts, parseCallAction } from "./intercom-call-actions.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -105,6 +106,11 @@ process.on("uncaughtException", function (error: Error): void {
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
     console.log("Other instance detected: exiting");
+    app.exit();
+} else if (parseCallAction(process.argv) !== undefined) {
+    // InterCom: a call action (--toggle-mute and the like) is for the instance that is running. With
+    // none running there is no call to act on, and starting the app would be a surprise.
+    console.log("InterCom is not running: nothing to do");
     app.exit();
 }
 
@@ -253,6 +259,8 @@ app.on("ready", async () => {
     initDiagnostics();
     // InterCom: lets a screen share take its audio from a PipeWire/PulseAudio sink (Linux)
     initShareAudio();
+    // InterCom: global mute and deafen shortcuts while a call is on (Windows; Linux through the portal on request)
+    initCallShortcuts();
 
     console.debug("Opening main window");
     const preloadScript = path.normalize(`${__dirname}/preload.cjs`);
@@ -450,6 +458,9 @@ app.on("before-quit", beforeQuit);
 autoUpdater.on("before-quit-for-update", beforeQuit);
 
 app.on("second-instance", (ev, commandLine, workingDirectory) => {
+    // InterCom: `intercom --toggle-mute` and the like act on the call and leave the window alone
+    if (handleSecondInstanceCallAction(commandLine)) return;
+
     // If other instance launched with --hidden then skip showing window
     if (commandLine.includes("--hidden")) return;
 

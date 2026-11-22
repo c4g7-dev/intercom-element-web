@@ -57,6 +57,25 @@ Audio
 - Element Call reaches this through the widget action io.intercom.share_audio, which Element Web
   answers for the bundled call widget only (apps/web/src/intercom/ShareAudioBridge.ts).
 
+Call shortcuts
+--------------
+
+In a call, with the window focused: Ctrl+Shift+M mutes, Ctrl+Shift+D deafens (nobody is heard and
+the microphone is off, with a banner over the call) and Ctrl+Shift+V toggles the camera. While a
+call is on, Ctrl+Shift+D is not the space panel's.
+
+From anywhere: a second `intercom` with one of --toggle-mute, --mute, --unmute, --toggle-deafen,
+--toggle-camera, --leave-call hands the action to the running instance and exits without opening a
+window (and does nothing where none is running). Wayland compositors give applications no global
+shortcuts, so bind the commands there, e.g. in hyprland.conf:
+
+    bind = SUPER, M, exec, /path/to/run-intercom.sh --toggle-mute
+    bind = SUPER SHIFT, M, exec, /path/to/run-intercom.sh --toggle-deafen
+
+On Windows, Ctrl+Shift+M and Ctrl+Shift+D are global while a call is on; --no-global-shortcuts or
+INTERCOM_NO_GLOBAL_SHORTCUTS=1 turns that off. --global-shortcuts-portal (Linux, experimental) asks
+the XDG GlobalShortcuts portal for the same two.
+
 Diagnostics
 -----------
 
@@ -71,7 +90,7 @@ first. It holds
 - console warnings and errors of all frames, with anything that looks like a token taken out.
 
 Frame snapshots taken from the call's diagnostics overlay land in logs/snapshots/.
-Help > "Open diagnostics folder" (also in the tray menu) opens the folder; Ctrl+Shift+D in a call
+Help > "Open diagnostics folder" (also in the tray menu) opens the folder; Ctrl+Alt+D in a call
 toggles the overlay; ../../../../tools/diag-summary.py turns one or more logs into verdicts.
 
 Windows build from Linux

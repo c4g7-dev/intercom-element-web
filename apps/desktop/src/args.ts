@@ -147,6 +147,15 @@ export function getArgs(protocolHandler: ProtocolHandler): Args {
                 `                         The INTERCOM_NO_HW_VIDEO=1 environment variable does the same.`,
         );
         console.log("  --hw-video-zero-copy: Linux: also enable zero-copy hardware video decode (experimental).");
+        console.log(
+            `  --toggle-mute, --mute, --unmute, --toggle-deafen, --toggle-camera, --leave-call:\n` +
+                `                         Act on the call of the InterCom that is already running, and exit. For\n` +
+                `                         global shortcuts, bind them in the compositor or desktop.`,
+        );
+        console.log("  --no-global-shortcuts: Windows: do not take Ctrl+Shift+M and Ctrl+Shift+D while in a call.");
+        console.log(
+            "  --global-shortcuts-portal: Linux: ask the XDG GlobalShortcuts portal for the same (experimental).",
+        );
         console.log("  --help:               Displays this help message.");
         console.log("And more such as --proxy, see: https://electronjs.org/docs/api/command-line-switches");
         app.exit();

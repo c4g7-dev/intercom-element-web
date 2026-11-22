@@ -95,9 +95,14 @@ export function getEnabledFeatures(
     argv: string[] = process.argv,
     env: NodeJS.ProcessEnv = process.env,
 ): string[] {
-    if (platform !== "linux" || isHwVideoDisabled(argv, env)) return [];
-    const features = [...LINUX_HW_VIDEO_FEATURES];
-    if (argv.includes("--hw-video-zero-copy")) features.push(LINUX_HW_VIDEO_ZERO_COPY_FEATURE);
+    if (platform !== "linux") return [];
+    const features: string[] = [];
+    if (!isHwVideoDisabled(argv, env)) {
+        features.push(...LINUX_HW_VIDEO_FEATURES);
+        if (argv.includes("--hw-video-zero-copy")) features.push(LINUX_HW_VIDEO_ZERO_COPY_FEATURE);
+    }
+    // Opt-in: lets globalShortcut go through the XDG GlobalShortcuts portal on Wayland (see intercom-call-actions.ts)
+    if (argv.includes("--global-shortcuts-portal")) features.push("GlobalShortcutsPortal");
     return features;
 }
 
