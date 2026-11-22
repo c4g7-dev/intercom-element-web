@@ -133,6 +133,21 @@ declare global {
         getSettingValue(settingName: string): Promise<any>;
         // X.509 hardware key IPC
         x509?: X509Api;
+        // InterCom: screen share audio from a PipeWire/PulseAudio sink (Linux desktop only)
+        intercomShareAudio?: {
+            listSinks(): Promise<{
+                supported: boolean;
+                sinks: {
+                    name: string;
+                    description: string;
+                    apps: string[];
+                    ownPlayback: boolean;
+                    source?: string;
+                }[];
+            }>;
+            prepareShareSource(sinkName: string): Promise<{ sourceName: string; description: string; reused: boolean }>;
+            releaseShareSource(sinkName?: string): Promise<void>;
+        };
     }
 
     interface DesktopCapturerSource {
