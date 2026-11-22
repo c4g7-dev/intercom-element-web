@@ -5,7 +5,8 @@
 # Needs pnpm 12 (see devEngines in the root package.json). Heavy steps run one at a time.
 #
 #   INTERCOM_DIST_DIR=dist-next   build beside a running app instead of replacing dist/
-#   INTERCOM_TARGET=win           cross-build the Windows x64 installer (needs wine), see README
+#   INTERCOM_TARGET=win           build the Windows x64 installer: on Windows (Git Bash), or from
+#                                 Linux with wine, see README
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=6144}"

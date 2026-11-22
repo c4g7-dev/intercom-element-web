@@ -100,6 +100,8 @@ INTERCOM_TARGET=win intercom/build.sh --skip-web builds dist-win/InterCom-Setup-
 per user, x64) and dist-win/win-unpacked. It needs wine on the PATH, for the executable's icon
 and version details and for NSIS to write its uninstaller; unset DISPLAY and WAYLAND_DISPLAY to
 keep wine off the desktop, and set WINEPREFIX to keep it out of ~/.wine.
+On Windows itself (Git Bash) the same command needs no wine; the release workflow of the InterCom
+repository builds the installer that way.
 
 - It is not code signed, so SmartScreen warns on first start.
 - The seshat search index is included when its Windows prebuilt is installed, which pnpm leaves

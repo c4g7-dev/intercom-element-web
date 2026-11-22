@@ -260,11 +260,13 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
 };
 
 /**
- * InterCom: a Windows build made on another system (INTERCOM_TARGET=win intercom/build.sh, with wine).
- * Nothing can be compiled for Windows there, so native modules are taken as they come prebuilt
- * (seshat) or left out (the optional PKCS#11 pair, which the app does without).
+ * InterCom: the Windows installer (INTERCOM_TARGET=win intercom/build.sh): NSIS, per user. It is made
+ * on Windows by the release workflow, or on another system with wine. Nothing can be compiled for
+ * Windows on another system, and the two builds are to hold the same files, so in both cases native
+ * modules are taken as they come prebuilt (seshat) or left out (the optional PKCS#11 pair, which
+ * the app does without).
  */
-if (process.env.INTERCOM_TARGET === "win" && os.platform() !== "win32") {
+if (process.env.INTERCOM_TARGET === "win") {
     config.npmRebuild = false;
     config.files = [...(config.files as string[]), "!node_modules/pkcs11js/**", "!node_modules/graphene-pk11/**"];
     config.nsis = {
