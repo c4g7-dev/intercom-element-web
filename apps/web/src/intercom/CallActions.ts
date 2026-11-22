@@ -1,0 +1,96 @@
+/*
+Copyright 2026 The InterCom contributors
+
+SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+Please see LICENSE files in the repository root for full details.
+*/
+
+import { logger } from "matrix-js-sdk/src/logger";
+
+import { CallStore } from "../stores/CallStore";
+import { WidgetMessagingStore } from "../stores/widgets/WidgetMessagingStore";
+import WidgetUtils from "../utils/WidgetUtils";
+
+/**
+ * What a shortcut can ask of the call that is on: from the keyboard while the window has the
+ * focus, and from the desktop app while it has not (a global shortcut, or `intercom --toggle-mute`
+ * run by the compositor's key binding).
+ */
+export type CallAction = "toggle-mute" | "mute" | "unmute" | "toggle-deafen" | "toggle-camera" | "leave-call";
+
+const CALL_ACTIONS = new Set<string>(["toggle-mute", "mute", "unmute", "toggle-deafen", "toggle-camera", "leave-call"]);
+
+export function isCallAction(value: unknown): value is CallAction {
+    return typeof value === "string" && CALL_ACTIONS.has(value);
+}
+
+/** The widget action Element Call (InterCom build) carries the call actions out on. */
+export const CALL_ACTION_WIDGET_ACTION = "io.intercom.call_action";
+
+/** The shortcut a key press is while a call is on: Ctrl+Shift+M, D or V. */
+export function callActionForKey(
+    ev: Pick<KeyboardEvent, "key" | "ctrlKey" | "shiftKey" | "altKey" | "metaKey">,
+): CallAction | undefined {
+    if (!ev.ctrlKey || !ev.shiftKey || ev.altKey || ev.metaKey) return undefined;
+    switch (ev.key.toLowerCase()) {
+        case "m":
+            return "toggle-mute";
+        case "d":
+            return "toggle-deafen";
+        case "v":
+            return "toggle-camera";
+        default:
+            return undefined;
+    }
+}
+
+/**
+ * Carry a call action out on every call the user is in (which is one, as a rule).
+ * @returns how many calls it was passed to; 0 where there is no call, which is not an error
+ */
+export async function performCallAction(action: unknown, source: string): Promise<number> {
+    if (!isCallAction(action)) {
+        logger.warn(`Ignoring unknown call action from ${source}`);
+        return 0;
+    }
+    let reached = 0;
+    for (const call of CallStore.instance.connectedCalls) {
+        try {
+            if (action === "leave-call") {
+                await call.disconnect();
+            } else {
+                const messaging = WidgetMessagingStore.instance.getMessagingForUid(
+                    WidgetUtils.getWidgetUid(call.widget),
+                );
+                if (!messaging?.widgetApi) continue;
+                await messaging.widgetApi.transport.send(CALL_ACTION_WIDGET_ACTION, { action });
+            }
+            reached++;
+        } catch (e) {
+            // A call widget that does not know the action (not the InterCom build) says so
+            logger.warn(`Call action ${action} from ${source} failed`, e);
+        }
+    }
+    // The desktop app writes the console's diagnostics lines to its log
+    logger.log(`[intercom-diag] ${JSON.stringify({ type: "call_action_host", action, source, calls: reached })}`);
+    return reached;
+}
+
+/**
+ * Listen for the call shortcuts on the app's own page. The call's frame listens for the same keys
+ * itself, as key presses inside a frame do not come by here.
+ * @returns what removes the listener again
+ */
+export function installCallShortcuts(target: Document = document): () => void {
+    const onKeyDown = (ev: KeyboardEvent): void => {
+        const action = callActionForKey(ev);
+        // Outside a call the keys are whatever they are otherwise (Ctrl+Shift+D: the space panel)
+        if (action === undefined || CallStore.instance.connectedCalls.size === 0) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (!ev.repeat) void performCallAction(action, "keyboard");
+    };
+    // Captured, so that it is ours before the app's own key bindings see it
+    target.addEventListener("keydown", onKeyDown, true);
+    return () => target.removeEventListener("keydown", onKeyDown, true);
+}

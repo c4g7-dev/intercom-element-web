@@ -41,6 +41,7 @@ import { avatarUrlForRoom, getInitialLetter } from "../../Avatar";
 import DesktopCapturerSourcePicker from "../../components/views/elements/DesktopCapturerSourcePicker";
 import { MatrixClientPeg } from "../../MatrixClientPeg";
 import { SeshatIndexManager } from "./SeshatIndexManager";
+import { installCallShortcuts, performCallAction } from "../../intercom/CallActions";
 import { IPCManager } from "./IPCManager";
 import { _t } from "../../languageHandler";
 import { BadgeOverlayRenderer } from "../../favicon";
@@ -180,6 +181,13 @@ export default class ElectronPlatform extends BasePlatform {
                 priority: 99,
             });
         });
+
+        // InterCom: mute, deafen, camera and leave, from a global shortcut or from `intercom --toggle-mute`
+        // run by a key binding of the compositor, and from the keyboard while the window has the focus
+        this.electron.on("intercomCallAction", (ev, action) => {
+            void performCallAction(action, "desktop");
+        });
+        installCallShortcuts();
 
         this.electron.on("openDesktopCapturerSourcePicker", async () => {
             const { finished } = Modal.createDialog(DesktopCapturerSourcePicker);
