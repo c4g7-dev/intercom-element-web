@@ -70,6 +70,29 @@ Please see LICENSE files in the repository root for full details.
     overflow: hidden;
 }
 
+/*
+ * The side panel with the logo shows the card's own background. Upstream makes that a blurred copy
+ * of the page background under a translucent wash, and the custom themes inherit the light wash
+ * (white at 59 %) whether they are dark or not: a grey panel in InterCom Dark. A flat surface in
+ * the theme's panel colour instead, no blur, and a hairline around the card.
+ */
+:root:root .mx_AuthPage_modal_withBlur {
+    border: var(--cpd-border-width-1) solid var(--roomlist-separator-color, var(--cpd-color-gray-400));
+}
+
+:root:root .mx_AuthPage_modal_withBlur .mx_AuthPage_modalBlur {
+    display: none;
+}
+
+:root:root .mx_AuthPage_modal_withBlur .mx_AuthPage_modalContent {
+    background-color: var(--roomlist-background-color, var(--cpd-color-bg-subtle-secondary));
+}
+
+/* The card clips its corners, the form inside does not round its own */
+:root:root .mx_AuthPage_modal_withBlur .mx_AuthBody {
+    border-radius: 0;
+}
+
 /* Inputs follow the same radius as the surfaces around them */
 :root:root .mx_Field,
 :root:root .mx_Field input,
