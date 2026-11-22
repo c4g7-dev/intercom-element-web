@@ -48,6 +48,63 @@ if (process.env.SENTRY_DSN) {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * A stand-in for a directory of the build machine, exactly as long as the directory's own path,
+ * so that nothing moves in a bundle whose source map is already written: `/app` and as many
+ * `/.` as it takes, which a URL parser folds away again.
+ */
+function anonymousPath(directory: string): string {
+    for (const base of ["/app", "/apps"]) {
+        const padding = directory.length - base.length;
+        if (padding >= 0 && padding % 2 === 0) return base + "/.".repeat(padding / 2);
+    }
+    return "/app";
+}
+
+/**
+ * webpack writes `import.meta.url` into a bundle as the `file://` URL of the module on the
+ * machine that built it, which says where the build was made and by which user. Nothing reads
+ * more of those URLs than their end (they are bases for URLs that are absolute anyway, or tested
+ * for being http), so the directories given are replaced in every script that is emitted.
+ */
+class AnonymiseBuildPathsPlugin {
+    private readonly replacements: [string, string][];
+
+    public constructor(directories: string[]) {
+        this.replacements = [...directories]
+            // The longest first, so that a directory is not replaced by way of its parent
+            .sort((a, b) => b.length - a.length)
+            .map((directory): [string, string] => [directory, anonymousPath(directory)]);
+    }
+
+    public apply(compiler: webpack.Compiler): void {
+        compiler.hooks.thisCompilation.tap("AnonymiseBuildPathsPlugin", (compilation) => {
+            compilation.hooks.processAssets.tap(
+                {
+                    name: "AnonymiseBuildPathsPlugin",
+                    // After minifying and after the source maps were written, before the hashes of
+                    // the contents are taken
+                    stage: webpack.Compilation.PROCESS_ASSETS_STAGE_OPTIMIZE_INLINE,
+                },
+                (assets) => {
+                    for (const name of Object.keys(assets)) {
+                        if (!/\.(js|mjs|css|html)$/.test(name)) continue;
+                        const source = assets[name].source();
+                        const before = typeof source === "string" ? source : source.toString("utf8");
+                        let after = before;
+                        for (const [directory, replacement] of this.replacements) {
+                            after = after.replaceAll(directory, replacement);
+                        }
+                        if (after !== before) {
+                            compilation.updateAsset(name, new webpack.sources.RawSource(after));
+                        }
+                    }
+                },
+            );
+        });
+    }
+}
+
 dotenv.config();
 let ogImageUrl = process.env.RIOT_OG_IMAGE_URL;
 if (!ogImageUrl) ogImageUrl = "https://app.element.io/themes/element/img/logos/opengraph.png";
@@ -603,6 +660,9 @@ export default (env: string, argv: Record<string, any>): webpack.Configuration =
         },
 
         plugins: [
+            // InterCom: no path of the machine that built it in what is shipped
+            new AnonymiseBuildPathsPlugin([path.resolve(__dirname, "../.."), path.resolve(__dirname, "../../..")]),
+
             new I18nWebpackPlugin({
                 stringsPath: "src/i18n/strings/",
                 additionalStringsPaths: ["../../packages/shared-components/src/i18n/strings/"],
