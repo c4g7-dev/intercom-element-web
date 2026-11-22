@@ -5,6 +5,43 @@ InterCom is not affiliated with, endorsed by or supported by Element (New Vector
 "Element" is a trademark of New Vector Ltd and is deliberately not used in the name,
 icon or branding of this build. The upstream licence and copyright notices are kept.
 
-  build.json   electron-builder variant (app id, executable name, protocols)
-  config.json  config baked into webapp.asar (brand, theme, no Element services)
-  icon.svg     source of every icon; regenerate the rasters with gen-icons.sh
+build.json electron-builder variant (app id, executable name, protocols)
+config.json config baked into webapp.asar (brand, theme, no Element services)
+icon.svg source of every icon; regenerate the rasters with gen-icons.sh
+
+Building (Linux)
+----------------
+
+intercom/build.sh web app + webapp.asar + dist/linux-unpacked and a tar.gz
+intercom/build.sh --skip-web reuse the existing apps/web/webapp
+Set WEBPACK_JOBS=<n> to cap the minifier's worker processes when memory is tight.
+
+Profile and environment
+-----------------------
+
+The profile lives in ~/.config/InterCom (never ~/.config/Element). INTERCOM_PROFILE_DIR and
+INTERCOM_DESKTOP_CONFIG_JSON replace Element's ELEMENT_PROFILE_DIR / ELEMENT_DESKTOP_CONFIG_JSON,
+and a ~/.config/InterCom/config.json overrides the bundled config.json (homeserver, theme, ...).
+
+Hardware video on Linux (Electron 44 / Chromium 152)
+----------------------------------------------------
+
+Enabled by default (src/intercom.ts): AcceleratedVideoDecodeLinuxGL, AcceleratedVideoEncoder,
+VaapiOnNvidiaGPUs, VaapiIgnoreDriverChecks. Opt out with --no-hw-video or INTERCOM_NO_HW_VIDEO=1;
+--hw-video-zero-copy additionally enables AcceleratedVideoDecodeLinuxZeroCopyGL.
+
+- Decode goes through VA-API. With NVIDIA this needs nvidia-vaapi-driver, and VaapiOnNvidiaGPUs
+  is what makes Chromium accept it.
+- Encode needs a VA driver with encode entrypoints (Intel, AMD). nvidia-vaapi-driver only
+  decodes and Chromium has no NVENC backend on Linux, so on NVIDIA calls and screen shares are
+  encoded in software whatever the flags.
+- The Wayland screen capturer is PipeWire through xdg-desktop-portal by default; there is no
+  flag for it any more.
+
+Audio
+-----
+
+- WebRtcAllowInputVolumeAdjustment is disabled, so calls never move the system capture volume.
+- Chromium does not list PulseAudio/PipeWire _monitor_ sources as microphones. To feed a sink
+  into a call, expose it as a real source, e.g.
+  pactl load-module module-remap-source master=<sink>.monitor source_name=<name>

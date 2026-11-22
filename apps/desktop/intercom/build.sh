@@ -8,6 +8,8 @@ cd "$(dirname "$0")/.."
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=6144}"
 
 if [[ "${1:-}" != "--skip-web" ]]; then
+    # webpack does not clean its output, stale bundles would end up in the asar
+    rm -rf ../web/webapp
     (cd ../web && pnpm exec nx run-many -t build -p element-web --parallel=1)
 fi
 
