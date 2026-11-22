@@ -16,8 +16,8 @@ intercom/build.sh web app + webapp.asar + dist/linux-unpacked and a tar.gz
 intercom/build.sh --skip-web reuse the existing apps/web/webapp
 Set WEBPACK_JOBS=<n> to cap the minifier's worker processes when memory is tight.
 
-INTERCOM_DIST_DIR=dist-next intercom/build.sh    build beside dist/ while the app in dist/ is running
-INTERCOM_TARGET=win intercom/build.sh            Windows x64 installer into dist-win/, from Linux (see below)
+INTERCOM_DIST_DIR=dist-next intercom/build.sh build beside dist/ while the app in dist/ is running
+INTERCOM_TARGET=win intercom/build.sh Windows x64 installer into dist-win/, from Linux (see below)
 
 Profile and environment
 -----------------------
@@ -55,11 +55,13 @@ Diagnostics
 Every run writes <profile>/logs/diag-YYYYMMDD-HHMMSS.jsonl (~/.config/InterCom/logs on Linux,
 %APPDATA%\InterCom\logs on Windows): one JSON record per line, 200 MB in total, oldest deleted
 first. It holds
+
 - an app_start record (versions, OS, Wayland/X11, feature switches, GPU feature status),
 - every console line of every frame of every window that starts with "[intercom-diag] ", which
   is how Element Call reports the statistics of every track every 2 s and what happens in a call
   (src/intercom-diagnostics.ts here, src/diagnostics/ in element-call),
 - console warnings and errors of all frames, with anything that looks like a token taken out.
+
 Frame snapshots taken from the call's diagnostics overlay land in logs/snapshots/.
 Help > "Open diagnostics folder" (also in the tray menu) opens the folder; Ctrl+Shift+D in a call
 toggles the overlay; ../../../../tools/diag-summary.py turns one or more logs into verdicts.
@@ -69,5 +71,5 @@ Windows build from Linux
 
 INTERCOM_TARGET=win intercom/build.sh --skip-web builds dist-win/InterCom Setup <version>.exe
 (NSIS, x64) with wine. It is not code signed, so SmartScreen warns on first start. The seshat
-search index is included when its Windows prebuilt (@matrix-org/seshat-win32-x64-msvc) is
+search index is included when its Windows prebuilt (@matrix-org/seshat-win32-x64) is
 installed; without it the app runs but cannot search encrypted rooms.
