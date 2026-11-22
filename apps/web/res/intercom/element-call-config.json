@@ -1,0 +1,5 @@
+{
+    "media_quality": {
+        "server_egress_budget_mbps": 400
+    }
+}

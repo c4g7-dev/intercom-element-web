@@ -139,6 +139,8 @@ allowedDeprecatedVersions:
     react-beautiful-dnd: "13"
 
 overrides:
+    # InterCom: the patched Element Call build from the sibling element-call checkout
+    "@element-hq/element-call-embedded": link:../element-call/embedded/web
     pretty-format@30>react-is: 19.3.0
     "@types/react": "catalog:"
     "@types/react-dom": "catalog:"

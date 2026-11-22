@@ -81,6 +81,8 @@ export default (env: string, argv: Record<string, any>): webpack.Configuration =
     const nodeEnv = argv.mode;
     const devMode = nodeEnv !== "production";
     const enableMinification = !devMode && !process.env.CI_PACKAGE;
+    // InterCom: WEBPACK_JOBS caps the minifier workers (one per core otherwise), for machines short on memory
+    const minimizerJobs = process.env.WEBPACK_JOBS ? Number(process.env.WEBPACK_JOBS) : true;
 
     let VERSION = process.env.VERSION;
     if (!VERSION) {
@@ -181,6 +183,7 @@ export default (env: string, argv: Record<string, any>): webpack.Configuration =
             minimizer: enableMinification
                 ? [
                       new TerserPlugin({
+                          parallel: minimizerJobs,
                           exclude: [
                               // Already minified and includes an auto-generated license comment
                               // that the plugin would otherwise pointlessly extract into a separate
@@ -192,7 +195,7 @@ export default (env: string, argv: Record<string, any>): webpack.Configuration =
                               "widgets/element-call/",
                           ],
                       }),
-                      new CssMinimizerPlugin(),
+                      new CssMinimizerPlugin({ parallel: minimizerJobs }),
                   ]
                 : [],
 
@@ -717,6 +720,27 @@ export default (env: string, argv: Record<string, any>): webpack.Configuration =
                         from: "**",
                         context: path.join(getPackageRoot("@element-hq/element-call-embedded"), "dist"),
                         to: path.join(__dirname, "webapp", "widgets", "element-call"),
+                    },
+                    // InterCom: Element Call's own config.json, read by the widget from next to its index.html.
+                    // Our keys are merged over the one the Element Call package ships, if it ships one.
+                    {
+                        from: "res/intercom/element-call-config.json",
+                        to: path.join(__dirname, "webapp", "widgets", "element-call", "config.json"),
+                        force: true,
+                        transform: (content: Buffer): string => {
+                            const shipped = path.join(
+                                getPackageRoot("@element-hq/element-call-embedded"),
+                                "dist",
+                                "config.json",
+                            );
+                            const base = fs.existsSync(shipped) ? JSON.parse(fs.readFileSync(shipped, "utf8")) : {};
+                            const ours = JSON.parse(content.toString("utf8"));
+                            return JSON.stringify(
+                                { ...base, ...ours, media_quality: { ...base.media_quality, ...ours.media_quality } },
+                                null,
+                                4,
+                            );
+                        },
                     },
                     // Mobile guide assets
                     {

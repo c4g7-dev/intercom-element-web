@@ -243,6 +243,7 @@ catalogs:
       version: 6.0.2
 
 overrides:
+  '@element-hq/element-call-embedded': link:../element-call/embedded/web
   pretty-format@30>react-is: 19.3.0
   '@types/react': ^19.2.10
   '@types/react-dom': ^19.2.3
@@ -319,7 +320,7 @@ importers:
         version: 3.30.0
       eslint-plugin-element-call:
         specifier: github:element-hq/element-call#main&path:/eslint
-        version: https://codeload.github.com/element-hq/element-call/tar.gz/d46840ce81a0cae922f47765399d4afa995a9439#path:/eslint
+        version: https://codeload.github.com/element-hq/element-call/tar.gz/b480f7ebb4e91f52394a551681f0f0612efd7729#path:/eslint
       eslint-plugin-element-web:
         specifier: workspace:*
         version: link:packages/eslint-plugin-element-web
@@ -744,8 +745,8 @@ importers:
         specifier: ^7.12.7
         version: 7.29.7(@babel/core@7.29.7)(supports-color@10.2.2)
       '@element-hq/element-call-embedded':
-        specifier: 0.28.2
-        version: 0.28.2
+        specifier: link:../../../element-call/embedded/web
+        version: link:../../../element-call/embedded/web
       '@element-hq/element-web-playwright-common':
         specifier: workspace:*
         version: link:../../packages/playwright-common
@@ -2819,9 +2820,6 @@ packages:
       matrix-js-sdk: '*'
       react: ^19
       react-dom: ^19
-
-  '@element-hq/element-call-embedded@0.28.2':
-    resolution: {integrity: sha512-Ua6BG0ZQJ4yrv98mI9XIWpaHvRHAlAIb3ZyXgmWTJoaBRHA/zBpFSmpaJKL4IlQZeWw84YwI02m8GJK4jUbWSg==}
 
   '@emnapi/core@1.11.0':
     resolution: {integrity: sha512-l9Oo58x0HOP5znGzVhYW9U3e5wVuA4LAZU2AGezTmkhO1CgQRFDhDg4nneHsu/t3WniXg9QrG2nIXL/ZS8ln8Q==}
@@ -8599,8 +8597,8 @@ packages:
     resolution: {integrity: sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==}
     engines: {node: '>=12'}
 
-  eslint-plugin-element-call@https://codeload.github.com/element-hq/element-call/tar.gz/d46840ce81a0cae922f47765399d4afa995a9439#path:/eslint:
-    resolution: {gitHosted: true, integrity: sha512-aVgpBbZH/mxMp2DA0sOTlEa0Pu6lwxqlaYYlp38ZYLJQM7FEtPXfWclvjmas8jJDLgFoaA9gSkXrFVPzKaq6gg==, path: /eslint, tarball: https://codeload.github.com/element-hq/element-call/tar.gz/d46840ce81a0cae922f47765399d4afa995a9439}
+  eslint-plugin-element-call@https://codeload.github.com/element-hq/element-call/tar.gz/b480f7ebb4e91f52394a551681f0f0612efd7729#path:/eslint:
+    resolution: {gitHosted: true, integrity: sha512-wJppVWVOx4sGKbDJZrnMzuQdmlS4mw814AjP/Uf73LqSyQBJrHrqAvQQ2KEk1rfpU2hmKngwzvWO857QEgDcXQ==, path: /eslint, tarball: https://codeload.github.com/element-hq/element-call/tar.gz/b480f7ebb4e91f52394a551681f0f0612efd7729}
     version: 0.0.0
 
   eslint-plugin-react-web-api@5.28.0:
@@ -15164,8 +15162,6 @@ snapshots:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
-  '@element-hq/element-call-embedded@0.28.2': {}
-
   '@emnapi/core@1.11.0':
     dependencies:
       '@emnapi/wasi-threads': 1.2.2
@@ -20850,7 +20846,7 @@ snapshots:
 
   escape-string-regexp@5.0.0: {}
 
-  eslint-plugin-element-call@https://codeload.github.com/element-hq/element-call/tar.gz/d46840ce81a0cae922f47765399d4afa995a9439#path:/eslint: {}
+  eslint-plugin-element-call@https://codeload.github.com/element-hq/element-call/tar.gz/b480f7ebb4e91f52394a551681f0f0612efd7729#path:/eslint: {}
 
   eslint-plugin-react-web-api@5.28.0(@typescript/typescript6@6.0.2)(eslint@10.12.0)(supports-color@7.2.0):
     dependencies:
