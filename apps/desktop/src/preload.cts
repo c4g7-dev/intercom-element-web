@@ -88,4 +88,13 @@ contextBridge.exposeInMainWorld("electron", {
         signData: (serialNumber: string, data: Uint8Array) =>
             ipcRenderer.invoke("x509", "signData", serialNumber, data),
     } satisfies X509Api,
+
+    // InterCom: screen share audio from a PipeWire/PulseAudio sink (Linux), see intercom-share-audio.ts
+    intercomShareAudio: {
+        listSinks: () => ipcRenderer.invoke("intercomShareAudio", "listSinks"),
+        prepareShareSource: (sinkName: string) =>
+            ipcRenderer.invoke("intercomShareAudio", "prepareShareSource", sinkName),
+        releaseShareSource: (sinkName?: string) =>
+            ipcRenderer.invoke("intercomShareAudio", "releaseShareSource", sinkName),
+    },
 });

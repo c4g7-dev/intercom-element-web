@@ -51,6 +51,7 @@ import { getArgs } from "./args.js";
 import { type ConfigOptions, loadConfig } from "./config.js";
 import { configureChromium, grantDisplayMedia, WINDOW_BACKGROUND } from "./intercom.js";
 import { initDiagnostics, labelDiagnosticsWindow, logDiagnostics } from "./intercom-diagnostics.js";
+import { initShareAudio } from "./intercom-share-audio.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -250,6 +251,8 @@ app.on("ready", async () => {
 
     // InterCom: from here on every window's diagnostics lines, warnings and errors go to <userData>/logs
     initDiagnostics();
+    // InterCom: lets a screen share take its audio from a PipeWire/PulseAudio sink (Linux)
+    initShareAudio();
 
     console.debug("Opening main window");
     const preloadScript = path.normalize(`${__dirname}/preload.cjs`);

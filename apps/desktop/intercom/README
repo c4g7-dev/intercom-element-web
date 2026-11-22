@@ -45,9 +45,17 @@ Audio
 -----
 
 - WebRtcAllowInputVolumeAdjustment is disabled, so calls never move the system capture volume.
-- Chromium does not list PulseAudio/PipeWire _monitor_ sources as microphones. To feed a sink
-  into a call, expose it as a real source, e.g.
-  pactl load-module module-remap-source master=<sink>.monitor source_name=<name>
+- Chromium does not list PulseAudio/PipeWire _monitor_ sources as microphones. To share what plays
+  into a sink, the share dialog lists the sinks ("Apps playing into…", with the applications
+  playing into each) and src/intercom-share-audio.ts makes a real source of the chosen ones:
+  pactl load-module module-remap-source master=<sink>.monitor source_name=intercom-share-<sink>
+  A remap of the same monitor that is already loaded (your own, e.g. from pipewire-pulse.conf.d)
+  is used as it is and never unloaded; what InterCom loaded is unloaded when the source leaves the
+  mix, when the share ends and when the app quits. Needs pactl; without it the section is hidden.
+- Sources described as InterCom-Share-_, InterCom-Screen-_ or "InterCom share: *" are share sources:
+  they are offered for a share's audio and kept out of the microphone list.
+- Element Call reaches this through the widget action io.intercom.share_audio, which Element Web
+  answers for the bundled call widget only (apps/web/src/intercom/ShareAudioBridge.ts).
 
 Diagnostics
 -----------
