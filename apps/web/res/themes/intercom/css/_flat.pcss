@@ -1,0 +1,83 @@
+/*
+Copyright 2026 The InterCom contributors
+
+SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+Please see LICENSE files in the repository root for full details.
+*/
+
+/*
+ * InterCom's flat layer. Imported last by the light, dark and custom theme entrypoints, so it
+ * applies whichever theme is selected; the colours themselves come from the "InterCom Dark" and
+ * "InterCom Light" custom themes in the bundled config.json.
+ *
+ * It only restyles surfaces: no drop shadows, one border, three radii. Nothing here changes layout
+ * or component structure, so it can be deleted without consequence.
+ *
+ * `:root:root` raises specificity above the nested upstream rules it replaces (for instance
+ * `.mx_BaseCard .mx_ContextualMenu`) without resorting to `!important`.
+ */
+
+:root {
+    --ic-radius-sm: 6px;
+    --ic-radius-md: 10px;
+    --ic-radius-lg: 14px;
+    --ic-surface-border: var(--cpd-border-width-1) solid var(--cpd-color-gray-400);
+
+    /* Message bubbles, images and other message bodies */
+    --MBody-border-radius: var(--ic-radius-md);
+}
+
+/* Floating surfaces: separated from the page by a border rather than by a shadow */
+:root:root .mx_ContextualMenu,
+:root:root .mx_InteractiveTooltip,
+:root:root .mx_Autocomplete,
+:root:root .mx_ToastContainer .mx_Toast_toast,
+:root:root .mx_BeaconStatusTooltip,
+:root:root .mx_DialogOwnBeaconStatus {
+    box-shadow: none;
+    border: var(--ic-surface-border);
+    border-radius: var(--ic-radius-md);
+}
+
+:root:root .mx_Autocomplete {
+    border-bottom: none;
+    border-radius: var(--ic-radius-md) var(--ic-radius-md) 0 0;
+}
+
+:root:root .mx_ToastContainer.mx_ToastContainer_stacked::before {
+    box-shadow: none;
+    border-radius: var(--ic-radius-md);
+}
+
+/* In-page surfaces which carried a decorative shadow */
+:root:root .mx_PinnedMessageBanner,
+:root:root .mx_ReplyPreview,
+:root:root .mx_CompoundDialog_footer,
+:root:root .mx_AuthPage_modal.mx_AuthPage_modal_withBlur,
+:root:root .mx_LegacyCallView.mx_LegacyCallView_pip {
+    box-shadow: none;
+}
+
+:root:root .mx_EncryptionCard {
+    box-shadow: none;
+    border: var(--ic-surface-border);
+    border-radius: var(--ic-radius-lg);
+}
+
+/* Sign-in card */
+:root:root .mx_AuthPage_modal {
+    border-radius: var(--ic-radius-lg);
+    overflow: hidden;
+}
+
+/* Inputs follow the same radius as the surfaces around them */
+:root:root .mx_Field,
+:root:root .mx_Field input,
+:root:root .mx_Field select,
+:root:root .mx_Field textarea {
+    border-radius: var(--ic-radius-md);
+}
+
+:root:root .mx_Dropdown_input {
+    border-radius: var(--ic-radius-md);
+}
