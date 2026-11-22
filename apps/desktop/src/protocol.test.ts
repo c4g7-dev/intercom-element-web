@@ -60,7 +60,7 @@ describe("ProtocolHandler", () => {
             expect(
                 handler.getProfileFromDeeplink([
                     "Element.app",
-                    `element://vector/webapp/?element-desktop-ssoid=${TEST_SESSION_ID}`,
+                    `intercom://vector/webapp/?element-desktop-ssoid=${TEST_SESSION_ID}`,
                 ]),
             ).toBe(USER_DATA_DIR);
         });
@@ -150,7 +150,7 @@ describe("ProtocolHandler", () => {
 
             const args = ["--no-update"];
             expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith(TEST_PROTOCOL, "/bin/element-desktop", args);
-            expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith("element", "/bin/element-desktop", args);
+            expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith("intercom", "/bin/element-desktop", args);
         });
 
         it("should handle deeplink", () => {

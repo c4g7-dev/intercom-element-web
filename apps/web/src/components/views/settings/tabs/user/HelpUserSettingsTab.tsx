@@ -13,6 +13,7 @@ import { type EmptyObject } from "matrix-js-sdk/src/matrix";
 import AccessibleButton from "../../../elements/AccessibleButton";
 import { _t } from "../../../../../languageHandler";
 import SdkConfig from "../../../../../SdkConfig";
+import { isElementBranded } from "../../../../../branding";
 import PlatformPeg from "../../../../../PlatformPeg";
 import UpdateCheckButton from "../../UpdateCheckButton";
 import CopyableText from "../../../elements/CopyableText";
@@ -263,6 +264,22 @@ export default class HelpUserSettingsTab extends React.Component<EmptyObject, IS
                             </CopyableText>
                             {updateButton}
                         </SettingsSubsectionText>
+                        {!isElementBranded() && (
+                            // InterCom: a modified build has to say what it is built from
+                            <SettingsSubsectionText>
+                                {_t(
+                                    "setting|help_about|based_on_element",
+                                    { brand },
+                                    {
+                                        a: (sub) => (
+                                            <ExternalLink href="https://github.com/element-hq/element-web">
+                                                {sub}
+                                            </ExternalLink>
+                                        ),
+                                    },
+                                )}
+                            </SettingsSubsectionText>
+                        )}
                     </SettingsSubsection>
                     {this.renderLegal()}
                     {this.renderCredits()}

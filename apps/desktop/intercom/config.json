@@ -1,0 +1,183 @@
+{
+    "brand": "InterCom",
+    "default_server_config": {
+        "m.homeserver": {
+            "base_url": "https://matrix-client.matrix.org",
+            "server_name": "matrix.org"
+        }
+    },
+    "disable_custom_urls": false,
+    "disable_guests": true,
+    "default_theme": "custom-InterCom Dark",
+    "branding": {
+        "auth_header_logo_url": "themes/intercom/img/logos/intercom-logo.svg",
+        "welcome_background_url": "themes/intercom/img/backgrounds/flat.svg",
+        "logo_link_url": "https://github.com/element-hq/element-web",
+        "auth_footer_links": [
+            {
+                "text": "Based on Element",
+                "url": "https://github.com/element-hq/element-web"
+            }
+        ]
+    },
+    "help_url": "https://github.com/element-hq/element-web/tree/develop/docs",
+    "element_call": {
+        "brand": "InterCom Call"
+    },
+    "desktop_builds": {
+        "available": false,
+        "logo": "vector-icons/1024.png",
+        "url": "https://github.com/element-hq/element-web"
+    },
+    "mobile_builds": {
+        "ios": null,
+        "android": null,
+        "fdroid": null
+    },
+    "show_labs_settings": true,
+    "room_directory": {
+        "servers": ["matrix.org"]
+    },
+    "features": {
+        "feature_video_rooms": true,
+        "feature_element_call_video_rooms": true
+    },
+    "setting_defaults": {
+        "use_system_theme": false,
+        "custom_themes": [
+            {
+                "name": "InterCom Dark",
+                "is_dark": true,
+                "colors": {
+                    "accent-color": "#6875f5",
+                    "primary-color": "#8b96f8",
+                    "warning-color": "#ff5b55",
+                    "sidebar-color": "#0d0f12",
+                    "roomlist-background-color": "#15181d",
+                    "roomlist-text-color": "#ebeef2",
+                    "roomlist-text-secondary-color": "#9199a4",
+                    "roomlist-highlights-color": "#1f232b",
+                    "roomlist-separator-color": "#23272f",
+                    "timeline-background-color": "#111317",
+                    "timeline-text-color": "#ebeef2",
+                    "timeline-text-secondary-color": "#9199a4",
+                    "timeline-highlights-color": "#181b21",
+                    "secondary-hairline-color": "#23272f",
+                    "togglesw-off-color": "#808994",
+                    "room-highlight-color": "#6875f5",
+                    "focus-bg-color": "#23272f",
+                    "menu-selected-color": "#1f232b",
+                    "other-user-pill-bg-color": "#23272f",
+                    "reaction-row-button-selected-bg-color": "#252a5c",
+                    "eventbubble-self-bg": "#252a5c",
+                    "eventbubble-others-bg": "#1c1f26",
+                    "eventbubble-bg-hover": "#181b21",
+                    "accent-color-100": "#12142e",
+                    "accent-color-200": "#171a3a",
+                    "accent-color-300": "#1d2149",
+                    "accent-color-400": "#252a5c",
+                    "accent-color-500": "#2f3573",
+                    "accent-color-600": "#3a418a",
+                    "accent-color-700": "#4650a8",
+                    "accent-color-800": "#5560d6",
+                    "accent-color-900": "#6875f5",
+                    "accent-color-1000": "#7c88f7",
+                    "accent-color-1100": "#909afa",
+                    "accent-color-1200": "#b0b7fb",
+                    "accent-color-1300": "#d3d7fd",
+                    "accent-color-1400": "#e9ebfe"
+                },
+                "compound": {
+                    "--cpd-color-theme-bg": "#111317",
+                    "--cpd-color-text-action-accent": "#7c88f7",
+                    "--cpd-color-text-badge-accent": "#909afa",
+                    "--cpd-color-bg-accent-rest": "#6875f5",
+                    "--cpd-color-bg-accent-hovered": "#7c88f7",
+                    "--cpd-color-bg-accent-pressed": "#909afa",
+                    "--cpd-color-bg-accent-selected": "#6875f52e",
+                    "--cpd-color-bg-accent-subtle": "#171a3a",
+                    "--cpd-color-bg-badge-accent": "#252a5c",
+                    "--cpd-color-border-accent-subtle": "#4650a8",
+                    "--cpd-color-border-accent-primary": "#6875f5",
+                    "--cpd-color-icon-accent-tertiary": "#5560d6",
+                    "--cpd-color-icon-accent-primary": "#6875f5",
+                    "--cpd-color-gradient-action-stop1": "#909afa",
+                    "--cpd-color-gradient-action-stop2": "#6875f5",
+                    "--cpd-color-gradient-action-stop3": "#4650a8",
+                    "--cpd-color-gradient-action-stop4": "#2f3573",
+                    "--cpd-color-gradient-subtle-stop1": "#6875f533",
+                    "--cpd-color-gradient-subtle-stop2": "#6875f526",
+                    "--cpd-color-gradient-subtle-stop3": "#6875f51a",
+                    "--cpd-color-gradient-subtle-stop4": "#6875f50d",
+                    "--cpd-color-gradient-subtle-stop5": "#6875f500"
+                }
+            },
+            {
+                "name": "InterCom Light",
+                "is_dark": false,
+                "colors": {
+                    "accent-color": "#4f5bd5",
+                    "primary-color": "#4450c8",
+                    "warning-color": "#d92d3a",
+                    "sidebar-color": "#eceef2",
+                    "roomlist-background-color": "#f6f7f9",
+                    "roomlist-text-color": "#1b1d22",
+                    "roomlist-text-secondary-color": "#656d77",
+                    "roomlist-highlights-color": "#e9ecf1",
+                    "roomlist-separator-color": "#e1e6ec",
+                    "timeline-background-color": "#ffffff",
+                    "timeline-text-color": "#1b1d22",
+                    "timeline-text-secondary-color": "#656d77",
+                    "timeline-highlights-color": "#f3f5f8",
+                    "secondary-hairline-color": "#e1e6ec",
+                    "togglesw-off-color": "#818a95",
+                    "room-highlight-color": "#4f5bd5",
+                    "focus-bg-color": "#e9ecf1",
+                    "menu-selected-color": "#eceef2",
+                    "other-user-pill-bg-color": "#e9ecf1",
+                    "reaction-row-button-selected-bg-color": "#e4e7ff",
+                    "eventbubble-self-bg": "#e4e7ff",
+                    "eventbubble-others-bg": "#f0f2f5",
+                    "eventbubble-bg-hover": "#f7f9fa",
+                    "accent-color-100": "#f7f8ff",
+                    "accent-color-200": "#eef0ff",
+                    "accent-color-300": "#e4e7ff",
+                    "accent-color-400": "#d5d9fd",
+                    "accent-color-500": "#bfc5f9",
+                    "accent-color-600": "#a9b0f3",
+                    "accent-color-700": "#8e97ec",
+                    "accent-color-800": "#6c77e0",
+                    "accent-color-900": "#4f5bd5",
+                    "accent-color-1000": "#4450c8",
+                    "accent-color-1100": "#3944b0",
+                    "accent-color-1200": "#2d3690",
+                    "accent-color-1300": "#20276b",
+                    "accent-color-1400": "#151a47"
+                },
+                "compound": {
+                    "--cpd-color-text-action-accent": "#4450c8",
+                    "--cpd-color-text-badge-accent": "#3944b0",
+                    "--cpd-color-bg-accent-rest": "#4f5bd5",
+                    "--cpd-color-bg-accent-hovered": "#4450c8",
+                    "--cpd-color-bg-accent-pressed": "#3944b0",
+                    "--cpd-color-bg-accent-selected": "#4f5bd51f",
+                    "--cpd-color-bg-accent-subtle": "#eef0ff",
+                    "--cpd-color-bg-badge-accent": "#d5d9fd",
+                    "--cpd-color-border-accent-subtle": "#8e97ec",
+                    "--cpd-color-border-accent-primary": "#4f5bd5",
+                    "--cpd-color-icon-accent-tertiary": "#6c77e0",
+                    "--cpd-color-icon-accent-primary": "#4f5bd5",
+                    "--cpd-color-gradient-action-stop1": "#3944b0",
+                    "--cpd-color-gradient-action-stop2": "#4f5bd5",
+                    "--cpd-color-gradient-action-stop3": "#8e97ec",
+                    "--cpd-color-gradient-action-stop4": "#bfc5f9",
+                    "--cpd-color-gradient-subtle-stop1": "#4f5bd533",
+                    "--cpd-color-gradient-subtle-stop2": "#4f5bd526",
+                    "--cpd-color-gradient-subtle-stop3": "#4f5bd51a",
+                    "--cpd-color-gradient-subtle-stop4": "#4f5bd50d",
+                    "--cpd-color-gradient-subtle-stop5": "#4f5bd500"
+                }
+            }
+        ]
+    }
+}

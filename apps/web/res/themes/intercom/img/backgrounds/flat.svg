@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <!-- InterCom welcome background: flat colour blocks. Original artwork, CC0. -->
+  <rect width="1920" height="1080" fill="#111317"/>
+  <path d="M0 1080V620l720 460z" fill="#181B21"/>
+  <path d="M1920 0v520L1180 0z" fill="#181B21"/>
+  <circle cx="1560" cy="820" r="260" fill="#4F5BD5" opacity=".18"/>
+  <circle cx="330" cy="250" r="150" fill="#4F5BD5" opacity=".12"/>
+</svg>

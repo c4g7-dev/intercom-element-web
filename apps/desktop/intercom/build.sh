@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Builds InterCom for Linux from this checkout: the web app, webapp.asar with the InterCom config,
+# then the desktop app (unpacked directory + tar.gz) in apps/desktop/dist.
+#
+# Needs pnpm 12 (see devEngines in the root package.json). Heavy steps run one at a time.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=6144}"
+
+if [[ "${1:-}" != "--skip-web" ]]; then
+    (cd ../web && pnpm exec nx run-many -t build -p element-web --parallel=1)
+fi
+
+rm -rf webapp webapp.asar
+cp -r ../web/webapp webapp
+cp intercom/config.json webapp/config.json
+pnpm run asar-webapp
+rm -rf webapp
+
+pnpm exec nx run-many -t build:ts,build:res -p element-desktop --parallel=1
+pnpm exec electron-builder --linux dir tar.gz --x64 --publish never

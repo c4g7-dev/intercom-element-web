@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 1024 1024">
+  <!-- InterCom logo for the auth and home pages. Original artwork, CC0. -->
+  <rect width="1024" height="1024" rx="228" fill="#4F5BD5"/>
+  <path fill="#FFFFFF" d="M296 232h432c61.9 0 112 50.1 112 112v248c0 61.9-50.1 112-112 112H468L330.6 812.9c-18.300 14.500-45.400 1.500-45.400-21.900V703.300C227.800 698 184 649.800 184 592V344c0-61.900 50.100-112 112-112z"/>
+  <g fill="#4F5BD5">
+    <rect x="316" y="424" width="56" height="88" rx="28"/>
+    <rect x="412" y="364" width="56" height="208" rx="28"/>
+    <rect x="508" y="316" width="56" height="304" rx="28"/>
+    <rect x="604" y="380" width="56" height="176" rx="28"/>
+    <rect x="700" y="432" width="56" height="72" rx="28"/>
+  </g>
+</svg>

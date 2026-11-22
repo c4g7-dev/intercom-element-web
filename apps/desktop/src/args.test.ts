@@ -213,9 +213,9 @@ describe("getArgs", () => {
             });
         });
 
-        it("should handle ELEMENT_PROFILE_DIR", () => {
+        it("should handle INTERCOM_PROFILE_DIR", () => {
             vi.spyOn(process, "env", "get").mockReturnValue({
-                ELEMENT_PROFILE_DIR: "/mnt/foo/profile",
+                INTERCOM_PROFILE_DIR: "/mnt/foo/profile",
             });
             const args = run();
             expect(args).toEqual({
@@ -227,10 +227,10 @@ describe("getArgs", () => {
             });
         });
 
-        it("should prefer deeplink over ELEMENT_PROFILE_DIR", () => {
+        it("should prefer deeplink over INTERCOM_PROFILE_DIR", () => {
             vi.spyOn(process, "argv", "get").mockReturnValue(["/path/to/app", "protocol:/#state=foo&code=bar"]);
             vi.spyOn(process, "env", "get").mockReturnValue({
-                ELEMENT_PROFILE_DIR: "/mnt/foo/profile",
+                INTERCOM_PROFILE_DIR: "/mnt/foo/profile",
             });
             const mockProtocolHandler = {
                 getProfileFromDeeplink: vi.fn().mockReturnValue("/path/to/deeplinked-profile"),
@@ -247,9 +247,9 @@ describe("getArgs", () => {
             });
         });
 
-        it("should combine ELEMENT_PROFILE_DIR with '--profile'", () => {
+        it("should combine INTERCOM_PROFILE_DIR with '--profile'", () => {
             vi.spyOn(process, "env", "get").mockReturnValue({
-                ELEMENT_PROFILE_DIR: "/mnt/foo/profile",
+                INTERCOM_PROFILE_DIR: "/mnt/foo/profile",
             });
             const args = run("--profile", "play");
             expect(args).toEqual({
@@ -290,9 +290,9 @@ describe("getArgs", () => {
             });
         });
 
-        it("should handle ELEMENT_DESKTOP_CONFIG_JSON", () => {
+        it("should handle INTERCOM_DESKTOP_CONFIG_JSON", () => {
             vi.spyOn(process, "env", "get").mockReturnValue({
-                ELEMENT_DESKTOP_CONFIG_JSON: "/path/for/config.json",
+                INTERCOM_DESKTOP_CONFIG_JSON: "/path/for/config.json",
             });
             const args = run();
             expect(args).toEqual({
@@ -307,7 +307,7 @@ describe("getArgs", () => {
 
         it("should prefer arg over env", () => {
             vi.spyOn(process, "env", "get").mockReturnValue({
-                ELEMENT_DESKTOP_CONFIG_JSON: "/path/for/config.json",
+                INTERCOM_DESKTOP_CONFIG_JSON: "/path/for/config.json",
             });
             const args = run("--config", "/path/to/config.json");
             expect(args).toEqual({

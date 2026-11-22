@@ -1,0 +1,7 @@
+{
+    "appId": "chat.intercom.desktop",
+    "name": "intercom",
+    "productName": "InterCom",
+    "description": "InterCom: a Matrix client based on Element",
+    "protocols": ["chat.intercom.desktop", "intercom"]
+}

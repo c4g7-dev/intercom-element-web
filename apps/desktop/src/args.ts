@@ -94,7 +94,7 @@ function getUserDataPath(argv: ParsedArgs, protocolHandler: ProtocolHandler): st
         return argv["profile-dir"];
     }
 
-    let newUserDataPath = process.env.ELEMENT_PROFILE_DIR ?? defaultUserDataDir;
+    let newUserDataPath = process.env.INTERCOM_PROFILE_DIR ?? defaultUserDataDir;
     if (argv["profile"]) {
         newUserDataPath += "-" + argv["profile"];
     }
@@ -132,16 +132,21 @@ export function getArgs(protocolHandler: ProtocolHandler): Args {
         console.log(
             `  --profile {name}:     Name of alternate profile to use, allows for running multiple accounts.\n` +
                 `                         Ignored if --profile-dir is specified.\n` +
-                `                         The ELEMENT_PROFILE_DIR environment variable may be used to change the default profile path.\n` +
+                `                         The INTERCOM_PROFILE_DIR environment variable may be used to change the default profile path.\n` +
                 `                         It is overridden by --profile-dir, but can be combined with --profile.`,
         );
         console.log("  --devtools:           Install and use react-devtools and react-perf.");
         console.log(
-            `  --config:             Path to the config.json file. May also be specified via the ELEMENT_DESKTOP_CONFIG_JSON environment variable.\n` +
+            `  --config:             Path to the config.json file. May also be specified via the INTERCOM_DESKTOP_CONFIG_JSON environment variable.\n` +
                 `                         Otherwise use the default user location '${defaultUserDataDir}'`,
         );
         console.log("  --no-update:          Disable automatic updating.");
         console.log("  --hidden:             Start the application hidden in the system tray.");
+        console.log(
+            `  --no-hw-video:        Linux: leave hardware video decode/encode (VA-API) at Chromium's defaults.\n` +
+                `                         The INTERCOM_NO_HW_VIDEO=1 environment variable does the same.`,
+        );
+        console.log("  --hw-video-zero-copy: Linux: also enable zero-copy hardware video decode (experimental).");
         console.log("  --help:               Displays this help message.");
         console.log("And more such as --proxy, see: https://electronjs.org/docs/api/command-line-switches");
         app.exit();
@@ -154,7 +159,7 @@ export function getArgs(protocolHandler: ProtocolHandler): Args {
 
     return {
         userDataPath: getUserDataPath(argv, protocolHandler),
-        localConfigPath: argv["config"] ?? process.env.ELEMENT_DESKTOP_CONFIG_JSON,
+        localConfigPath: argv["config"] ?? process.env.INTERCOM_DESKTOP_CONFIG_JSON,
         storageMode,
         devtools: argv["devtools"] || false,
         // Minimist parses `--no-`-prefixed arguments as booleans with value `false` rather than verbatim.

@@ -1,0 +1,10 @@
+This directory contains the build variant and the bundled config.json for InterCom,
+an unofficial, modified build of Element Desktop / Element Web.
+
+InterCom is not affiliated with, endorsed by or supported by Element (New Vector Ltd).
+"Element" is a trademark of New Vector Ltd and is deliberately not used in the name,
+icon or branding of this build. The upstream licence and copyright notices are kept.
+
+  build.json   electron-builder variant (app id, executable name, protocols)
+  config.json  config baked into webapp.asar (brand, theme, no Element services)
+  icon.svg     source of every icon; regenerate the rasters with gen-icons.sh

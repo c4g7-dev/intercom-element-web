@@ -14,7 +14,8 @@ import { randomUUID } from "node:crypto";
 
 import { type Args, getArgsForProtocolRegistration } from "./args.js";
 
-const LEGACY_PROTOCOL = "element";
+// InterCom: must not claim Element's own `element://` scheme
+const LEGACY_PROTOCOL = "intercom";
 const SEARCH_PARAM = "element-desktop-ssoid";
 const STORE_FILE_NAME = "sso-sessions.json";
 

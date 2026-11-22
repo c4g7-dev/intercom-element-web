@@ -72,7 +72,8 @@ type Writable<T> = NonNullable<
 >;
 
 // Load the default variant as a base configuration
-const DEFAULT_VARIANT = path.join("element.io", "release", "build.json");
+// InterCom: never build with Element's own identity by default
+const DEFAULT_VARIANT = path.join("intercom", "build.json");
 let variant: Variant = JSON.parse(fs.readFileSync(DEFAULT_VARIANT, "utf8"));
 
 /**
@@ -147,6 +148,14 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         executableName: variant.name, // element-desktop or element-desktop-nightly
         // Name the desktop file after desktopName and set its StartupWMClass to match
         syncDesktopName: true,
+        desktop: {
+            entry: {
+                Name: variant.productName,
+                GenericName: "Matrix Client",
+                Comment: variant.description,
+                Keywords: "matrix;chat;call;voip;",
+            },
+        },
     },
     deb: {
         packageCategory: "net",
@@ -163,7 +172,6 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
             "libasound2",
             "libgbm1",
         ],
-        recommends: ["element-io-archive-keyring"],
         fpm: ["--deb-pre-depends", "libc6 (>= 2.35)"],
     },
     mac: {
@@ -174,6 +182,10 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         gatekeeperAssess: true,
         strictVerify: true,
         entitlements: "./build/entitlements.mac.plist",
+        extendInfo: {
+            // InterCom: needed to grant system audio ("loopback") to a screen share on macOS 14.2+
+            NSAudioCaptureUsageDescription: "Share the sound of your computer when you share your screen in a call.",
+        },
         icon: "build/icon.icon",
         mergeASARs: true,
         // The prebuilt seshat binaries are single-arch and present in both halves of the universal build,
