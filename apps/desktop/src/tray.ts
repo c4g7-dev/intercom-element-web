@@ -17,6 +17,7 @@ import { _t } from "./language-helper.js";
 import { getBuildConfig } from "./build-config.js";
 import { getIconPath } from "./icon.js";
 import { getConfig } from "./config.js";
+import { openDiagnosticsFolder } from "./intercom-diagnostics.js";
 
 // This hardcoded uuid is an arbitrary v4 uuid generated on https://www.uuidgenerator.net/version4
 const UUID_NAMESPACE = "9fc9c6a0-9ffe-45c9-9cd7-5639ae38b232";
@@ -118,6 +119,10 @@ export function initApplicationMenu(): void {
         {
             label: _t("action|show_hide"),
             click: toggleWin,
+        },
+        {
+            label: _t("action|open_diagnostics_folder"),
+            click: openDiagnosticsFolder,
         },
         { type: "separator" },
         {

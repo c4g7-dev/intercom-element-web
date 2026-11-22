@@ -8,6 +8,7 @@
         "delete": "Delete",
         "edit": "Edit",
         "minimise": "Minimize",
+        "open_diagnostics_folder": "Open diagnostics folder",
         "paste": "Paste",
         "paste_match_style": "Paste and Match Style",
         "quit": "Quit",

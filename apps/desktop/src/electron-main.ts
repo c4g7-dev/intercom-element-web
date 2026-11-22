@@ -50,6 +50,7 @@ import { getIconPath } from "./icon.js";
 import { getArgs } from "./args.js";
 import { type ConfigOptions, loadConfig } from "./config.js";
 import { configureChromium, grantDisplayMedia, WINDOW_BACKGROUND } from "./intercom.js";
+import { initDiagnostics, labelDiagnosticsWindow, logDiagnostics } from "./intercom-diagnostics.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -247,6 +248,9 @@ app.on("ready", async () => {
         defaultHeight: 768,
     });
 
+    // InterCom: from here on every window's diagnostics lines, warnings and errors go to <userData>/logs
+    initDiagnostics();
+
     console.debug("Opening main window");
     const preloadScript = path.normalize(`${__dirname}/preload.cjs`);
     global.mainWindow = new BrowserWindow({
@@ -274,6 +278,7 @@ app.on("ready", async () => {
         },
     });
 
+    labelDiagnosticsWindow(global.mainWindow.webContents, "main");
     global.mainWindow.setContentProtection(store.get("enableContentProtection"));
 
     try {
@@ -377,8 +382,15 @@ app.on("ready", async () => {
     session.defaultSession.setDisplayMediaRequestHandler(
         (request, callback) => {
             // InterCom: add system audio to the grant where the platform can loop it back (Windows, macOS)
-            const grant = (streams: Electron.Streams): void =>
+            const grant = (streams: Electron.Streams): void => {
+                const id = streams.video && "id" in streams.video ? streams.video.id : "";
+                logDiagnostics("display_media_grant", {
+                    audioRequested: request.audioRequested,
+                    // "screen" or "window"; which one is the user's business
+                    sourceKind: id.split(":")[0] || "none",
+                });
                 grantDisplayMedia(callback, streams.video, request.audioRequested);
+            };
 
             if (process.env.XDG_SESSION_TYPE === "wayland") {
                 if (waylandPickerOpen) {

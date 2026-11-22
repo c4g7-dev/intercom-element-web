@@ -27,6 +27,7 @@ import { _t } from "./language-helper.js";
 import { saveImageToFile } from "./save-image.js";
 import { getConfig } from "./config.js";
 import { getPopoutWindowResponse, POPOUT_FRAME_PREFIX, setupPopoutWindow } from "./intercom.js";
+import { handleSnapshotDownload, labelDiagnosticsWindow } from "./intercom-diagnostics.js";
 
 const MAILTO_PREFIX = "mailto:";
 
@@ -295,7 +296,10 @@ export default (webContents: WebContents): void => {
         return { action: "deny" };
     });
     webContents.on("did-create-window", (window, details) => {
-        if (details.frameName.startsWith(POPOUT_FRAME_PREFIX)) setupPopoutWindow(window);
+        if (details.frameName.startsWith(POPOUT_FRAME_PREFIX)) {
+            setupPopoutWindow(window);
+            labelDiagnosticsWindow(window.webContents, details.frameName);
+        }
     });
 
     webContents.on("will-navigate", (ev: Event, target: string): void => {
@@ -314,6 +318,9 @@ export default (webContents: WebContents): void => {
     });
 
     webContents.session.on("will-download", (event: Event, item: DownloadItem): void => {
+        // InterCom: a frame snapshot from the call's diagnostics goes straight to the diagnostics folder
+        if (handleSnapshotDownload(item)) return;
+
         // Electron only offers "All Files" unless it is told otherwise, so say what this download is
         // before it puts the save dialog up.
         const filters = saveDialogFilters(item.getFilename());

@@ -10,6 +10,7 @@ import { app, shell, Menu, type MenuItem, type MenuItemConstructorOptions } from
 
 import { _t } from "./language-helper.js";
 import { getConfig } from "./config.js";
+import { openDiagnosticsFolder } from "./intercom-diagnostics.js";
 
 const isMac = process.platform === "darwin";
 
@@ -134,6 +135,10 @@ export function buildMenuTemplate(): Menu {
                     click(): void {
                         void shell.openExternal(getConfig().help_url);
                     },
+                },
+                {
+                    label: _t("action|open_diagnostics_folder"),
+                    click: openDiagnosticsFolder,
                 },
             ],
         },

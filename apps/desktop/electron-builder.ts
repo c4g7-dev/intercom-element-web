@@ -206,7 +206,8 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         perMachine: true,
     },
     directories: {
-        output: "dist",
+        // InterCom: a build can go beside the one in use (INTERCOM_DIST_DIR=dist-next) rather than over it
+        output: process.env.INTERCOM_DIST_DIR || "dist",
     },
     protocols: {
         name: variant.productName,
@@ -257,6 +258,21 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         }
     },
 };
+
+/**
+ * InterCom: a Windows build made on another system (INTERCOM_TARGET=win intercom/build.sh, with wine).
+ * Nothing can be compiled for Windows there, so native modules are taken as they come prebuilt
+ * (seshat) or left out (the optional PKCS#11 pair, which the app does without).
+ */
+if (process.env.INTERCOM_TARGET === "win" && os.platform() !== "win32") {
+    config.npmRebuild = false;
+    config.files = [...(config.files as string[]), "!node_modules/pkcs11js/**", "!node_modules/graphene-pk11/**"];
+    config.nsis = {
+        oneClick: true,
+        perMachine: false,
+        artifactName: "${productName}-Setup-${arch}.${ext}",
+    };
+}
 
 /**
  * Allow specifying the version via env var.

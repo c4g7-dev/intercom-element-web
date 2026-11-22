@@ -16,4 +16,5 @@ node_modules/
 yarn-error.log
 .DS_Store
 /playwright-report
-.pnpm-store
+.pnpm-store/dist-next
+/dist-win
