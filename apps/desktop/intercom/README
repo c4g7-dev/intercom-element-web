@@ -69,7 +69,13 @@ toggles the overlay; ../../../../tools/diag-summary.py turns one or more logs in
 Windows build from Linux
 ------------------------
 
-INTERCOM_TARGET=win intercom/build.sh --skip-web builds dist-win/InterCom Setup <version>.exe
-(NSIS, x64) with wine. It is not code signed, so SmartScreen warns on first start. The seshat
-search index is included when its Windows prebuilt (@matrix-org/seshat-win32-x64) is
-installed; without it the app runs but cannot search encrypted rooms.
+INTERCOM_TARGET=win intercom/build.sh --skip-web builds dist-win/InterCom-Setup-x64.exe (NSIS,
+per user, x64) and dist-win/win-unpacked. It needs wine on the PATH, for the executable's icon
+and version details and for NSIS to write its uninstaller; unset DISPLAY and WAYLAND_DISPLAY to
+keep wine off the desktop, and set WINEPREFIX to keep it out of ~/.wine.
+
+- It is not code signed, so SmartScreen warns on first start.
+- The seshat search index is included when its Windows prebuilt is installed, which pnpm leaves
+  out on Linux unless asked: pnpm install --frozen-lockfile --os linux --os win32 --cpu x64
+  --filter element-desktop. Without it the app runs but cannot search encrypted rooms.
+- The optional PKCS#11 modules cannot be compiled for Windows here and are left out.
