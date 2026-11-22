@@ -33,6 +33,7 @@ import { DecryptError, DownloadError } from "../../utils/DecryptFile";
 import { BLURHASH_FIELD, createThumbnail } from "../../utils/image-media";
 import { isMimeTypeAllowed } from "../../utils/blobs";
 import ImageView from "../../components/views/elements/ImageView";
+import { type LightboxNavigation, type LightboxOpener } from "../../intercom/gallery/GalleryContext";
 
 export interface ImageBodyViewModelProps {
     /**
@@ -71,6 +72,10 @@ export interface ImageBodyViewModelProps {
      * Callback invoked when hidden media is revealed.
      */
     setMediaVisible?: (visible: boolean) => void;
+    /**
+     * Where the lightbox finds the pictures beside this one, when it is one of a gallery.
+     */
+    lightboxNavigation?: () => LightboxNavigation | undefined;
 }
 
 interface LoadedImageDimensions {
@@ -97,7 +102,7 @@ interface InternalState {
  */
 export class ImageBodyViewModel
     extends BaseViewModel<ImageBodyViewSnapshot, ImageBodyViewModelProps>
-    implements ImageBodyViewModelInterface
+    implements ImageBodyViewModelInterface, LightboxOpener
 {
     private state: InternalState;
     private blurhashTimeout?: number;
@@ -462,6 +467,16 @@ export class ImageBodyViewModel
             return;
         }
 
+        this.openLightbox();
+    }
+
+    /**
+     * Shows the picture in the lightbox.
+     * @returns false when there is nothing to show (yet): hidden media, or not loaded
+     */
+    public openLightbox(): boolean {
+        if (!this.props.mediaVisible) return false;
+
         const content = this.props.mxEvent.getContent<ImageContent>();
 
         let httpUrl = this.state.contentUrl;
@@ -473,7 +488,7 @@ export class ImageBodyViewModel
         }
 
         if (!httpUrl) {
-            return;
+            return false;
         }
 
         const params: Omit<ComponentProps<typeof ImageView>, "onFinished"> = {
@@ -481,6 +496,7 @@ export class ImageBodyViewModel
             name: content.body && content.body.length > 0 ? content.body : _t("common|attachment"),
             mxEvent: this.props.mxEvent,
             permalinkCreator: this.props.permalinkCreator,
+            navigation: this.props.lightboxNavigation?.(),
         };
 
         if (content.info) {
@@ -500,6 +516,7 @@ export class ImageBodyViewModel
         }
 
         Modal.createDialog(ImageView, params, "mx_Dialog_lightbox", undefined, true);
+        return true;
     }
 
     public onLinkClick = (event: MouseEvent<HTMLAnchorElement>): void => {
@@ -612,6 +629,11 @@ export class ImageBodyViewModel
             this.scheduleBlurhashPlaceholder();
             void this.downloadImage();
         }
+    }
+
+    /** Sets where the lightbox finds the pictures beside this one, when it is one of a gallery. */
+    public setLightboxNavigation(lightboxNavigation?: () => LightboxNavigation | undefined): void {
+        this.props = { ...this.props, lightboxNavigation };
     }
 
     public setPermalinkCreator(permalinkCreator?: RoomPermalinkCreator): void {

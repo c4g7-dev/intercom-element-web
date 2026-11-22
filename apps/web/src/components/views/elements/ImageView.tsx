@@ -12,6 +12,8 @@ import React, { type JSX, createRef, type CSSProperties, useEffect } from "react
 import FocusLock from "react-focus-lock";
 import { type MatrixEvent } from "matrix-js-sdk/src/matrix";
 import {
+    ChevronLeftIcon,
+    ChevronRightIcon,
     CloseIcon,
     DownloadIcon,
     OverflowHorizontalIcon,
@@ -39,6 +41,7 @@ import { getKeyBindingsManager } from "../../../KeyBindingsManager";
 import { presentableTextForFile } from "../../../utils/FileUtils";
 import AccessibleButton from "./AccessibleButton";
 import { useDownloadMedia } from "../../../hooks/useDownloadMedia.ts";
+import { type LightboxNavigation } from "../../../intercom/gallery/GalleryContext";
 import {
     MessageTimestampViewModel,
     type MessageTimestampViewModelProps,
@@ -81,6 +84,11 @@ interface IProps {
         width: number;
         height: number;
     };
+    /**
+     * Set when the image is one of a gallery: the lightbox then has buttons (and the arrow keys)
+     * for the pictures beside it.
+     */
+    navigation?: LightboxNavigation;
     onFinished(): void;
 }
 
@@ -311,6 +319,18 @@ export default class ImageView extends React.Component<IProps, IState> {
                 ev.preventDefault();
                 this.props.onFinished();
                 break;
+            case KeyBindingAction.ArrowLeft:
+            case KeyBindingAction.ArrowRight: {
+                const go =
+                    action === KeyBindingAction.ArrowLeft
+                        ? this.props.navigation?.onPrevious
+                        : this.props.navigation?.onNext;
+                if (!go) break;
+                ev.stopPropagation();
+                ev.preventDefault();
+                this.navigate(go);
+                break;
+            }
             case KeyBindingAction.Save:
                 ev.preventDefault();
                 ev.stopPropagation();
@@ -319,6 +339,27 @@ export default class ImageView extends React.Component<IProps, IState> {
                 }
                 break;
         }
+    };
+
+    /** Closes this lightbox and lets the gallery open the one of another picture. */
+    private navigate(go: () => void): void {
+        this.props.onFinished();
+        go();
+    }
+
+    private onPreviousClick = (): void => {
+        const go = this.props.navigation?.onPrevious;
+        if (go) this.navigate(go);
+    };
+
+    private onNextClick = (): void => {
+        const go = this.props.navigation?.onNext;
+        if (go) this.navigate(go);
+    };
+
+    // The wrapper closes the lightbox on a press, which a press on a button in it is not to do
+    private stopMouseDown = (ev: React.MouseEvent): void => {
+        ev.stopPropagation();
     };
 
     private onRotateCounterClockwiseClick = (): void => {
@@ -520,11 +561,17 @@ export default class ImageView extends React.Component<IProps, IState> {
             );
         }
 
+        const navigation = this.props.navigation;
         let title: JSX.Element | undefined;
         if (this.props.mxEvent?.getContent()) {
             title = (
                 <div className="mx_ImageView_title">
                     {presentableTextForFile(this.props.mxEvent?.getContent(), _t("common|image"), true)}
+                    {navigation && (
+                        <span className="mx_ImageView_position" aria-live="polite">
+                            {_t("lightbox|gallery_position", { index: navigation.index, total: navigation.total })}
+                        </span>
+                    )}
                 </div>
             );
         }
@@ -606,6 +653,26 @@ export default class ImageView extends React.Component<IProps, IState> {
                         draggable={true}
                         onMouseDown={this.onStartMoving}
                     />
+                    {navigation?.onPrevious && (
+                        <AccessibleButton
+                            className="mx_ImageView_button mx_ImageView_nav mx_ImageView_nav_previous"
+                            title={_t("lightbox|previous_image")}
+                            onClick={this.onPreviousClick}
+                            onMouseDown={this.stopMouseDown}
+                        >
+                            <ChevronLeftIcon />
+                        </AccessibleButton>
+                    )}
+                    {navigation?.onNext && (
+                        <AccessibleButton
+                            className="mx_ImageView_button mx_ImageView_nav mx_ImageView_nav_next"
+                            title={_t("lightbox|next_image")}
+                            onClick={this.onNextClick}
+                            onMouseDown={this.stopMouseDown}
+                        >
+                            <ChevronRightIcon />
+                        </AccessibleButton>
+                    )}
                 </div>
             </FocusLock>
         );

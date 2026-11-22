@@ -28,7 +28,6 @@ import {
     type MediaEventInfo,
 } from "matrix-js-sdk/src/types";
 import encrypt from "matrix-encrypt-attachment";
-import extractPngChunks from "png-chunks-extract";
 import { logger } from "matrix-js-sdk/src/logger";
 import { removeElement } from "matrix-js-sdk/src/utils";
 import type { AttachmentSend } from "@matrix-org/analytics-events/types/typescript/AttachmentSend";
@@ -57,9 +56,11 @@ import UploadConfirmDialog from "./components/views/dialogs/UploadConfirmDialog"
 import { createThumbnail } from "./utils/image-media";
 import { attachMentions, attachRelation } from "./utils/messages.ts";
 import { doMaybeLocalRoomAction } from "./utils/local-room";
-import { blobIsAnimated } from "./utils/Image.ts";
+import { blobIsAnimated, mayBeAnimated } from "./utils/Image.ts";
 import { PosthogAnalytics } from "./PosthogAnalytics.ts";
 import { cacheUploadedMedia } from "./utils/UploadedMediaCache";
+import { UploadTrace, type UploadTracePart } from "./intercom/UploadDiagnostics";
+import BatchUploadDialog from "./intercom/gallery/BatchUploadDialog";
 
 // scraped out of a macOS hidpi (5660ppm) screenshot png
 //                  5669 px (x-axis)      , 5669 px (y-axis)      , per metre
@@ -77,62 +78,101 @@ interface IMediaConfig {
     "m.upload.size"?: number;
 }
 
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+// How much of a PNG is read at a time when looking for its pHYs chunk
+const PNG_HEADER_WINDOW = 1 << 16;
+// A PNG has a handful of chunks before its image data; more than this is not a header any more
+const PNG_MAX_HEADER_CHUNKS = 64;
+
+/**
+ * Whether a PNG says that it is a hi-dpi (macOS "retina") screenshot, which is shown at half its
+ * pixel size. Only the chunks before the image data are read, not the file: pHYs always comes
+ * before the first IDAT.
+ */
+export async function isHidpiPng(file: Blob): Promise<boolean> {
+    try {
+        let windowStart = 0;
+        let window = new DataView(await file.slice(0, PNG_HEADER_WINDOW).arrayBuffer());
+        if (window.byteLength < PNG_SIGNATURE.length + 8) return false;
+        if (PNG_SIGNATURE.some((byte, i) => window.getUint8(i) !== byte)) return false;
+
+        let offset = PNG_SIGNATURE.length;
+        for (let i = 0; i < PNG_MAX_HEADER_CHUNKS; i++) {
+            // A chunk is its length, its type, its data and a CRC
+            if (offset + 8 > file.size) return false;
+            if (offset + 8 + PHYS_HIDPI.length > windowStart + window.byteLength) {
+                windowStart = offset;
+                window = new DataView(await file.slice(offset, offset + PNG_HEADER_WINDOW).arrayBuffer());
+                if (window.byteLength < 8) return false;
+            }
+            const at = offset - windowStart;
+            const length = window.getUint32(at);
+            const type = String.fromCharCode(
+                window.getUint8(at + 4),
+                window.getUint8(at + 5),
+                window.getUint8(at + 6),
+                window.getUint8(at + 7),
+            );
+            if (type === "pHYs") {
+                if (length !== PHYS_HIDPI.length || at + 8 + length > window.byteLength) return false;
+                return PHYS_HIDPI.every((val, j) => window.getUint8(at + 8 + j) === val);
+            }
+            if (type === "IDAT" || type === "IEND") return false;
+            offset += 12 + length;
+        }
+    } catch (e) {
+        console.error("Failed to parse PNG", e);
+    }
+    return false;
+}
+
 /**
  * Load a file into a newly created image element.
  *
  * @param {File} imageFile The file to load in an image element.
  * @returns {Promise} A promise that resolves with the html image element.
  */
-async function loadImageElement(imageFile: File): Promise<{
-    width: number;
-    height: number;
-    img: HTMLImageElement;
-}> {
+async function loadImageElement(imageFile: File): Promise<HTMLImageElement> {
     // Load the file into an html element
     const img = new Image();
     const objectUrl = URL.createObjectURL(imageFile);
-    const imgPromise = new Promise((resolve, reject) => {
+    const imgPromise = new Promise<HTMLImageElement>((resolve, reject) => {
         img.onload = function (): void {
             URL.revokeObjectURL(objectUrl);
             resolve(img);
         };
         img.onerror = function (e): void {
+            URL.revokeObjectURL(objectUrl);
             reject(e);
         };
     });
     img.src = objectUrl;
+    return imgPromise;
+}
 
-    // check for hi-dpi PNGs and fudge display resolution as needed.
-    // this is mainly needed for macOS screencaps
-    let parsePromise = Promise.resolve(false);
-    if (imageFile.type === "image/png") {
-        // in practice macOS happens to order the chunks so they fall in
-        // the first 0x1000 bytes (thanks to a massive ICC header).
-        // Thus we could slice the file down to only sniff the first 0x1000
-        // bytes (but this makes extractPngChunks choke on the corrupt file)
-        const headers = imageFile; //.slice(0, 0x1000);
-        parsePromise = readFileAsArrayBuffer(headers)
-            .then((arrayBuffer) => {
-                const buffer = new Uint8Array(arrayBuffer);
-                const chunks = extractPngChunks(buffer);
-                for (const chunk of chunks) {
-                    if (chunk.name === "pHYs") {
-                        if (chunk.data.byteLength !== PHYS_HIDPI.length) return false;
-                        return chunk.data.every((val, i) => val === PHYS_HIDPI[i]);
-                    }
-                }
-                return false;
-            })
-            .catch((e) => {
-                console.error("Failed to parse PNG", e);
-                return false;
-            });
+/**
+ * Decodes an image file to something that can be drawn, with its size.
+ *
+ * The file is decoded off the main thread where the browser can do that (createImageBitmap);
+ * an <img> is the fallback, for SVGs and for browsers without it.
+ */
+async function decodeImage(
+    imageFile: File,
+    trace?: UploadTrace,
+): Promise<{ source: HTMLImageElement | ImageBitmap; width: number; height: number; close: () => void }> {
+    const start = performance.now();
+    if (typeof createImageBitmap === "function" && imageFile.type !== "image/svg+xml") {
+        try {
+            const bitmap = await createImageBitmap(imageFile);
+            trace?.mark("decode", performance.now() - start, { via: "bitmap" });
+            return { source: bitmap, width: bitmap.width, height: bitmap.height, close: () => bitmap.close() };
+        } catch {
+            // Not something createImageBitmap reads; an <img> may still
+        }
     }
-
-    const [hidpi] = await Promise.all([parsePromise, imgPromise]);
-    const width = hidpi ? img.width >> 1 : img.width;
-    const height = hidpi ? img.height >> 1 : img.height;
-    return { width, height, img };
+    const img = await loadImageElement(imageFile);
+    trace?.mark("decode", performance.now() - start, { via: "img" });
+    return { source: img, width: img.width, height: img.height, close: () => undefined };
 }
 
 // Minimum size for image files before we generate a thumbnail for them.
@@ -154,23 +194,53 @@ const ALWAYS_INCLUDE_THUMBNAIL = ["image/avif", "image/webp", "image/svg+xml"];
  * @param {File} imageFile The image to read and thumbnail.
  * @returns {Promise} A promise that resolves with the attachment info.
  */
-async function infoForImageFile(matrixClient: MatrixClient, roomId: string, imageFile: File): Promise<ImageInfo> {
+async function infoForImageFile(
+    matrixClient: MatrixClient,
+    roomId: string,
+    imageFile: File,
+    trace?: UploadTrace,
+): Promise<ImageInfo> {
     let thumbnailType = "image/png";
     if (imageFile.type === "image/jpeg") {
         thumbnailType = "image/jpeg";
     }
 
-    // We don't await this immediately so it can happen in the background
-    const isAnimatedPromise = blobIsAnimated(imageFile);
+    // We don't await these immediately so they can happen in the background.
+    // A type that cannot be animated needs no look into the file.
+    const isAnimatedPromise = mayBeAnimated(imageFile.type)
+        ? (trace?.time("animated_check", () => blobIsAnimated(imageFile)) ?? blobIsAnimated(imageFile))
+        : Promise.resolve(undefined);
+    // check for hi-dpi PNGs and fudge display resolution as needed.
+    // this is mainly needed for macOS screencaps
+    const hidpiPromise =
+        imageFile.type === "image/png"
+            ? (trace?.time("png_header", () => isHidpiPng(imageFile)) ?? isHidpiPng(imageFile))
+            : Promise.resolve(false);
+    // Neither is to fail the upload, or to go unhandled when decoding fails first
+    isAnimatedPromise.catch(() => undefined);
 
-    const imageElement = await loadImageElement(imageFile);
-
-    const result = await createThumbnail(imageElement.img, imageElement.width, imageElement.height, thumbnailType);
+    const decoded = await decodeImage(imageFile, trace);
+    let result: Awaited<ReturnType<typeof createThumbnail>>;
+    try {
+        const hidpi = await hidpiPromise;
+        const width = hidpi ? decoded.width >> 1 : decoded.width;
+        const height = hidpi ? decoded.height >> 1 : decoded.height;
+        result = await createThumbnail(
+            decoded.source,
+            width,
+            height,
+            thumbnailType,
+            true,
+            trace && { trace, prefix: "thumb_" },
+        );
+    } finally {
+        decoded.close();
+    }
     const imageInfo = result.info;
 
-    const isAnimated = await isAnimatedPromise;
+    const isAnimated = await isAnimatedPromise.catch(() => undefined);
     if (isAnimated !== undefined) {
-        imageInfo["org.matrix.msc4230.is_animated"] = await isAnimatedPromise;
+        imageInfo["org.matrix.msc4230.is_animated"] = isAnimated;
     }
 
     // For lesser supported image types, always include the thumbnail even if it is larger
@@ -189,7 +259,14 @@ async function infoForImageFile(matrixClient: MatrixClient, roomId: string, imag
         }
     }
 
-    const uploadResult = await uploadFile(matrixClient, roomId, result.thumbnail);
+    const uploadResult = await uploadFile(
+        matrixClient,
+        roomId,
+        result.thumbnail,
+        undefined,
+        undefined,
+        trace && { trace, prefix: "thumb_" },
+    );
 
     imageInfo["thumbnail_url"] = uploadResult.url;
     imageInfo["thumbnail_file"] = uploadResult.file;
@@ -209,22 +286,18 @@ function loadAudioElement(audioFile: File): Promise<HTMLAudioElement> {
         audio.preload = "metadata";
         audio.muted = true;
 
-        const reader = new FileReader();
-
-        reader.onload = function (ev): void {
-            audio.onloadedmetadata = async function (): Promise<void> {
-                resolve(audio);
-            };
-            audio.onerror = function (e): void {
-                reject(e);
-            };
-
-            audio.src = ev.target?.result as string;
+        // An object URL lets the element read what it needs from the file. A data URL, as used to
+        // be made here, is the whole file in base64 in memory before the first byte is looked at.
+        const objectUrl = URL.createObjectURL(audioFile);
+        audio.onloadedmetadata = async function (): Promise<void> {
+            URL.revokeObjectURL(objectUrl);
+            resolve(audio);
         };
-        reader.onerror = function (e): void {
+        audio.onerror = function (e): void {
+            URL.revokeObjectURL(objectUrl);
             reject(e);
         };
-        reader.readAsDataURL(audioFile);
+        audio.src = objectUrl;
     });
 }
 
@@ -246,7 +319,7 @@ async function infoForAudioFile(audioFile: File): Promise<AudioInfo> {
  * @param {File} videoFile The file to load in a video element.
  * @returns {Promise} A promise that resolves with the video element.
  */
-function loadVideoElement(videoFile: File): Promise<HTMLVideoElement> {
+function loadVideoElement(videoFile: File): Promise<{ video: HTMLVideoElement; release: () => void }> {
     return new Promise((resolve, reject) => {
         // Load the file into a html element
         const video = document.createElement("video");
@@ -254,33 +327,32 @@ function loadVideoElement(videoFile: File): Promise<HTMLVideoElement> {
         video.playsInline = true;
         video.muted = true;
 
-        const reader = new FileReader();
-
-        reader.onload = function (ev): void {
-            // Wait until we have enough data to thumbnail the first frame.
-            video.onloadeddata = async function (): Promise<void> {
-                resolve(video);
-                video.pause();
-            };
-            video.onerror = function (e): void {
-                reject(e);
-            };
-
-            let dataUrl = ev.target?.result as string;
-            // Chrome chokes on quicktime but likes mp4, and `file.type` is
-            // read only, so do this horrible hack to unbreak quicktime
-            if (dataUrl?.startsWith("data:video/quicktime;")) {
-                dataUrl = dataUrl.replace("data:video/quicktime;", "data:video/mp4;");
-            }
-
-            video.src = dataUrl;
-            video.load();
-            void video.play();
+        // Chrome chokes on quicktime but likes mp4, and `file.type` is
+        // read only, so do this horrible hack to unbreak quicktime
+        const source: Blob =
+            videoFile.type === "video/quicktime" ? new Blob([videoFile], { type: "video/mp4" }) : videoFile;
+        // An object URL, not a data URL: the element reads the first frame from the file instead
+        // of the whole video being turned into base64 in memory first.
+        const objectUrl = URL.createObjectURL(source);
+        // The element shows its frame for as long as it has its source, so the URL is given
+        // back by the caller once the thumbnail is drawn.
+        const release = (): void => {
+            URL.revokeObjectURL(objectUrl);
         };
-        reader.onerror = function (e): void {
+
+        // Wait until we have enough data to thumbnail the first frame.
+        video.onloadeddata = async function (): Promise<void> {
+            resolve({ video, release });
+            video.pause();
+        };
+        video.onerror = function (e): void {
+            release();
             reject(e);
         };
-        reader.readAsDataURL(videoFile);
+
+        video.src = objectUrl;
+        video.load();
+        void video.play();
     });
 }
 
@@ -292,24 +364,31 @@ function loadVideoElement(videoFile: File): Promise<HTMLVideoElement> {
  * @param {File} videoFile The video to read and thumbnail.
  * @returns {Promise} A promise that resolves with the attachment info.
  */
-function infoForVideoFile(matrixClient: MatrixClient, roomId: string, videoFile: File): Promise<VideoInfo> {
+async function infoForVideoFile(
+    matrixClient: MatrixClient,
+    roomId: string,
+    videoFile: File,
+    trace?: UploadTrace,
+): Promise<VideoInfo> {
     const thumbnailType = "image/jpeg";
+    const tracePart = trace && { trace, prefix: "thumb_" };
 
     const videoInfo: VideoInfo = {};
-    return loadVideoElement(videoFile)
-        .then((video) => {
-            videoInfo.duration = Math.ceil(video.duration * 1000);
-            return createThumbnail(video, video.videoWidth, video.videoHeight, thumbnailType);
-        })
-        .then((result) => {
-            Object.assign(videoInfo, result.info);
-            return uploadFile(matrixClient, roomId, result.thumbnail);
-        })
-        .then((result) => {
-            videoInfo.thumbnail_url = result.url;
-            videoInfo.thumbnail_file = result.file;
-            return videoInfo;
-        });
+    const loadStart = performance.now();
+    const { video, release } = await loadVideoElement(videoFile);
+    trace?.mark("decode", performance.now() - loadStart, { via: "video" });
+    let result: Awaited<ReturnType<typeof createThumbnail>>;
+    try {
+        videoInfo.duration = Math.ceil(video.duration * 1000);
+        result = await createThumbnail(video, video.videoWidth, video.videoHeight, thumbnailType, true, tracePart);
+    } finally {
+        release();
+    }
+    Object.assign(videoInfo, result.info);
+    const uploaded = await uploadFile(matrixClient, roomId, result.thumbnail, undefined, undefined, tracePart);
+    videoInfo.thumbnail_url = uploaded.url;
+    videoInfo.thumbnail_file = uploaded.file;
+    return videoInfo;
 }
 
 /**
@@ -341,6 +420,7 @@ function readFileAsArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
  * @param {Function?} progressHandler optional callback to be called when a chunk of
  *    data is uploaded.
  * @param {AbortController?} controller optional abortController to use for this upload.
+ * @param tracePart optional diagnostics trace to write the time of each step to.
  * @returns {Promise} A promise that resolves with an object.
  *  If the file is unencrypted then the object will have a "url" key.
  *  If the file is encrypted then the object will have a "file" key.
@@ -351,17 +431,20 @@ export async function uploadFile(
     file: File | Blob,
     progressHandler?: UploadOpts["progressHandler"],
     controller?: AbortController,
+    tracePart?: UploadTracePart,
 ): Promise<{ url?: string; file?: EncryptedFile }> {
     const abortController = controller ?? new AbortController();
+    const timed = <T>(phase: string, fn: () => Promise<T>, extra?: Record<string, number | boolean>): Promise<T> =>
+        tracePart ? tracePart.trace.time(tracePart.prefix + phase, fn, extra) : fn();
 
     // If the room is encrypted then encrypt the file before uploading it.
     if (await matrixClient.getCrypto()?.isEncryptionEnabledInRoom(roomId)) {
         // First read the file into memory.
-        const data = await readFileAsArrayBuffer(file);
+        const data = await timed("read", () => readFileAsArrayBuffer(file));
         if (abortController.signal.aborted) throw new UploadCanceledError();
 
         // Then encrypt the file.
-        const encryptResult = await encrypt.encryptAttachment(data);
+        const encryptResult = await timed("encrypt", () => encrypt.encryptAttachment(data));
         if (abortController.signal.aborted) throw new UploadCanceledError();
 
         // Pass the encrypted data as a Blob to the uploader.
@@ -369,12 +452,17 @@ export async function uploadFile(
 
         let url: string;
         try {
-            ({ content_uri: url } = await matrixClient.uploadContent(blob, {
-                progressHandler,
-                abortController,
-                includeFilename: false,
-                type: "application/octet-stream",
-            }));
+            ({ content_uri: url } = await timed(
+                "http",
+                () =>
+                    matrixClient.uploadContent(blob, {
+                        progressHandler,
+                        abortController,
+                        includeFilename: false,
+                        type: "application/octet-stream",
+                    }),
+                { sent: blob.size, encrypted: true },
+            ));
         } catch (e) {
             if (abortController.signal.aborted) throw new UploadCanceledError();
             console.error("Failed to upload file", e);
@@ -395,7 +483,11 @@ export async function uploadFile(
     } else {
         let url: string;
         try {
-            ({ content_uri: url } = await matrixClient.uploadContent(file, { progressHandler, abortController }));
+            ({ content_uri: url } = await timed(
+                "http",
+                () => matrixClient.uploadContent(file, { progressHandler, abortController }),
+                { sent: file.size, encrypted: false },
+            ));
         } catch (e) {
             if (abortController.signal.aborted) throw new UploadCanceledError();
             console.error("Failed to upload file", e);
@@ -491,6 +583,20 @@ export default class ContentMessages {
         }
 
         let uploadAll = false;
+        // Text sent with the first file, when the files were confirmed as one batch
+        let caption: string | undefined;
+        if (okFiles.length > 1 && okFiles.every((file) => file.type.startsWith("image/"))) {
+            // Several pictures chosen together are asked for once and sent as one batch, one after
+            // the other, so that they arrive as the gallery they were chosen as.
+            const { finished } = Modal.createDialog(BatchUploadDialog, { files: okFiles });
+            const [confirmed, text] = await finished;
+            if (confirmed) {
+                uploadAll = true;
+                caption = text;
+            } else {
+                okFiles.length = 0;
+            }
+        }
         // Promise to complete before sending next file into room, used for synchronisation of file-sending
         // to match the order the files were specified in
         let promBefore: Promise<any> = Promise.resolve();
@@ -523,6 +629,7 @@ export default class ContentMessages {
                         matrixClient,
                         replyToEvent ?? undefined,
                         loopPromiseBefore,
+                        i === 0 ? caption : undefined,
                     ),
                 matrixClient,
             );
@@ -591,10 +698,12 @@ export default class ContentMessages {
         matrixClient: MatrixClient,
         replyToEvent: MatrixEvent | undefined,
         promBefore?: Promise<any>,
+        caption?: string,
     ): Promise<void> {
         const fileName = file.name || _t("common|attachment");
         const content: Omit<MediaEventContent, "info"> & { info: Partial<MediaEventInfo> } = {
-            body: fileName,
+            // With a caption the body is the caption and the file name goes beside it
+            ...(caption ? { body: caption, filename: fileName } : { body: fileName }),
             info: {
                 size: file.size,
             },
@@ -626,11 +735,26 @@ export default class ContentMessages {
             dis.dispatch<UploadProgressPayload>({ action: Action.UploadProgress, upload });
         }
 
+        const trace = new UploadTrace(file.size, file.type || "unknown");
+        let outcome: "sent" | "failed" | "cancelled" = "failed";
+
+        // The file itself goes up while its thumbnail and metadata are being made, rather than
+        // after them: neither needs the other, and for a picture the two requests used to be made
+        // one after the other.
+        // It has an abort controller of its own, so that it can be stopped when the thumbnail fails
+        // without the upload counting as cancelled by the user.
+        const fileAbort = new AbortController();
+        if (upload.cancelled) fileAbort.abort();
+        upload.abortController.signal.addEventListener("abort", () => fileAbort.abort());
+        const fileUpload = uploadFile(matrixClient, roomId, file, onProgress, fileAbort, { trace, prefix: "" });
+        // Looked at below; until then a failure is not to count as unhandled
+        fileUpload.catch(() => undefined);
+
         try {
             if (file.type.startsWith("image/")) {
                 content.msgtype = MsgType.Image;
                 try {
-                    const imageInfo = await infoForImageFile(matrixClient, roomId, file);
+                    const imageInfo = await infoForImageFile(matrixClient, roomId, file, trace);
                     Object.assign(content.info, imageInfo);
                 } catch (e) {
                     if (e instanceof UploadFailedError) {
@@ -644,7 +768,7 @@ export default class ContentMessages {
             } else if (file.type.startsWith("audio/")) {
                 content.msgtype = MsgType.Audio;
                 try {
-                    const audioInfo = await infoForAudioFile(file);
+                    const audioInfo = await trace.time("metadata", () => infoForAudioFile(file));
                     Object.assign(content.info, audioInfo);
                 } catch (e) {
                     // Failed to process audio file, fall back to uploading an m.file
@@ -654,7 +778,7 @@ export default class ContentMessages {
             } else if (file.type.startsWith("video/")) {
                 content.msgtype = MsgType.Video;
                 try {
-                    const videoInfo = await infoForVideoFile(matrixClient, roomId, file);
+                    const videoInfo = await infoForVideoFile(matrixClient, roomId, file, trace);
                     Object.assign(content.info, videoInfo);
                 } catch (e) {
                     // Failed to thumbnail, fall back to uploading an m.file
@@ -666,18 +790,21 @@ export default class ContentMessages {
             }
 
             if (upload.cancelled) throw new UploadCanceledError();
-            const result = await uploadFile(matrixClient, roomId, file, onProgress, upload.abortController);
+            const result = await fileUpload;
             content.file = result.file;
             content.url = result.url;
 
             if (upload.cancelled) throw new UploadCanceledError();
             // Await previous message being sent into the room
-            if (promBefore) await promBefore;
+            if (promBefore) await trace.time("wait_previous", () => promBefore);
 
             if (upload.cancelled) throw new UploadCanceledError();
             const threadId = relation?.rel_type === THREAD_RELATION_TYPE.name ? relation.event_id : null;
 
-            const response = await matrixClient.sendMessage(roomId, threadId ?? null, content as MediaEventContent);
+            const response = await trace.time("send_event", () =>
+                matrixClient.sendMessage(roomId, threadId ?? null, content as MediaEventContent),
+            );
+            outcome = "sent";
 
             if (SettingsStore.getValue("Performance.addSendMessageTimingMetadata")) {
                 sendRoundTripMetric(matrixClient, roomId, response.event_id);
@@ -686,6 +813,9 @@ export default class ContentMessages {
             dis.dispatch<UploadFinishedPayload>({ action: Action.UploadFinished, upload });
             dis.dispatch({ action: "message_sent" });
         } catch (error) {
+            // Whatever of this upload is still on its way is of no use any more
+            if (outcome !== "sent") fileAbort.abort();
+            if (upload.cancelled) outcome = "cancelled";
             // Unwrap UploadFailedError to get the underlying error
             const unwrappedError = error instanceof UploadFailedError && error.cause ? error.cause : error;
 
@@ -709,6 +839,7 @@ export default class ContentMessages {
                 dis.dispatch<UploadErrorPayload>({ action: Action.UploadFailed, upload, error });
             }
         } finally {
+            trace.finish(outcome, { kind: content.msgtype });
             removeElement(this.inprogress, (e) => e.promise === upload.promise);
         }
     }

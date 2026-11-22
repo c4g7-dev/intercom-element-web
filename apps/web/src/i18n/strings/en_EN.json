@@ -1647,6 +1647,9 @@
         "space_rejoin_warning_restricted": "This space is restricted and cannot be rejoined unless you are in one of its authorised spaces or invited."
     },
     "lightbox": {
+        "gallery_position": "%(index)s of %(total)s",
+        "next_image": "Next image",
+        "previous_image": "Previous image",
         "rotate_left": "Rotate Left",
         "rotate_right": "Rotate Right",
         "title": "Image view"
@@ -3428,6 +3431,10 @@
             "error": "Unable to show image due to error",
             "error_decrypting": "Error decrypting image",
             "error_downloading": "Error downloading image",
+            "gallery_label": {
+                "one": "%(count)s image",
+                "other": "%(count)s images"
+            },
             "sent": "%(senderDisplayName)s sent an image.",
             "show_image": "Show image"
         },
@@ -3833,6 +3840,15 @@
     "upload_failed_size": "The file '%(fileName)s' exceeds the size limit for uploads",
     "upload_failed_title": "Upload Failed",
     "upload_file": {
+        "batch_caption_placeholder": "Add a caption (optional)",
+        "batch_summary": {
+            "one": "%(count)s image, %(size)s. Sent as one gallery.",
+            "other": "%(count)s images, %(size)s in total. Sent as one gallery."
+        },
+        "batch_title": {
+            "one": "Upload %(count)s image",
+            "other": "Upload %(count)s images"
+        },
         "cancel_all_button": "Cancel All",
         "error_file_too_large": "This file is <b>too large</b> to upload. The file size limit is %(limit)s but this file is %(sizeOfThisFile)s.",
         "error_files_too_large": "These files are <b>too large</b> to upload. The file size limit is %(limit)s.",
@@ -3979,6 +3995,11 @@
         "hangup": "Hangup",
         "hide_sidebar_button": "Hide sidebar",
         "input_devices": "Input devices",
+        "intercom_split_collapse": "Hide the call",
+        "intercom_split_expand": "Show the call",
+        "intercom_split_full": "Call only (hide the chat)",
+        "intercom_split_resize": "Resize the call",
+        "intercom_split_show": "Show the chat under the call",
         "jitsi_call": "Jitsi Conference",
         "join_with_video": "Join with video",
         "legacy_call": "Legacy Call",

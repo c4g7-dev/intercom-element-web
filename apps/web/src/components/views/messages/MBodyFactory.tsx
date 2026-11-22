@@ -32,6 +32,8 @@ import { VideoBodyViewModel } from "../../../viewmodels/message-body/VideoBodyVi
 import { isMimeTypeAllowed } from "../../../utils/blobs";
 import { type MediaEventHelper } from "../../../utils/MediaEventHelper";
 import { MBodyTileViewModel } from "../../../viewmodels/message-body/MBodyTileViewModel";
+import { GalleryCellContext, GalleryGroupContext } from "../../../intercom/gallery/GalleryContext";
+import { IntercomGallery } from "../../../intercom/gallery/IntercomGallery";
 
 type MBodyComponent = React.ComponentType<IBodyProps>;
 
@@ -185,7 +187,33 @@ export function VideoBodyFactory({
     );
 }
 
-export function ImageBodyFactory({
+/**
+ * The body of a picture message: the picture, or, on the tile that stands for a gallery, all of
+ * the gallery's pictures in a grid.
+ */
+export function ImageBodyFactory(
+    props: Readonly<
+        Pick<
+            IBodyProps,
+            "mxEvent" | "mediaEventHelper" | "forExport" | "maxImageHeight" | "permalinkCreator" | "showFileInfo"
+        >
+    >,
+): JSX.Element {
+    const gallery = useContext(GalleryGroupContext);
+    if (gallery && !props.forExport && gallery[0]?.getId() === props.mxEvent.getId()) {
+        return (
+            <IntercomGallery
+                events={gallery}
+                firstMediaEventHelper={props.mediaEventHelper}
+                permalinkCreator={props.permalinkCreator}
+                CellBody={SingleImageBody}
+            />
+        );
+    }
+    return <SingleImageBody {...props} />;
+}
+
+function SingleImageBody({
     mxEvent,
     mediaEventHelper,
     forExport,
@@ -221,6 +249,18 @@ export function ImageBodyFactory({
                 setMediaVisible,
             }),
     );
+
+    // One of a gallery: the lightbox can go on to the pictures beside this one
+    const galleryCell = useContext(GalleryCellContext);
+    const eventId = mxEvent.getId();
+    useEffect(() => {
+        if (!galleryCell || !eventId || shouldFallbackToFileBody) {
+            vm.setLightboxNavigation(undefined);
+            return;
+        }
+        vm.setLightboxNavigation(() => galleryCell.navigationFor(eventId));
+        return galleryCell.register(eventId, vm);
+    }, [eventId, galleryCell, shouldFallbackToFileBody, vm]);
 
     useEffect(() => {
         if (shouldFallbackToFileBody) return;

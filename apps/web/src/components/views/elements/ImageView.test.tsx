@@ -32,6 +32,30 @@ describe("<ImageView />", () => {
         expect(container).toMatchSnapshot();
     });
 
+    it("steps through a gallery with its buttons and the arrow keys", () => {
+        const onFinished = vi.fn();
+        const onNext = vi.fn();
+        const { getByRole, queryByRole } = render(
+            <ImageView
+                src="https://example.com/image.png"
+                onFinished={onFinished}
+                navigation={{ index: 1, total: 3, onNext }}
+            />,
+        );
+        // The first of a gallery has nothing before it
+        expect(queryByRole("button", { name: "Previous image" })).toBeNull();
+
+        fireEvent.click(getByRole("button", { name: "Next image" }));
+        expect(onFinished).toHaveBeenCalledTimes(1);
+        expect(onNext).toHaveBeenCalledTimes(1);
+
+        fireEvent.keyDown(getByRole("dialog"), { key: "ArrowRight" });
+        expect(onNext).toHaveBeenCalledTimes(2);
+        fireEvent.keyDown(getByRole("dialog"), { key: "ArrowLeft" });
+        expect(onNext).toHaveBeenCalledTimes(2);
+        expect(onFinished).toHaveBeenCalledTimes(2);
+    });
+
     it("should download on click", async () => {
         fetchMock.get("https://example.com/image.png", "TESTFILE");
         const { getByRole } = render(

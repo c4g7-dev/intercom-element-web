@@ -28,6 +28,14 @@ export enum MainSplitContentType {
     Timeline,
     MaximisedWidget,
     Call,
+    // InterCom: the call over the timeline, with a divider between them. The chat is in the
+    // main split here, so nothing of it goes to the right panel.
+    CallSplit,
+}
+
+/** Whether a main split of this kind shows the room's timeline itself. */
+export function mainSplitShowsTimeline(type: MainSplitContentType | undefined): boolean {
+    return type === MainSplitContentType.Timeline || type === MainSplitContentType.CallSplit;
 }
 
 export interface RoomContextType extends IRoomState {

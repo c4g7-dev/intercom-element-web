@@ -23,7 +23,7 @@ import PublicIcon from "@vector-im/compound-design-tokens/assets/web/icons/publi
 import { HistoryVisibility, JoinRule, type Room } from "matrix-js-sdk/src/matrix";
 import { Flex, Box, StatusTextView } from "@element-hq/web-shared-components";
 import { CallType } from "matrix-js-sdk/src/webrtc/call";
-import { HistoryIcon, UserProfileSolidIcon } from "@vector-im/compound-design-tokens/assets/web/icons";
+import { ExpandIcon, HistoryIcon, UserProfileSolidIcon } from "@vector-im/compound-design-tokens/assets/web/icons";
 
 import { useRoomName } from "../../../../hooks/useRoomName.ts";
 import { RightPanelPhases } from "../../../../stores/right-panel/RightPanelStorePhases.ts";
@@ -46,6 +46,8 @@ import { RoomKnocksBar } from "../RoomKnocksBar.tsx";
 import { isVideoRoom as calcIsVideoRoom } from "../../../../utils/video-rooms.ts";
 import { notificationLevelToIndicator } from "../../../../utils/notifications.ts";
 import { CallGuestLinkButton } from "./CallGuestLinkButton.tsx";
+import { CallSplitStore, CallSplitStoreEvent } from "../../../../intercom/CallSplitStore.ts";
+import { useTypedEventEmitterState } from "../../../../hooks/useEventEmitter.ts";
 import { type ButtonEvent } from "../../elements/AccessibleButton.tsx";
 import WithPresenceIndicator, { useDmMember } from "../../avatars/WithPresenceIndicator.tsx";
 import { type IOOBData } from "../../../../stores/ThreepidInviteStore.ts";
@@ -59,6 +61,35 @@ import { LocalRoom } from "../../../../models/LocalRoom.ts";
 import { useIsEncrypted } from "../../../../hooks/useIsEncrypted.ts";
 import { useUserStatus } from "../../../../hooks/useUserStatus.ts";
 import { SDKContext } from "../../../../contexts/SDKContext.ts";
+
+/**
+ * InterCom: chooses between the call over the room's chat, with a divider between them, and the
+ * call filling the room.
+ */
+function CallSplitButton(): JSX.Element {
+    const store = CallSplitStore.instance;
+    const mode = useTypedEventEmitterState(store, CallSplitStoreEvent.Mode, () => store.mode);
+    const split = mode === "split";
+    const toggle = useCallback((): void => {
+        store.setMode(split ? "full" : "split");
+    }, [split, store]);
+    return (
+        <Tooltip label={split ? _t("voip|intercom_split_full") : _t("voip|intercom_split_show")}>
+            <IconButton onClick={toggle} aria-pressed={split} data-testid="intercom-call-split-button">
+                {split ? <ExpandIcon /> : <SplitViewIcon />}
+            </IconButton>
+        </Tooltip>
+    );
+}
+
+/** A room shown as a call over its chat: two panes, one above the other. */
+function SplitViewIcon(): JSX.Element {
+    return (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 2v7h14V5H5Zm0 9v5h14v-5H5Z" />
+        </svg>
+    );
+}
 
 function RoomHeaderButtons({ room, extraButtons }: { room: Room; extraButtons?: JSX.Element }): JSX.Element {
     const sdkContext = useContext(SDKContext);
@@ -313,6 +344,8 @@ function RoomHeaderButtons({ room, extraButtons }: { room: Room; extraButtons?: 
             {extraButtons}
 
             {isViewingCall && <CallGuestLinkButton room={room} />}
+
+            {isViewingCall && !isVideoRoom && <CallSplitButton />}
 
             {activeCallSessionType && !isConnectedToCall && !isViewingCall ? (
                 joinCallButton

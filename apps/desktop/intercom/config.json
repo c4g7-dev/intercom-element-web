@@ -36,9 +36,7 @@
     },
     "show_labs_settings": true,
     "room_directory": {
-        "servers": [
-            "matrix.org"
-        ]
+        "servers": ["matrix.org"]
     },
     "features": {
         "feature_video_rooms": true,

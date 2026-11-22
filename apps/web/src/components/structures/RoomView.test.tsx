@@ -27,7 +27,19 @@ import {
 } from "matrix-js-sdk/src/matrix";
 import { type CryptoApi, CryptoEvent, UserVerificationStatus } from "matrix-js-sdk/src/crypto-api";
 import { KnownMembership } from "matrix-js-sdk/src/types";
-import { act, cleanup, fireEvent, render, type RenderResult, screen, waitFor, findByRole } from "test-utils-rtl";
+import {
+    act,
+    cleanup,
+    fireEvent,
+    render,
+    type RenderResult,
+    screen,
+    waitFor,
+    findByRole,
+    within,
+} from "test-utils-rtl";
+
+import { CallSplitStore } from "../../intercom/CallSplitStore";
 import userEvent from "@testing-library/user-event";
 import {
     createTestClient,
@@ -659,6 +671,48 @@ describe("RoomView", () => {
         beforeEach(async () => {
             await setupAsyncStoreWithClient(CallStore.instance, MatrixClientPeg.safeGet());
             vi.spyOn(room, "getMyMembership").mockReturnValue(KnownMembership.Join);
+        });
+
+        it("shows the call over the timeline, and the call alone when asked to", async () => {
+            window.localStorage.removeItem("intercom_call_view_mode");
+            await mountRoomView();
+            await act(() =>
+                stores.roomViewStore.viewRoom({
+                    action: Action.ViewRoom,
+                    room_id: stores.roomViewStore.getRoomId()!,
+                    metricsTrigger: undefined,
+                    view_call: true,
+                }),
+            );
+
+            // The call and the chat share the room, with a divider that can be moved
+            const split = await screen.findByTestId("intercom-call-split");
+            expect(screen.getByTestId("timeline")).toBeInTheDocument();
+            const divider = within(split).getByRole("separator", { name: "Resize the call" });
+            expect(divider).toHaveAttribute("aria-orientation", "horizontal");
+            expect(divider).toHaveAttribute("tabindex", "0");
+
+            // Folding the call away and back
+            await userEvent.click(within(split).getByRole("button", { name: "Hide the call" }));
+            expect(split).toHaveAttribute("data-collapsed", "true");
+            await userEvent.click(within(split).getByRole("button", { name: "Show the call" }));
+            expect(split).toHaveAttribute("data-collapsed", "false");
+
+            // The call alone: the room is the call, as it was before there was a split
+            await userEvent.click(within(split).getByRole("button", { name: "Call only (hide the chat)" }));
+            // (the same panel, so that the call's frame stays where it is)
+            expect(screen.getByTestId("intercom-call-split")).toBe(split);
+            expect(split).toHaveAttribute("data-full", "true");
+            expect(screen.queryByTestId("timeline")).toBeNull();
+            expect(within(split).queryByRole("separator")).toBeNull();
+
+            act(() => {
+                CallSplitStore.instance.setMode("split");
+            });
+            expect(split).toHaveAttribute("data-full", "false");
+            expect(await screen.findByTestId("timeline")).toBeInTheDocument();
+            window.localStorage.removeItem("intercom_call_view_mode");
+            window.localStorage.removeItem("intercom_call_split_collapsed");
         });
 
         it("hides the right panel chat when closing a call", async () => {

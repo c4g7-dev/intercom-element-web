@@ -22,7 +22,8 @@ import { type ImageInfo } from "matrix-js-sdk/src/types";
 import encrypt, { type IEncryptedFile } from "matrix-encrypt-attachment";
 import { createTestClient, flushPromises, mkEvent } from "test-utils";
 
-import ContentMessages, { UploadCanceledError, uploadFile } from "./ContentMessages";
+import ContentMessages, { UploadCanceledError, isHidpiPng, uploadFile } from "./ContentMessages";
+import BatchUploadDialog from "./intercom/gallery/BatchUploadDialog";
 import { clearUploadedMediaCache, queryUploadedMediaCache } from "./utils/UploadedMediaCache";
 import { doMaybeLocalRoomAction } from "./utils/local-room";
 import { BlurhashEncoder } from "./BlurhashEncoder";
@@ -558,5 +559,148 @@ describe("sendContentListToRoom analytics", () => {
             }),
         );
         expect(contentMessages.sendContentToRoom).not.toHaveBeenCalled();
+    });
+});
+
+describe("isHidpiPng", () => {
+    const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    const chunk = (type: string, data: number[]): number[] => [
+        (data.length >>> 24) & 0xff,
+        (data.length >>> 16) & 0xff,
+        (data.length >>> 8) & 0xff,
+        data.length & 0xff,
+        ...[...type].map((c) => c.charCodeAt(0)),
+        ...data,
+        0,
+        0,
+        0,
+        0, // CRC, which is not looked at
+    ];
+    const png = (...chunks: number[][]): Blob => new Blob([new Uint8Array([...signature, ...chunks.flat()])]);
+    const ihdr = chunk("IHDR", new Array(13).fill(0));
+    const hidpi = [0x00, 0x00, 0x16, 0x25, 0x00, 0x00, 0x16, 0x25, 0x01];
+
+    it("finds the hi-dpi pHYs chunk of a macOS screenshot", async () => {
+        await expect(isHidpiPng(png(ihdr, chunk("pHYs", hidpi), chunk("IDAT", [1, 2, 3])))).resolves.toBe(true);
+    });
+
+    it("finds it behind a colour profile larger than what is read at once", async () => {
+        const profile = chunk("iCCP", new Array(200_000).fill(7));
+        await expect(isHidpiPng(png(ihdr, profile, chunk("pHYs", hidpi), chunk("IDAT", [1])))).resolves.toBe(true);
+    });
+
+    it("says no for another density, for no pHYs and for what is not a PNG", async () => {
+        const other = [0x00, 0x00, 0x0b, 0x13, 0x00, 0x00, 0x0b, 0x13, 0x01];
+        await expect(isHidpiPng(png(ihdr, chunk("pHYs", other), chunk("IDAT", [1])))).resolves.toBe(false);
+        await expect(isHidpiPng(png(ihdr, chunk("IDAT", [1]), chunk("pHYs", hidpi)))).resolves.toBe(false);
+        await expect(isHidpiPng(new Blob(["not a png at all, just text"]))).resolves.toBe(false);
+        await expect(isHidpiPng(new Blob([]))).resolves.toBe(false);
+    });
+});
+
+describe("InterCom upload pipeline", () => {
+    const roomId = "!roomId:server";
+    let client: MatrixClient;
+    let contentMessages: ContentMessages;
+
+    beforeEach(() => {
+        client = createTestClient();
+        contentMessages = new ContentMessages();
+        vi.mocked(doMaybeLocalRoomAction).mockImplementation(
+            <T>(roomId: string, fn: (actualRoomId: string) => Promise<T>) => fn(roomId),
+        );
+        vi.mocked(client.sendMessage).mockResolvedValue({ event_id: "$event" });
+        vi.mocked(BlurhashEncoder.instance.getBlurhash).mockResolvedValue("blurhashstring");
+        Object.defineProperty(global.Image.prototype, "src", {
+            configurable: true,
+            set() {
+                window.setTimeout(() => this.onload());
+            },
+        });
+        Object.defineProperty(global.Image.prototype, "height", { configurable: true, get: () => 3000 });
+        Object.defineProperty(global.Image.prototype, "width", { configurable: true, get: () => 4000 });
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it("starts uploading the file before its thumbnail is made", async () => {
+        const order: string[] = [];
+        vi.mocked(client.uploadContent).mockImplementation(async () => {
+            order.push("upload");
+            return { content_uri: "mxc://server/file" };
+        });
+        vi.mocked(BlurhashEncoder.instance.getBlurhash).mockImplementation(async () => {
+            order.push("blurhash");
+            return "blurhashstring";
+        });
+        const file = new File([new Uint8Array(200_000)], "photo.jpg", { type: "image/jpeg" });
+        await contentMessages.sendContentToRoom(file, roomId, undefined, client, undefined);
+        expect(order[0]).toBe("upload");
+        expect(order).toContain("blurhash");
+        expect(client.sendMessage).toHaveBeenCalledWith(
+            roomId,
+            null,
+            expect.objectContaining({ msgtype: "m.image", url: "mxc://server/file" }),
+        );
+    });
+
+    it("makes the blurhash from a small copy of the thumbnail", async () => {
+        vi.mocked(client.uploadContent).mockResolvedValue({ content_uri: "mxc://server/file" });
+        const file = new File([new Uint8Array(200_000)], "photo.jpg", { type: "image/jpeg" });
+        await contentMessages.sendContentToRoom(file, roomId, undefined, client, undefined);
+        const imageData = vi.mocked(BlurhashEncoder.instance.getBlurhash).mock.calls[0][0];
+        expect(Math.max(imageData.width, imageData.height)).toBeLessThanOrEqual(64);
+        expect(client.sendMessage).toHaveBeenCalledWith(
+            roomId,
+            null,
+            expect.objectContaining({
+                info: expect.objectContaining({ "w": 4000, "h": 3000, "xyz.amorgan.blurhash": "blurhashstring" }),
+            }),
+        );
+    });
+
+    it("writes where the time went to the diagnostics log, without the file name", async () => {
+        const log = vi.spyOn(console, "log").mockImplementation(() => {});
+        vi.mocked(client.uploadContent).mockResolvedValue({ content_uri: "mxc://server/file" });
+        const file = new File([new Uint8Array(1000)], "secret-name.zip", { type: "application/zip" });
+        await contentMessages.sendContentToRoom(file, roomId, undefined, client, undefined);
+        const records = log.mock.calls
+            .map(([line]) => String(line))
+            .filter((line) => line.startsWith("[intercom-diag] "))
+            .map((line) => JSON.parse(line.slice("[intercom-diag] ".length)));
+        expect(records.every((r) => r.type === "upload_phase")).toBe(true);
+        expect(records.map((r) => r.phase)).toEqual(expect.arrayContaining(["http", "send_event", "total"]));
+        const total = records.find((r) => r.phase === "total");
+        expect(total).toMatchObject({ outcome: "sent", bytes: 1000, mime: "application/zip", kind: "m.file" });
+        expect(JSON.stringify(records)).not.toContain("secret-name");
+    });
+
+    it("asks once for several pictures and sends the caption with the first", async () => {
+        vi.spyOn(Modal, "createDialog").mockImplementation(((component: unknown) => ({
+            // The spinner shown while the media config is fetched stays until it is closed
+            finished: component === BatchUploadDialog ? Promise.resolve([true, "our trip"]) : new Promise(() => {}),
+            close: vi.fn(),
+        })) as unknown as typeof Modal.createDialog);
+        vi.mocked(client.getMediaConfig).mockResolvedValue({});
+        vi.mocked(client.uploadContent).mockResolvedValue({ content_uri: "mxc://server/file" });
+        vi.spyOn(PosthogAnalytics.instance, "trackEvent").mockImplementation(() => {});
+        const files = ["a.jpg", "b.jpg", "c.jpg"].map(
+            (name) => new File([new Uint8Array(10)], name, { type: "image/jpeg" }),
+        );
+
+        await contentMessages.sendContentListToRoom(files, roomId, undefined, undefined, client);
+        await flushPromises();
+        await vi.waitFor(() => expect(client.sendMessage).toHaveBeenCalledTimes(3));
+
+        expect(vi.mocked(Modal.createDialog).mock.calls.filter(([c]) => c === BatchUploadDialog)).toHaveLength(1);
+        expect(vi.mocked(Modal.createDialog).mock.calls.some(([c]) => c === UploadConfirmDialog)).toBe(false);
+        const contents = vi
+            .mocked(client.sendMessage)
+            .mock.calls.map((call) => call[2] as unknown as Record<string, unknown>);
+        expect(contents.map((c) => c.body)).toEqual(["our trip", "b.jpg", "c.jpg"]);
+        expect(contents[0].filename).toBe("a.jpg");
+        expect(contents[1].filename).toBeUndefined();
     });
 });

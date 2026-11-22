@@ -345,6 +345,33 @@ describe("MessagePanel", function () {
         expect(tiles.length).toEqual(10);
     });
 
+    it("shows pictures sent together as one gallery on the tile of the first", function () {
+        const ts = new Date(2026, 5, 1, 12, 0, 0).getTime();
+        const picture = (i: number, user = "@user:id"): MatrixEvent =>
+            TestUtilsMatrix.mkEvent({
+                event: true,
+                type: "m.room.message",
+                room: "!room:id",
+                user,
+                ts: ts + i * 1000,
+                content: { msgtype: "m.image", body: `picture${i}.png`, url: `mxc://server/picture${i}` },
+            });
+        const gallery = [picture(0), picture(1), picture(2)];
+        const other = picture(3, "@other:id");
+        const { container } = render(
+            getComponent({ events: [...gallery, other] }),
+            clientAndSDKContextRenderOptions(client, sdkContext),
+        );
+
+        // One tile for the three pictures, one for the picture of somebody else
+        expect(container.getElementsByClassName("mx_EventTile")).toHaveLength(2);
+        const grids = container.getElementsByClassName("mx_IntercomGallery");
+        expect(grids).toHaveLength(1);
+        const cells = grids[0].getElementsByClassName("mx_IntercomGallery_cell");
+        expect([...cells].map((cell) => cell.getAttribute("data-event-id"))).toEqual(gallery.map((ev) => ev.getId()));
+        expect(grids[0].closest(".mx_EventTile")).toBe(container.getElementsByClassName("mx_EventTile")[0]);
+    });
+
     it("should collapse adjacent member events", function () {
         const { container } = render(
             getComponent({ events: mkMelsEvents() }),

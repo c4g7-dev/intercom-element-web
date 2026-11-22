@@ -125,3 +125,39 @@ $button-gap: var(--cpd-space-3x);
         transition: none !important;
     }
 }
+
+/* InterCom: the pictures beside this one, when it is one of a gallery */
+.mx_ImageView_position {
+    margin-inline-start: var(--cpd-space-3x);
+    color: $secondary-content;
+    font-variant-numeric: tabular-nums;
+}
+
+.mx_ImageView_nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1;
+    box-sizing: content-box;
+    padding: 10px;
+    border-radius: 50%;
+    background-color: rgb(255 255 255 / 12%);
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+        background-color: rgb(255 255 255 / 24%);
+    }
+
+    svg {
+        color: #fff;
+    }
+}
+
+.mx_ImageView_nav_previous {
+    inset-inline-start: var(--cpd-space-4x);
+}
+
+.mx_ImageView_nav_next {
+    inset-inline-end: var(--cpd-space-4x);
+}

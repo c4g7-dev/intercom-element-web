@@ -45,6 +45,8 @@ import { MainGrouper } from "./grouper/MainGrouper";
 import { CreationGrouper } from "./grouper/CreationGrouper";
 import { _t } from "../../languageHandler";
 import { getLateEventInfo } from "./grouper/LateEventGrouper";
+import { findGalleries } from "../../intercom/gallery/grouping";
+import { GalleryGroupContext } from "../../intercom/gallery/GalleryContext";
 import { findLastSuccessfulWeSent } from "../../viewmodels/room/timeline/event-tile/EventTileReceiptState";
 import { getReadReceiptsByShownEvent, getReadReceiptsForEvent, type ShownReadReceipt } from "../../utils/read-receipts";
 import { DateSeparatorWrapper } from "./DateSeparatorWrapper";
@@ -229,6 +231,8 @@ export default class MessagePanel extends React.Component<IProps, IState> {
     // for ease of passing the data around since it's computed in one pass
     // over all events.
     private readReceiptsByEvent: Map<string, IReadReceiptProps[]> = new Map();
+    // InterCom: the pictures shown as one gallery, under the ID of the first of each
+    private galleries: Map<string, MatrixEvent[]> = new Map();
 
     // Track read receipts by user ID. For each user ID we've ever shown a
     // a read receipt for, we store an object:
@@ -610,6 +614,17 @@ export default class MessagePanel extends React.Component<IProps, IState> {
             };
         });
 
+        // Pictures sent together are one gallery on the tile of the first of them; the others get
+        // no tile of their own (and so hand their read receipts to that tile).
+        this.galleries = this.findGalleries(events);
+        if (this.galleries.size > 0) {
+            const followers = new Set<MatrixEvent>();
+            for (const gallery of this.galleries.values()) gallery.slice(1).forEach((ev) => followers.add(ev));
+            for (const wrapped of events) {
+                if (followers.has(wrapped.event)) wrapped.shouldShow = false;
+            }
+        }
+
         const userId = MatrixClientPeg.safeGet().getSafeUserId();
 
         const lastSuccessfulIndex = findLastSuccessfulWeSent(
@@ -716,6 +731,36 @@ export default class MessagePanel extends React.Component<IProps, IState> {
         return ret;
     }
 
+    /**
+     * The galleries among the events: runs of pictures from one sender, under the ID of the first.
+     * A gallery that has not changed is the same array as before, so that its tile is not
+     * rendered anew with every render of the panel.
+     */
+    private findGalleries(events: WrappedEvent[]): Map<string, MatrixEvent[]> {
+        const type = this.context.timelineRenderingType;
+        if (
+            this.showHiddenEvents ||
+            this.props.disableGrouping ||
+            (type !== TimelineRenderingType.Room && type !== TimelineRenderingType.Thread)
+        ) {
+            return new Map();
+        }
+        // The picture a permalink points at, or that is being edited, keeps its own tile
+        const exclude = new Set<string>();
+        if (this.props.highlightedEventId) exclude.add(this.props.highlightedEventId);
+        const editing = this.props.editState?.getEvent().getId();
+        if (editing) exclude.add(editing);
+
+        const found = findGalleries(events, exclude);
+        for (const [id, gallery] of found) {
+            const before = this.galleries.get(id);
+            if (before && before.length === gallery.length && before.every((ev, i) => ev === gallery[i])) {
+                found.set(id, before);
+            }
+        }
+        return found;
+    }
+
     public getTilesForEvent(
         prevEvent: MatrixEvent | null,
         wrappedEvent: WrappedEvent,
@@ -784,8 +829,9 @@ export default class MessagePanel extends React.Component<IProps, IState> {
         const readReceipts = this.readReceiptsByEvent.get(eventId);
 
         const callEventGrouper = this.props.callEventGroupers.get(mxEv.getContent().call_id);
+        const gallery = this.galleries.get(eventId);
         // use txnId as key if available so that we don't remount during sending
-        ret.push(
+        const tile = (
             <EventTile
                 key={mxEv.getTxnId() || eventId}
                 as="li"
@@ -815,7 +861,16 @@ export default class MessagePanel extends React.Component<IProps, IState> {
                 showReadReceipts={this.props.showReadReceipts}
                 callEventGrouper={callEventGrouper}
                 hideSender={this.state.hideSender}
-            />,
+            />
+        );
+        ret.push(
+            gallery ? (
+                <GalleryGroupContext.Provider key={tile.key} value={gallery}>
+                    {tile}
+                </GalleryGroupContext.Provider>
+            ) : (
+                tile
+            ),
         );
 
         return ret;

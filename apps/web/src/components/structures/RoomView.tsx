@@ -69,7 +69,7 @@ import WidgetEchoStore from "../../stores/WidgetEchoStore";
 import SettingsStore from "../../settings/SettingsStore";
 import { Layout } from "../../settings/enums/Layout";
 import AccessibleButton, { type ButtonEvent } from "../views/elements/AccessibleButton";
-import { TimelineRenderingType, MainSplitContentType } from "../../contexts/RoomContext";
+import { TimelineRenderingType, MainSplitContentType, mainSplitShowsTimeline } from "../../contexts/RoomContext";
 import { E2EStatus, shieldStatusForRoom } from "../../utils/ShieldUtils";
 import { Action } from "../../dispatcher/actions";
 import { type IMatrixClientCreds } from "../../utils/createMatrixClient";
@@ -88,6 +88,8 @@ import EffectsOverlay from "../views/elements/EffectsOverlay";
 import { containsEmoji } from "../../effects/utils";
 import { CHAT_EFFECTS } from "../../effects";
 import { CallView } from "../views/voip/CallView";
+import { CallSplitPanel } from "../../intercom/CallSplitPanel";
+import { CallSplitStore, CallSplitStoreEvent } from "../../intercom/CallSplitStore";
 import { UPDATE_EVENT } from "../../stores/AsyncStore";
 import { showToast as showNotificationsToast } from "../../toasts/DesktopNotificationsToast";
 import { WidgetLayoutStore } from "../../stores/widgets/WidgetLayoutStore";
@@ -601,8 +603,12 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
     };
 
     private getMainSplitContentType = (room: Room): MainSplitContentType => {
-        if (this.roomViewStore.isViewingCall() || isVideoRoom(room)) {
-            return MainSplitContentType.Call;
+        if (isVideoRoom(room)) return MainSplitContentType.Call;
+        if (this.roomViewStore.isViewingCall()) {
+            // InterCom: the call shares the room with its chat unless the user asked for all of it
+            return CallSplitStore.instance.mode === "split"
+                ? MainSplitContentType.CallSplit
+                : MainSplitContentType.Call;
         }
         if (this.context.widgetLayoutStore.hasMaximisedWidget(room)) {
             return MainSplitContentType.MaximisedWidget;
@@ -663,7 +669,7 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
         };
 
         if (
-            newState.mainSplitContentType === MainSplitContentType.Timeline &&
+            mainSplitShowsTimeline(newState.mainSplitContentType) &&
             this.context.rightPanelStore.isOpen &&
             this.context.rightPanelStore.currentCard.phase === RightPanelPhases.Timeline &&
             this.context.rightPanelStore.roomPhaseHistory.some((card) => card.phase === RightPanelPhases.Timeline)
@@ -788,7 +794,7 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
 
         if (
             room &&
-            this.getMainSplitContentType(room) !== MainSplitContentType.Timeline &&
+            !mainSplitShowsTimeline(this.getMainSplitContentType(room)) &&
             newState.initialEventId !== this.state.initialEventId
         ) {
             // Ensure the right panel timeline is open to show the linked event
@@ -814,6 +820,24 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
             ...(isRoomEncrypted &&
                 newState.roomId && { e2eStatus: RoomView.e2eStatusCache.get(newState.roomId) ?? E2EStatus.Warning }),
         });
+    };
+
+    /** InterCom: the user chose between the call over the chat and the call alone. */
+    private onCallViewModeChange = (): void => {
+        const room = this.state.room;
+        if (!room) return;
+        const mainSplitContentType = this.getMainSplitContentType(room);
+        if (mainSplitContentType === this.state.mainSplitContentType) return;
+        if (
+            mainSplitShowsTimeline(mainSplitContentType) &&
+            this.context.rightPanelStore.isOpen &&
+            this.context.rightPanelStore.currentCard.phase === RightPanelPhases.Timeline
+        ) {
+            // The main split shows the timeline now, so the right panel is not to show it too
+            this.context.rightPanelStore.setCard({ phase: RightPanelPhases.RoomSummary });
+            this.context.rightPanelStore.togglePanel(room.roomId);
+        }
+        this.setState({ mainSplitContentType });
     };
 
     private onCallClose = (): void => {
@@ -976,6 +1000,7 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
         this.unmounted = false;
 
         this.dispatcherRef = defaultDispatcher.register(this.onAction);
+        CallSplitStore.instance.on(CallSplitStoreEvent.Mode, this.onCallViewModeChange);
         if (this.context.client) {
             this.context.client.on(ClientEvent.Room, this.onRoom);
             this.context.client.on(RoomEvent.Timeline, this.onRoomTimeline);
@@ -1074,6 +1099,7 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
         // (We could use isMounted, but facebook have deprecated that.)
         this.unmounted = true;
 
+        CallSplitStore.instance.off(CallSplitStoreEvent.Mode, this.onCallViewModeChange);
         this.context.legacyCallHandler.removeListener(LegacyCallHandlerEvent.CallState, this.onCallState);
 
         // update the scroll map before we get unmounted
@@ -1486,7 +1512,7 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
         void this.updateRoomEncrypted(room);
 
         if (
-            this.getMainSplitContentType(room) !== MainSplitContentType.Timeline &&
+            !mainSplitShowsTimeline(this.getMainSplitContentType(room)) &&
             this.context.roomNotificationStateStore.getRoomState(room).isUnread
         ) {
             // Automatically open the chat panel to make unread messages easier to discover
@@ -2657,14 +2683,15 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
         });
 
         let { mainSplitContentType } = this.state;
-        if (this.state.search) {
+        if (this.state.search && mainSplitContentType !== MainSplitContentType.CallSplit) {
             // When in the middle of a search force the main split content type to timeline
+            // (the call split has the timeline in it, and keeps the call over the results)
             mainSplitContentType = MainSplitContentType.Timeline;
         }
 
         const mainClasses = classNames("mx_RoomView", {
             mx_RoomView_inCall: Boolean(activeCall),
-            mx_RoomView_immersive: mainSplitContentType !== MainSplitContentType.Timeline,
+            mx_RoomView_immersive: !mainSplitShowsTimeline(mainSplitContentType),
         });
 
         const showChatEffects = SettingsStore.getValue("showChatEffects");
@@ -2672,24 +2699,45 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
         let mainSplitBody: JSX.Element | undefined;
         let mainSplitContentClassName: string | undefined;
         // Decide what to show in the main split
-        switch (mainSplitContentType) {
+        // InterCom: the call of an ordinary room is the same panel whether it shares the room with
+        // the chat or has it to itself, so that going from one to the other leaves the call alone
+        const callOnly = mainSplitContentType === MainSplitContentType.Call && !isVideoRoom(this.state.room);
+        const callSplit = mainSplitContentType === MainSplitContentType.CallSplit;
+        switch (callOnly ? MainSplitContentType.CallSplit : mainSplitContentType) {
             case MainSplitContentType.Timeline:
-                mainSplitContentClassName = "mx_MainSplit_timeline";
+            case MainSplitContentType.CallSplit:
+                mainSplitContentClassName = callOnly
+                    ? "mx_MainSplit_call"
+                    : callSplit
+                      ? "mx_MainSplit_timeline mx_MainSplit_callSplit"
+                      : "mx_MainSplit_timeline";
                 mainSplitBody = (
                     <RoomUploadContextProvider>
-                        <Measured sensor={this.roomViewBody} onMeasurement={this.onMeasurement} />
-                        {auxPanel}
-                        {pinnedMessageBanner}
-                        <main className={timelineClasses} data-testid="timeline">
-                            <FileDropTarget parent={this.roomView.current} />
-                            {topUnreadMessagesBar}
-                            {jumpToBottom}
-                            {messagePanel}
-                            {searchResultsPanel}
-                        </main>
-                        {statusBarArea}
+                        {(callSplit || callOnly) && (
+                            <CallSplitPanel
+                                room={this.state.room}
+                                full={callOnly}
+                                resizing={this.state.resizing}
+                                onClose={this.onCallClose}
+                            />
+                        )}
+                        {!callOnly && (
+                            <>
+                                <Measured sensor={this.roomViewBody} onMeasurement={this.onMeasurement} />
+                                {auxPanel}
+                                {pinnedMessageBanner}
+                                <main className={timelineClasses} data-testid="timeline">
+                                    <FileDropTarget parent={this.roomView.current} />
+                                    {topUnreadMessagesBar}
+                                    {jumpToBottom}
+                                    {messagePanel}
+                                    {searchResultsPanel}
+                                </main>
+                                {statusBarArea}
+                            </>
+                        )}
                         {previewBar}
-                        {messageComposer}
+                        {!callOnly && messageComposer}
                     </RoomUploadContextProvider>
                 );
                 break;
@@ -2727,7 +2775,7 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
         let sizeKey: string | undefined;
         let defaultSize: number | undefined;
         let analyticsRoomType: ComponentProps<typeof MainSplit>["analyticsRoomType"] = "other_room";
-        if (this.state.mainSplitContentType !== MainSplitContentType.Timeline) {
+        if (!mainSplitShowsTimeline(this.state.mainSplitContentType)) {
             // Override defaults for video rooms where more space is needed for the chat timeline
             sizeKey = "wide";
             defaultSize = 420;
