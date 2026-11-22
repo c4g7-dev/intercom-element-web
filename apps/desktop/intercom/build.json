@@ -3,5 +3,5 @@
     "name": "intercom",
     "productName": "InterCom",
     "description": "InterCom: a Matrix client based on Element",
-    "protocols": ["chat.intercom.desktop", "intercom"]
+    "protocols": ["com.c4g7.intercom", "intercom"]
 }

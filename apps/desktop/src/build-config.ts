@@ -30,7 +30,7 @@ export function getBuildConfig(): BuildConfig {
         const packageJson = loadJsonFile(path.join(__dirname, "..", "package.json")) as JsonObject;
         buildConfig = {
             appId: (packageJson["electron_appId"] as string) || "chat.intercom.desktop",
-            protocol: (packageJson["electron_protocol"] as string) || "chat.intercom.desktop",
+            protocol: (packageJson["electron_protocol"] as string) || "com.c4g7.intercom",
             windowsCertSubjectName: packageJson["electron_windows_cert_sn"] as string,
         };
     }

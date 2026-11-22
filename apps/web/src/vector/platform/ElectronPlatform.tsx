@@ -476,7 +476,7 @@ export default class ElectronPlatform extends BasePlatform {
 
     public getSSOCallbackUrl(fragmentAfterLogin?: string): URL {
         const url = super.getSSOCallbackUrl(fragmentAfterLogin);
-        url.protocol = "element";
+        url.protocol = "intercom";
         url.searchParams.set(SSO_ID_KEY, this.sessionId);
         return url;
     }
