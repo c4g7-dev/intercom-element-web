@@ -71,7 +71,8 @@ const sandboxFlags =
 // Additional iframe feature permissions
 // (see - https://sites.google.com/a/chromium.org/dev/Home/chromium-security/deprecating-permissions-in-cross-origin-iframes and https://wicg.github.io/feature-policy/)
 const iframeFeatures =
-    "microphone; camera; encrypted-media; autoplay; display-capture; clipboard-write; clipboard-read;";
+    // InterCom: `fullscreen` is spelled out for Element Call, which puts single tiles into fullscreen
+    "microphone; camera; encrypted-media; autoplay; display-capture; fullscreen; clipboard-write; clipboard-read;";
 
 interface IProps {
     app: IWidget | IApp;

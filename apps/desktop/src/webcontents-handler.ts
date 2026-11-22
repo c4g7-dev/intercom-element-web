@@ -26,6 +26,7 @@ import path from "node:path";
 import { _t } from "./language-helper.js";
 import { saveImageToFile } from "./save-image.js";
 import { getConfig } from "./config.js";
+import { getPopoutWindowResponse, POPOUT_FRAME_PREFIX, setupPopoutWindow } from "./intercom.js";
 
 const MAILTO_PREFIX = "mailto:";
 
@@ -286,8 +287,15 @@ ipcMain.on("userDownloadAction", async function (ev: IpcMainEvent, { id, open = 
 
 export default (webContents: WebContents): void => {
     webContents.setWindowOpenHandler((details) => {
+        // InterCom: Element Call's video pop-outs are real child windows, everything else is as upstream
+        const popout = getPopoutWindowResponse(details);
+        if (popout) return popout;
+
         safeOpenURL(details.url);
         return { action: "deny" };
+    });
+    webContents.on("did-create-window", (window, details) => {
+        if (details.frameName.startsWith(POPOUT_FRAME_PREFIX)) setupPopoutWindow(window);
     });
 
     webContents.on("will-navigate", (ev: Event, target: string): void => {

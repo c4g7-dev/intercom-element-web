@@ -49,6 +49,7 @@ import { getAsarPath } from "./asar.js";
 import { getIconPath } from "./icon.js";
 import { getArgs } from "./args.js";
 import { type ConfigOptions, loadConfig } from "./config.js";
+import { configureChromium, grantDisplayMedia, WINDOW_BACKGROUND } from "./intercom.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -133,7 +134,8 @@ protocol.registerSchemesAsPrivileged([
 app.enableSandbox();
 
 // We disable media controls here. We do this because calls use audio and video elements and they sometimes capture the media keys. See https://github.com/vector-im/element-web/issues/15704
-app.commandLine.appendSwitch("disable-features", "HardwareMediaKeyHandling,MediaSessionService");
+// InterCom: this also stops WebRTC moving the system microphone volume and turns on hardware video, see intercom.ts
+configureChromium();
 
 const store = Store.initialize(args.storageMode); // must be called before any async actions
 
@@ -249,7 +251,8 @@ app.on("ready", async () => {
     const preloadScript = path.normalize(`${__dirname}/preload.cjs`);
     global.mainWindow = new BrowserWindow({
         // https://www.electronjs.org/docs/faq#the-font-looks-blurry-what-is-this-and-what-can-i-do
-        backgroundColor: "#fff",
+        // InterCom: dark by default, so paint dark rather than flashing white (element-web#32260)
+        backgroundColor: WINDOW_BACKGROUND,
 
         titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
         trafficLightPosition: { x: 12, y: 8 },
@@ -368,27 +371,41 @@ app.on("ready", async () => {
     // renderer stays a permanent blank window the user can only escape by killing the whole app.
     rendererRecovery = setupRendererRecovery(global.mainWindow);
 
+    // InterCom: only one screen share picker at a time. Each further request used to put up another
+    // portal dialog behind a fullscreen call (element-web#32215).
+    let waylandPickerOpen = false;
     session.defaultSession.setDisplayMediaRequestHandler(
-        (_, callback) => {
+        (request, callback) => {
+            // InterCom: add system audio to the grant where the platform can loop it back (Windows, macOS)
+            const grant = (streams: Electron.Streams): void =>
+                grantDisplayMedia(callback, streams.video, request.audioRequested);
+
             if (process.env.XDG_SESSION_TYPE === "wayland") {
+                if (waylandPickerOpen) {
+                    callback({ video: { id: "", name: "" } });
+                    return;
+                }
+                waylandPickerOpen = true;
                 // On Wayland, calling getSources() opens the xdg-desktop-portal picker.
                 // The user can only select a single source there, so Electron will return an array with exactly one entry.
                 desktopCapturer
                     .getSources({ types: ["screen", "window"] })
                     .then((sources) => {
-                        // oxlint-disable-next-line promise/no-callback-in-promise
-                        callback({ video: sources[0] });
+                        grant({ video: sources[0] });
                     })
                     .catch((err) => {
                         // If the user cancels the dialog an error occurs "Failed to get sources"
                         console.error("Wayland: failed to get user-selected source:", err);
                         // oxlint-disable-next-line promise/no-callback-in-promise
                         callback({ video: { id: "", name: "" } }); // The promise does not return if no dummy is passed here as source
+                    })
+                    .finally(() => {
+                        waylandPickerOpen = false;
                     });
             } else {
                 global.mainWindow?.webContents.send("openDesktopCapturerSourcePicker");
             }
-            setDisplayMediaCallback(callback);
+            setDisplayMediaCallback(grant);
         },
         { useSystemPicker: true },
     ); // Use Mac OS 15+ native picker
