@@ -35,7 +35,10 @@ export function destroy(): void {
 }
 
 function toggleWin(): void {
-    if (global.mainWindow?.isVisible() && !global.mainWindow.isMinimized() && global.mainWindow.isFocused()) {
+    // Clicking the tray icon on Windows takes focus away from the window first, so requiring focus
+    // there means the window is never hidden (element-web#35417).
+    const focused = process.platform === "win32" || global.mainWindow?.isFocused();
+    if (global.mainWindow?.isVisible() && !global.mainWindow.isMinimized() && focused) {
         global.mainWindow.hide();
     } else {
         if (global.mainWindow?.isMinimized()) global.mainWindow.restore();
