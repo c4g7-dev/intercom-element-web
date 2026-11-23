@@ -63,7 +63,7 @@ import { UploadTrace, type UploadTracePart } from "./intercom/UploadDiagnostics"
 import { secureRandomString } from "matrix-js-sdk/src/randomstring";
 import BatchUploadDialog from "./intercom/gallery/BatchUploadDialog";
 import { GALLERY_BATCH_FIELD } from "./intercom/gallery/grouping";
-import { uploadContentWithRetry } from "./intercom/UploadRetry";
+import { uploadContentWithRetry, UploadTokenRefreshError } from "./intercom/UploadRetry";
 
 // scraped out of a macOS hidpi (5660ppm) screenshot png
 //                  5669 px (x-axis)      , 5669 px (y-axis)      , per metre
@@ -842,6 +842,10 @@ export default class ContentMessages {
                     desc = _t("upload_failed_size", {
                         fileName: upload.fileName,
                     });
+                }
+                if (unwrappedError instanceof UploadTokenRefreshError) {
+                    // The sign-in ran out and could not be renewed: say so, it is not the file
+                    desc = _t("upload_failed_session", { fileName: upload.fileName });
                 }
                 Modal.createDialog(ErrorDialog, {
                     title: _t("upload_failed_title"),
