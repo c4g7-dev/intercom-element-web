@@ -12,6 +12,8 @@ import { userEvent } from "vitest/browser";
 import { fn } from "storybook/test";
 
 import * as stories from "./UploadButton.stories.tsx";
+import { UploadButton } from "./UploadButton";
+import { useMockedViewModel } from "../../../core/viewmodel";
 
 const { Default, WithOneOption } = composeStories(stories);
 
@@ -19,6 +21,23 @@ describe("UploadButton", () => {
     it("renders a default button", () => {
         const { container } = render(<Default />);
         expect(container).toMatchSnapshot();
+    });
+    it("shows the children as the button's icon", () => {
+        function WithOwnIcon(): React.JSX.Element {
+            const vm = useMockedViewModel(
+                { options: [{ type: "local", label: "Attachment" }] },
+                {
+                    onUploadOptionSelected: fn(),
+                },
+            );
+            return (
+                <UploadButton vm={vm}>
+                    <span data-testid="own-icon" />
+                </UploadButton>
+            );
+        }
+        const { getByRole, getByTestId } = render(<WithOwnIcon />);
+        expect(getByRole("button", { name: "Attachment" })).toContainElement(getByTestId("own-icon"));
     });
     it("will provide one option when only one is available", async () => {
         userEvent.setup();

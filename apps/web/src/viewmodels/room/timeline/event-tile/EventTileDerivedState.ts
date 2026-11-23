@@ -217,6 +217,8 @@ export interface ShouldShowTimestampInput {
     hideTimestamp?: boolean;
     /** Whether timestamps should always show. */
     alwaysShowTimestamps?: boolean;
+    /** InterCom: whether the tile starts a sender's group of messages, which carries the time beside the name. */
+    startsGroup?: boolean;
     /** Whether the tile is the last event in the timeline. */
     last?: boolean;
     /** Whether the tile is currently hovered. */
@@ -235,6 +237,7 @@ export function getShouldShowTimestamp({
     isRtcNotification,
     hideTimestamp,
     alwaysShowTimestamps,
+    startsGroup,
     last,
     hover,
     focusWithin,
@@ -245,7 +248,37 @@ export function getShouldShowTimestamp({
         !!eventTs &&
         !isRtcNotification &&
         !hideTimestamp &&
-        (alwaysShowTimestamps || last || hover || focusWithin || actionBarFocused || hasContextMenu)
+        (alwaysShowTimestamps || startsGroup || last || hover || focusWithin || actionBarFocused || hasContextMenu)
+    );
+}
+
+/** Inputs for deciding whether a tile starts a sender's group of messages. */
+export interface StartsGroupInput {
+    /** The current timeline rendering mode. */
+    timelineRenderingType: TimelineRenderingType;
+    /** The layout the timeline is shown in. */
+    layout: Layout | undefined;
+    /** Whether the tile continues the previous sender's messages. */
+    isContinuation: boolean | undefined;
+    /** Whether the event is shown as an info line (membership changes and the like). */
+    isInfoMessage: boolean;
+}
+
+/**
+ * InterCom: whether the tile is the first of a sender's messages in a room's timeline in the
+ * modern layout: the one that shows the name, and the time beside it.
+ */
+export function getStartsGroup({
+    timelineRenderingType,
+    layout,
+    isContinuation,
+    isInfoMessage,
+}: StartsGroupInput): boolean {
+    return (
+        timelineRenderingType === TimelineRenderingType.Room &&
+        (layout === undefined || layout === Layout.Group) &&
+        !isContinuation &&
+        !isInfoMessage
     );
 }
 

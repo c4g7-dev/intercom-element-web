@@ -1,0 +1,152 @@
+/*
+Copyright 2026 The InterCom contributors
+
+SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+Please see LICENSE files in the repository root for full details.
+*/
+
+/* The --ic-* properties are defined in _flat.pcss, which the theme entry points import first */
+/* stylelint-disable csstools/value-no-unknown-custom-properties */
+
+/*
+ * InterCom's timeline, composer and side panel. Messages of one sender sit close together under
+ * one name with the time beside it (the tile's own style sheet in shared-components places the
+ * avatar and the time), days are parted by a hairline, the composer is one rounded bar.
+ *
+ * Like _flat.pcss this only restyles: it can be deleted without consequence.
+ */
+
+/* --- Timeline -------------------------------------------------------------------------- */
+
+/* Only in a room's timeline: the thread list and the cards set their own */
+:root:root .mx_RoomView_MessageList .mx_EventTile {
+    --event-tile-block-start: 16px;
+    --event-tile-group-line-spacing-block-start: 1px;
+    --event-tile-group-line-spacing-block-end: 1px;
+    --event-tile-state-hover-background: var(--cpd-color-gray-200);
+}
+
+:root:root .mx_RoomView_MessageList .mx_EventTile > [data-testid="event-tile-slot-sender"] .mx_DisambiguatedProfile {
+    font: var(--cpd-font-body-md-semibold);
+}
+
+:root:root .mx_RoomView_MessageList .mx_EventTile .mx_MessageTimestamp {
+    font-size: 11px;
+    color: var(--cpd-color-text-secondary);
+}
+
+/* Day separators: a hairline with the date in small type */
+:root:root .mx_RoomView_MessageList .mx_TimelineSeparator {
+    margin: var(--cpd-space-4x) var(--cpd-space-4x) 0;
+    gap: var(--cpd-space-2x);
+}
+
+:root:root .mx_RoomView_MessageList .mx_TimelineSeparator > hr {
+    border-bottom: var(--ic-hairline);
+}
+
+:root:root .mx_RoomView_MessageList .mx_TimelineSeparator h2 {
+    font: var(--cpd-font-body-xs-semibold);
+    color: var(--cpd-color-text-secondary);
+}
+
+/* The actions of a message: a small bar on its top edge */
+:root:root .mx_MessageActionBar {
+    border: 1px solid var(--ic-separator-color);
+    border-radius: var(--ic-radius-md);
+    background-color: var(--cpd-color-gray-200);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 18%);
+    padding: 2px;
+    gap: 0;
+}
+
+:root:root .mx_MessageActionBar > button {
+    border-radius: var(--ic-radius-sm);
+}
+
+/* Reactions */
+:root:root .mx_ReactionsRow > button {
+    border-radius: var(--ic-radius-md);
+}
+
+/* Replies: a quiet line above the message */
+:root:root .mx_ReplyChain {
+    border-inline-start-width: 2px;
+    border-radius: 0;
+}
+
+/* The line under the last message read */
+:root:root .mx_MessagePanel_myReadMarker hr,
+:root:root .mx_RoomView_myReadMarker {
+    opacity: 0.6;
+}
+
+/* --- Composer -------------------------------------------------------------------------- */
+
+:root:root .mx_RoomView_body .mx_MessageComposer,
+:root:root .mx_ThreadView .mx_MessageComposer {
+    box-sizing: border-box;
+    border-top: none;
+    padding: 0 16px 20px;
+    margin: 0;
+}
+
+:root:root .mx_RoomView_body .mx_MessageComposer_wrapper,
+:root:root .mx_ThreadView .mx_MessageComposer_wrapper {
+    box-sizing: border-box;
+    padding: 0 10px 0 8px;
+    border: 1px solid var(--ic-separator-color);
+    border-radius: var(--ic-radius-lg);
+    background-color: var(--cpd-color-gray-300);
+    transition: border-color 0.15s linear;
+}
+
+:root:root .mx_MessageComposer_wrapper:focus-within {
+    border-color: var(--cpd-color-gray-600);
+}
+
+:root:root .mx_MessageComposer .mx_MessageComposer_row {
+    min-height: 46px;
+    align-items: center;
+    gap: 8px;
+}
+
+/* The lock that says the room is not encrypted: in the row, after the upload button */
+:root:root .mx_MessageComposer .mx_MessageComposer_e2eIconWrapper {
+    position: static;
+    display: flex;
+    flex: none;
+    margin: 0;
+}
+
+:root:root .mx_MessageComposer .mx_IntercomComposerUpload {
+    flex: none;
+    border-radius: 50%;
+}
+
+:root:root .mx_MessageComposer .mx_SendMessageComposer {
+    margin-right: 0;
+}
+
+/* --- Side panel ------------------------------------------------------------------------ */
+
+:root:root .mx_RightPanel {
+    border-left: var(--ic-hairline);
+}
+
+/* The people of a room: rows that light up when pointed at, with no rules between them */
+:root:root .mx_MemberListView .mx_MemberTileView {
+    width: calc(100% - 2 * var(--cpd-space-2x));
+    margin-inline: var(--cpd-space-2x);
+    padding-inline: var(--cpd-space-2x);
+    border-bottom: none;
+    border-radius: var(--ic-radius-md);
+}
+
+:root:root .mx_MemberListView .mx_MemberTileView:hover {
+    background-color: var(--cpd-color-gray-300);
+}
+
+:root:root .mx_MemberListView .mx_MemberListHeaderView {
+    border-bottom: none;
+}

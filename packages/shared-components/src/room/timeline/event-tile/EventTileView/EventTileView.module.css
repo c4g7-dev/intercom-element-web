@@ -1829,3 +1829,61 @@
         padding-block-start: var(--event-tile-file-separator-spacing);
     }
 }
+
+/*
+ * InterCom: a room's timeline in the modern layout. A sender's first message carries a larger
+ * avatar and the time beside the name; the following ones keep the time in the gutter, where it
+ * shows when the message is pointed at.
+ */
+:global(.mx_RoomView_MessageList) .root.layoutGroup {
+    --event-tile-group-gutter: 72px;
+    --event-tile-group-timestamp-width: 56px;
+
+    &:not(.stateInfo) > .slotAvatar {
+        inset-block-start: calc(var(--event-tile-block-start, 18px) + 2px);
+        inset-inline-start: var(--cpd-space-4x);
+
+        /* The avatar component takes its size from the application as an inline style */
+        :global(.mx_BaseAvatar) {
+            --cpd-avatar-size: 40px !important;
+        }
+    }
+
+    .slotTimestamp {
+        inset-inline-start: var(--cpd-space-2x);
+    }
+}
+
+/* Anchor positioning puts the time after the name, whatever the name's width */
+@supports (anchor-scope: --event-tile-sender) {
+    :global(.mx_RoomView_MessageList) .root.layoutGroup:not(.stateContinuation):not(.stateInfo) {
+        anchor-scope: --event-tile-sender;
+
+        > .slotSender > * {
+            anchor-name: --event-tile-sender;
+        }
+
+        /* The time is in the line but placed against the name above it, so the tile is what both refer to */
+        > .line {
+            position: static;
+        }
+
+        > .line > .slotTimestamp {
+            position-anchor: --event-tile-sender;
+            inset-block-start: anchor(top);
+            inset-inline-start: calc(anchor(right) + var(--cpd-space-2x));
+            width: auto;
+            height: auto;
+            min-height: var(--cpd-font-size-heading-sm);
+        }
+
+        /* With the line no longer their reference, these keep their place on its first row */
+        > .line > .slotActionBar {
+            inset-block-start: calc(var(--event-tile-block-start, 18px) - 18px);
+        }
+
+        > .line > .slotPadlock {
+            inset-block-start: calc(var(--event-tile-block-start, 18px) + var(--cpd-font-size-heading-sm));
+        }
+    }
+}

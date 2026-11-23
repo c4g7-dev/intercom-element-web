@@ -46,6 +46,7 @@ import UIStore, { UI_EVENTS } from "../../../stores/UIStore";
 import RoomContext from "../../../contexts/RoomContext";
 import { type SettingUpdatedPayload } from "../../../dispatcher/payloads/SettingUpdatedPayload";
 import MessageComposerButtons from "./MessageComposerButtons";
+import { ComposerUploadButton } from "../../../intercom/ComposerUploadButton";
 import AccessibleButton, { type ButtonEvent } from "../elements/AccessibleButton";
 import { type ViewRoomPayload } from "../../../dispatcher/payloads/ViewRoomPayload";
 import { isLocalRoom } from "../../../utils/localRoom/isLocalRoom";
@@ -704,6 +705,10 @@ export class MessageComposer extends React.Component<IProps, IState> {
                         permalinkCreator={this.props.permalinkCreator}
                     />
                     <div className="mx_MessageComposer_row">
+                        {/* InterCom: the upload button stands first; in the narrow layout it stays in the menu */}
+                        {canSendMessages && !this.context.narrow && !this.state.haveRecording && (
+                            <ComposerUploadButton />
+                        )}
                         {leftIcon}
                         {composer}
                         <div className="mx_MessageComposer_actions">

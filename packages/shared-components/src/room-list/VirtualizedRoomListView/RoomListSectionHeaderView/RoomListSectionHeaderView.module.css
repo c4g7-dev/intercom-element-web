@@ -13,10 +13,11 @@
 
     width: 100%;
     cursor: pointer;
-    font: var(--cpd-font-body-sm-regular);
-    letter-spacing: var(--cpd-font-letter-spacing-body-sm);
+    /* InterCom: a small, quiet label with room above it, as a category of channels */
+    font: var(--cpd-font-body-xs-semibold);
+    letter-spacing: 0.02em;
     color: var(--cpd-color-text-secondary);
-    padding: var(--cpd-space-1x) 0;
+    padding: var(--cpd-space-3x) 0 var(--cpd-space-0-5x);
 
     &:hover,
     /* keyboardActive is toggled in JS for keyboard focus only (see RoomListSectionHeaderView), and
@@ -28,10 +29,6 @@
 
         svg {
             fill: var(--cpd-color-icon-primary);
-        }
-
-        .container {
-            background-color: var(--cpd-color-bg-action-tertiary-hovered);
         }
 
         .menu {
@@ -68,16 +65,15 @@
     }
 
     &.unread {
-        font: var(--cpd-font-body-sm-semibold);
         color: var(--cpd-color-text-primary);
     }
 }
 
 .container {
     position: relative;
-    margin: 0 var(--cpd-space-3x);
-    padding: var(--cpd-space-1-5x) var(--cpd-space-2x) var(--cpd-space-1-5x) var(--cpd-space-1x);
-    border-radius: 8px;
+    margin: 0 var(--cpd-space-2x);
+    padding: var(--cpd-space-0-5x) var(--cpd-space-2x) var(--cpd-space-0-5x) var(--cpd-space-0-5x);
+    border-radius: 6px;
 
     div {
         min-width: 0;
@@ -85,6 +81,8 @@
 
     svg {
         flex-shrink: 0;
+        width: 16px;
+        height: 16px;
     }
 }
 
@@ -96,7 +94,7 @@
 }
 
 .firstHeader {
-    padding-top: 0;
+    padding-top: var(--cpd-space-1-5x);
 }
 
 .lastHeader {
@@ -163,7 +161,7 @@ scrolling rows beneath because the overlay wrapper (.stickyHeader) owns the stac
     content: "";
     position: absolute;
     inset-block: 0;
-    inset-inline: 0 var(--cpd-space-3x);
+    inset-inline: 0 var(--cpd-space-2x);
     z-index: -1;
     background: var(--cpd-color-bg-canvas-default);
 }

@@ -31,7 +31,8 @@ export interface UploadButtonViewActions {
 
 /**
  * A composer button to initiate uploading files. The button may also be
- * Ctrl+Clicked to pick the first option automatically.
+ * Ctrl+Clicked to pick the first option automatically. Children, if any,
+ * replace the button's icon.
  *
  * @example
  * ```tsx
@@ -41,6 +42,7 @@ export interface UploadButtonViewActions {
 export function UploadButton({
     vm,
     defaultOpen = false,
+    children,
     ...rootButtonProps
 }: PropsWithChildren<
     { vm: ViewModel<UploadButtonViewSnapshot, UploadButtonViewActions>; defaultOpen?: boolean } & ComponentProps<
@@ -73,7 +75,7 @@ export function UploadButton({
                 aria-label={label}
                 onClick={() => vm.onUploadOptionSelected(options[0].type)}
             >
-                {Icon ? <Icon /> : <AttachmentIcon />}
+                {children ?? (Icon ? <Icon /> : <AttachmentIcon />)}
             </IconButton>
         );
     }
@@ -86,7 +88,7 @@ export function UploadButton({
             onClick={onMenuClick}
             title={i18n.translate("common|attachment")}
         >
-            <AttachmentIcon />
+            {children ?? <AttachmentIcon />}
         </IconButton>
     );
 

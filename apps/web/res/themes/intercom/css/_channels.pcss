@@ -5,13 +5,18 @@ SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Com
 Please see LICENSE files in the repository root for full details.
 */
 
+/* The --ic-* properties are defined in _flat.pcss, which the theme entry points import first */
+/* stylelint-disable csstools/value-no-unknown-custom-properties */
+
 /*
- * InterCom's layout polish: the app reads as a place with text and voice channels. Three layers
- * of surface (the space rail darkest, the room list between, the timeline lightest), tighter
- * message groups, a compact room header. Colours come from the InterCom themes in config.json;
- * with another theme the fallbacks keep everything as upstream has it.
+ * InterCom's shell: the app reads as a place with text and voice channels. Three layers of
+ * surface (the space rail darkest, the room list between, the timeline lightest), a rail of round
+ * space icons, a room list of channel rows, compact bars at the top. Colours come from the
+ * InterCom themes in config.json; with another theme the fallbacks keep the surfaces as upstream
+ * has them.
  *
- * Like _flat.pcss this only restyles: it can be deleted without consequence.
+ * Like _flat.pcss this only restyles: it can be deleted without consequence. The rows of the room
+ * list and its section headers are sized in their own style sheets in shared-components.
  */
 
 /* --- Layers ---------------------------------------------------------------------------- */
@@ -20,59 +25,350 @@ Please see LICENSE files in the repository root for full details.
     /* Worked out here, above the room list, which then takes it for its canvas */
     --ic-roomlist-bg: var(--roomlist-background-color, var(--cpd-color-bg-canvas-default));
     --ic-rail-bg: var(--sidebar-color, var(--cpd-color-bg-canvas-default));
-    /* The height of the bars at the top: the search of the room list and the room's header */
-    --ic-topbar-height: 52px;
+    /* The height of the bars at the top: the space's name above the room list and the room's header */
+    --ic-topbar-height: 48px;
 }
 
 :root:root .mx_SpacePanel {
     background-color: var(--ic-rail-bg);
+    border-right: none;
 }
 
 :root:root .mx_RoomListPanel {
     /* Everything in the list that paints the canvas (pinned section headers) paints the list's */
     --cpd-color-bg-canvas-default: var(--ic-roomlist-bg);
     background-color: var(--ic-roomlist-bg);
+    border-right: var(--ic-hairline);
     /* The user panel sits on the list as the rail sits beside it */
     --intercom-user-panel-bg: var(--ic-rail-bg);
+    /* Rows on this surface: one step lighter when pointed at, two when open */
+    --cpd-color-bg-action-tertiary-hovered: var(--cpd-color-gray-200);
+    --cpd-color-bg-action-tertiary-selected: var(--cpd-color-gray-400);
+}
+
+:root:root .mx_LeftPanel_outerWrapper,
+:root:root .mx_LeftPanel {
+    border-right: none;
+}
+
+/* --- Space rail ------------------------------------------------------------------------ */
+
+/*
+ * The collapsed rail is one column of 40px icons: round at rest, a rounded square for the space
+ * that is open or pointed at, with a marker at the rail's edge (a dot for unread, longer when
+ * pointed at, full height for the open space). The expanded panel keeps upstream's rows.
+ */
+:root:root .mx_SpacePanel.collapsed {
+    --gutterSize: 12px;
+
+    width: 64px;
+
+    /* One column of 40px icons */
+    .mx_UserMenu {
+        position: relative;
+        justify-content: center;
+        margin: 0;
+        padding: 8px 0;
+    }
+
+    .mx_UserMenu > button {
+        margin: 0;
+        padding: 0;
+    }
+
+    .mx_UserMenu [role="img"] {
+        --cpd-avatar-size: 40px !important;
+    }
+
+    > .mx_AutoHideScrollbar {
+        scrollbar-gutter: auto;
+        scrollbar-width: none;
+    }
+
+    /* A hairline between the account and the spaces */
+    .mx_UserMenu::after {
+        content: "";
+        position: absolute;
+        inset: auto 20px 0;
+        height: 1px;
+        background-color: var(--ic-separator-color);
+    }
+
+    .mx_SpaceTreeLevel {
+        padding-top: 6px;
+    }
+
+    .mx_SpaceItem {
+        position: relative;
+        width: 100%;
+    }
+
+    .mx_SpaceItem > .mx_SpaceButton {
+        margin-left: 0;
+        padding: 3px 0;
+        justify-content: center;
+        border-radius: 0;
+    }
+
+    .mx_SpaceButton .mx_SpaceButton_selectionWrapper,
+    .mx_SpaceButton.mx_SpaceButton_active .mx_SpaceButton_selectionWrapper {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        justify-content: center;
+    }
+
+    /* Round at rest, a rounded square for the space that is open or pointed at */
+    .mx_SpaceButton .mx_BaseAvatar,
+    .mx_SpaceButton .mx_SpaceButton_icon {
+        --cpd-avatar-size: 40px !important;
+        --cpd-avatar-radius: 50%;
+        box-sizing: border-box;
+        width: 40px;
+        height: 40px;
+        padding: 10px;
+        border-radius: 50%;
+        transition:
+            border-radius 0.18s var(--ic-ease),
+            background-color 0.18s var(--ic-ease),
+            color 0.18s var(--ic-ease);
+    }
+
+    .mx_SpaceButton .mx_BaseAvatar {
+        padding: 0;
+        font-size: 16px;
+    }
+
+    .mx_SpaceButton_avatarWrapper,
+    .mx_SpaceButton_avatarPlaceholder {
+        width: 40px;
+        height: 40px;
+    }
+
+    .mx_SpaceButton .mx_SpaceButton_icon {
+        background-color: var(--cpd-color-bg-subtle-secondary);
+    }
+
+    .mx_SpaceButton .mx_SpaceButton_icon svg {
+        width: 20px;
+        height: 20px;
+        color: var(--cpd-color-icon-primary);
+    }
+
+    .mx_SpaceButton:hover .mx_BaseAvatar,
+    .mx_SpaceButton:focus-visible .mx_BaseAvatar,
+    .mx_SpaceButton_active .mx_BaseAvatar,
+    .mx_SpaceButton:hover .mx_SpaceButton_icon,
+    .mx_SpaceButton:focus-visible .mx_SpaceButton_icon,
+    .mx_SpaceButton_active .mx_SpaceButton_icon {
+        --cpd-avatar-radius: 13px;
+        border-radius: 13px;
+    }
+
+    .mx_SpaceButton:hover .mx_SpaceButton_icon,
+    .mx_SpaceButton_active .mx_SpaceButton_icon {
+        background-color: var(--cpd-color-bg-accent-rest);
+    }
+
+    .mx_SpaceButton:hover .mx_SpaceButton_icon svg,
+    .mx_SpaceButton_active .mx_SpaceButton_icon svg {
+        color: var(--cpd-color-text-on-solid-primary);
+    }
+
+    .mx_SpaceButton.mx_SpaceButton_new .mx_SpaceButton_icon {
+        background-color: var(--cpd-color-bg-subtle-secondary);
+    }
+
+    .mx_SpaceButton.mx_SpaceButton_new:hover .mx_SpaceButton_icon {
+        background-color: var(--cpd-color-bg-accent-rest);
+    }
+
+    /* The marker at the rail's edge: a dot for unread, longer when pointed at, full for the open space */
+    .mx_SpaceItem > .mx_SpaceButton::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 50%;
+        width: 4px;
+        height: 0;
+        border-radius: 0 4px 4px 0;
+        background-color: var(--cpd-color-text-primary);
+        transform: translateY(-50%);
+        transition: height 0.18s var(--ic-ease);
+    }
+
+    .mx_SpaceItem > .mx_SpaceButton:has(.mx_SpacePanel_notificationBadge)::before {
+        height: 8px;
+    }
+
+    .mx_SpaceItem:not(.mx_SpaceItem_new) > .mx_SpaceButton:hover::before,
+    .mx_SpaceItem:not(.mx_SpaceItem_new) > .mx_SpaceButton:focus-visible::before {
+        height: 20px;
+    }
+
+    .mx_SpaceItem > .mx_SpaceButton.mx_SpaceButton_active::before {
+        height: 36px;
+    }
+
+    .mx_SpacePanel_badgeContainer {
+        right: -4px;
+        top: auto;
+        bottom: -4px;
+    }
+}
+
+/* The badge sits on the rail, so its ring is the rail's colour */
+:root:root .mx_SpacePanel .mx_SpacePanel_badgeContainer .mx_SpacePanel_notificationBadge {
+    border-color: var(--ic-rail-bg);
+}
+
+/* Threads and quick settings at the foot of the rail */
+:root:root .mx_SpacePanel .mx_ThreadsActivityCentre_container,
+:root:root .mx_SpacePanel .mx_QuickSettingsButton {
+    margin-inline: auto;
 }
 
 /* --- Room list ------------------------------------------------------------------------- */
 
-:root:root .mx_RoomListPanel [data-testid="room-list-search"] {
+/* The space's name on top, like a server's, and the search under it */
+:root:root .mx_RoomListPanel > [data-testid="room-list-header"] {
+    order: -2;
+    box-sizing: border-box;
+    height: var(--ic-topbar-height);
     min-height: var(--ic-topbar-height);
+    padding: 0 var(--cpd-space-2x) 0 var(--cpd-space-4x);
+    border-bottom: var(--ic-hairline);
 }
 
-/* A voice channel has a speaker where other rooms have their avatar */
+:root:root .mx_RoomListPanel > [data-testid="room-list-header"] h1 {
+    font: var(--cpd-font-body-lg-semibold);
+}
+
+:root:root .mx_RoomListPanel > [data-testid="room-list-search"] {
+    order: -1;
+    min-height: 0;
+    padding: 10px var(--cpd-space-2x) var(--cpd-space-1x);
+    border-bottom: none;
+    gap: 6px;
+}
+
+:root:root .mx_RoomListPanel > [data-testid="room-list-search"] > button:first-child {
+    min-height: 32px;
+    height: 32px;
+    padding-inline: var(--cpd-space-2x);
+    border: var(--cpd-border-width-1) solid transparent;
+    border-radius: var(--ic-radius-md);
+    background-color: var(--ic-rail-bg);
+    color: var(--cpd-color-text-secondary);
+    font: var(--cpd-font-body-sm-regular);
+}
+
+:root:root .mx_RoomListPanel > [data-testid="room-list-search"] > button:first-child:hover {
+    border-color: var(--cpd-color-gray-500);
+}
+
+:root:root .mx_RoomListPanel > [data-testid="room-list-search"] kbd {
+    font: var(--cpd-font-body-xs-regular);
+    color: var(--cpd-color-text-secondary);
+}
+
+/* The filters: quiet chips */
+:root:root .mx_RoomListPanel [data-testid="primary-filters"] {
+    padding: 6px var(--cpd-space-2x) var(--cpd-space-1x);
+}
+
+:root:root .mx_RoomListPanel [data-testid="primary-filters"] [role="option"] {
+    padding: 2px 10px;
+    border: none;
+    border-radius: 999px;
+    background-color: var(--cpd-color-gray-300);
+    color: var(--cpd-color-text-secondary);
+    font: var(--cpd-font-body-xs-medium);
+    line-height: 20px;
+}
+
+:root:root .mx_RoomListPanel [data-testid="primary-filters"] [role="option"]:hover {
+    background-color: var(--cpd-color-gray-400);
+    color: var(--cpd-color-text-primary);
+}
+
+:root:root .mx_RoomListPanel [data-testid="primary-filters"] [role="option"][aria-selected="true"] {
+    background-color: var(--cpd-color-bg-accent-rest);
+    color: var(--cpd-color-text-on-solid-primary);
+}
+
+/* A row: glyph or face, name, what is new */
+:root:root .mx_RoomListPanel .mx_RoomListItemView > div {
+    gap: var(--cpd-space-2x);
+    transition: background-color 0.1s linear;
+}
+
+/* The dot at a row's end says what the marker at its start says already */
+:root:root .mx_RoomListPanel .mx_RoomListItemView [data-testid="notification-decoration"] > div {
+    display: none;
+}
+
+:root:root .mx_RoomListPanel .mx_RoomListItemView [data-testid="notification-decoration"] > span {
+    box-sizing: border-box;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 5px;
+    border-radius: 999px;
+    font: var(--cpd-font-body-xs-semibold);
+    font-size: 11px;
+    line-height: 16px;
+}
+
+:root:root .mx_RoomListPanel .mx_RoomListItemView [data-testid="notification-decoration"] svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Channel glyphs: "#" for a text room, a speaker for a voice room */
+.mx_IntercomChannelIcon,
 .mx_IntercomVoiceChannelIcon {
     display: flex;
     flex: none;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: var(--ic-radius-md);
-    color: var(--cpd-color-icon-secondary);
-    background-color: var(--cpd-color-bg-action-tertiary-hovered);
+    width: 20px;
+    height: 20px;
+    color: var(--cpd-color-icon-tertiary);
 }
 
+.mx_RoomListItemView:hover .mx_IntercomChannelIcon,
+.mx_RoomListItemView_selected .mx_IntercomChannelIcon,
+.mx_RoomListItemView:hover .mx_IntercomVoiceChannelIcon,
 .mx_RoomListItemView_selected .mx_IntercomVoiceChannelIcon {
-    color: var(--cpd-color-icon-accent-primary);
+    color: var(--cpd-color-icon-secondary);
+}
+
+/* A conversation with a person keeps its face, and a taller row */
+.mx_IntercomDmAvatar {
+    display: flex;
+    flex: none;
+}
+
+:root:root .mx_RoomListPanel .mx_RoomListItemView:has(.mx_IntercomDmAvatar) {
+    min-height: 44px;
+}
+
+:root:root .mx_RoomListPanel .mx_RoomListItemView:has(.mx_IntercomDmAvatar) > div {
+    gap: var(--cpd-space-3x);
 }
 
 /* --- Room header ----------------------------------------------------------------------- */
 
 :root:root .mx_RoomHeader {
     height: var(--ic-topbar-height);
+    padding-inline: var(--cpd-space-4x) var(--cpd-space-3x);
+    border-bottom: var(--ic-hairline);
+    gap: var(--cpd-space-2x);
 }
 
-/* --- Timeline -------------------------------------------------------------------------- */
-
-/*
- * Lines of one sender sit close together, and a new sender starts 12px further down rather
- * than 18px. Only in a room's timeline: the thread list and the cards set their own.
- */
-:root:root .mx_RoomView_MessageList .mx_EventTile {
-    --event-tile-block-start: 12px;
-    --event-tile-group-line-spacing-block-start: 0px;
-    --event-tile-group-line-spacing-block-end: 1px;
+:root:root .mx_RoomHeader > .mx_BaseAvatar {
+    /* The avatar component takes its size as an inline style */
+    --cpd-avatar-size: 28px !important;
 }

@@ -65,7 +65,7 @@ describe("MessageComposerButtons", () => {
         );
     }
 
-    it("Renders emoji and upload buttons in wide mode", () => {
+    it("Renders the emoji button in wide mode, the upload button being before the text (InterCom)", () => {
         wrapAndRender(
             <MessageComposerButtons
                 {...mockProps}
@@ -77,7 +77,7 @@ describe("MessageComposerButtons", () => {
             false,
         );
 
-        expect(getButtonLabels()).toEqual(["Emoji", "Attachment", "More options"]);
+        expect(getButtonLabels()).toEqual(["Emoji", "More options"]);
     });
 
     it("Renders other buttons in menu in wide mode", async () => {
@@ -97,7 +97,6 @@ describe("MessageComposerButtons", () => {
         await waitFor(() => {
             expect(getButtonLabels()).toEqual([
                 "Emoji",
-                "Attachment",
                 "More options",
                 ["Sticker", "Voice Message", "Poll", "Location"],
             ]);

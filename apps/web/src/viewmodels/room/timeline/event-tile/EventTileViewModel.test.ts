@@ -494,6 +494,22 @@ describe("EventTileViewModel", () => {
         expect(snapshot.timestamp.displayState.showRealTimestamp).toBe(true);
     });
 
+    it("shows the timestamp of the message that starts a sender's group without hover", () => {
+        const first = EventTileViewModel.createSnapshot(makeProps());
+        const following = EventTileViewModel.createSnapshot(makeProps({ display: { continuation: true } }));
+        const info = EventTileViewModel.createSnapshot(makeProps({ display: { isInfoMessage: true } }));
+        const irc = EventTileViewModel.createSnapshot(makeProps({ display: { layout: Layout.IRC } }));
+        const search = EventTileViewModel.createSnapshot(
+            makeProps({ display: { timelineRenderingType: TimelineRenderingType.Search } }),
+        );
+
+        expect(first.timestamp.show).toBe(true);
+        expect(following.timestamp.show).toBe(false);
+        expect(info.timestamp.show).toBe(false);
+        expect(irc.timestamp.show).toBe(false);
+        expect(search.timestamp.show).toBe(false);
+    });
+
     it("suppresses RTC notification timestamps", () => {
         const snapshot = EventTileViewModel.createSnapshot(
             makeProps({
@@ -591,13 +607,13 @@ describe("EventTileViewModel", () => {
     });
 
     it("updates an instance snapshot when inputs change", () => {
-        const vm = new EventTileViewModel(makeDependencies(), makeProps());
+        const vm = new EventTileViewModel(makeDependencies(), makeProps({ display: { continuation: true } }));
         const listener = vi.fn();
         const unsubscribe = vm.subscribe(listener);
 
         expect(vm.getSnapshot().snapshot.timestamp.show).toBe(false);
 
-        vm.setInputs(makeDependencies(), makeProps({ interaction: { hover: true } }));
+        vm.setInputs(makeDependencies(), makeProps({ display: { continuation: true }, interaction: { hover: true } }));
 
         expect(vm.getSnapshot().snapshot.timestamp.show).toBe(true);
         expect(listener).toHaveBeenCalled();

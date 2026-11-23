@@ -22,6 +22,10 @@ Please see LICENSE files in the repository root for full details.
     --ic-radius-md: 8px;
     --ic-radius-lg: 12px;
     --ic-surface-border: var(--cpd-border-width-1) solid var(--cpd-color-gray-400);
+    /* The line between two surfaces, and the curve of everything that moves */
+    --ic-separator-color: var(--roomlist-separator-color, var(--cpd-color-gray-400));
+    --ic-hairline: var(--cpd-border-width-1) solid var(--ic-separator-color);
+    --ic-ease: cubic-bezier(0.2, 0, 0, 1);
 
     /* Message bubbles, images and other message bodies */
     --MBody-border-radius: var(--ic-radius-md);
@@ -103,4 +107,22 @@ Please see LICENSE files in the repository root for full details.
 
 :root:root .mx_Dropdown_input {
     border-radius: var(--ic-radius-md);
+}
+
+/*
+ * Dialogs: upstream sets them in a wide translucent frame. A hairline and one radius instead,
+ * like every other surface that floats. (The lightbox, the spinner and the search have no frame:
+ * upstream takes its box away.)
+ */
+:root:root .mx_Dialog_border {
+    padding: 0;
+    border: var(--ic-surface-border);
+    border-radius: 16px;
+    background: none;
+    backdrop-filter: none;
+    overflow: hidden;
+}
+
+:root:root .mx_Dialog_border > .mx_Dialog {
+    border-radius: 0;
 }

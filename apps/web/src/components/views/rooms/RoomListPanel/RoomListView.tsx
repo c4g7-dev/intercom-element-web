@@ -23,6 +23,7 @@ import { Landmark, LandmarkNavigation } from "../../../../accessibility/Landmark
 import { RoomListViewModel } from "../../../../viewmodels/room-list/RoomListViewModel";
 import { SDKContext } from "../../../../contexts/SDKContext.ts";
 import { isVoiceChannel, VoiceChannelIcon, VoiceChannelParticipants } from "../../../../intercom/VoiceChannel";
+import { isDirectMessage, TextChannelIcon } from "../../../../intercom/ChannelIcon";
 
 /**
  * RoomListView component using shared components with proper MVVM pattern.
@@ -44,7 +45,15 @@ export function RoomListView(): JSX.Element {
     const renderAvatar = useCallback((room: SharedRoom): ReactNode => {
         // InterCom: a voice channel is a place to talk rather than a conversation with a face
         if (room instanceof Room && isVoiceChannel(room)) return <VoiceChannelIcon />;
-        if (room instanceof Room) return <DecoratedRoomAvatarView room={room} />;
+        // InterCom: a person keeps their face, every other room is a text channel
+        if (room instanceof Room && !isDirectMessage(room)) return <TextChannelIcon />;
+        if (room instanceof Room) {
+            return (
+                <span className="mx_IntercomDmAvatar">
+                    <DecoratedRoomAvatarView room={room} />
+                </span>
+            );
+        }
         // A preview item has no `Room`, only the data needed for its avatar
         if (room instanceof PreviewRoomAvatarData) return <RoomAvatar size="32px" oobData={room} />;
         return null;

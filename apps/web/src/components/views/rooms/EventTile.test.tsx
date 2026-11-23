@@ -312,14 +312,20 @@ describe("EventTile", () => {
             mxEvent = makeTimestampedMessage();
         });
 
-        it("hides the timestamp by default in room timelines", () => {
+        it("shows the timestamp of a sender's first message in room timelines (InterCom)", () => {
             const { container } = getComponent();
+
+            expect(container.querySelector(".mx_MessageTimestamp")).not.toBeNull();
+        });
+
+        it("hides the timestamp of a sender's following messages by default", () => {
+            const { container } = getComponent({ continuation: true });
 
             expect(container.querySelector(".mx_MessageTimestamp")).toBeNull();
         });
 
         it("shows the timestamp when the tile is hovered", async () => {
-            const { container } = getComponent();
+            const { container } = getComponent({ continuation: true });
             const tile = getTile(container);
             stubHoverMatches(tile);
 
@@ -331,7 +337,7 @@ describe("EventTile", () => {
         });
 
         it("shows the timestamp when focus is within the tile", () => {
-            const { container } = getComponent();
+            const { container } = getComponent({ continuation: true });
 
             expect(container.querySelector(".mx_MessageTimestamp")).toBeNull();
 
@@ -702,7 +708,7 @@ describe("EventTile", () => {
 
         it("shows the timestamp while the context menu is open", async () => {
             mxEvent = makeTimestampedMessage();
-            const { container } = getComponent();
+            const { container } = getComponent({ continuation: true });
 
             expect(container.querySelector(".mx_MessageTimestamp")).toBeNull();
 

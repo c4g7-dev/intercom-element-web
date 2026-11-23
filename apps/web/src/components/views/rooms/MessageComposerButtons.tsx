@@ -23,7 +23,7 @@ import {
     StickerIcon,
     TextFormattingIcon,
 } from "@vector-im/compound-design-tokens/assets/web/icons";
-import { UploadButton, useViewModel } from "@element-hq/web-shared-components";
+import { useViewModel } from "@element-hq/web-shared-components";
 
 import { _t } from "../../../languageHandler";
 import { CollapsibleButton, OverflowMenuContext } from "./CollapsibleButton";
@@ -114,7 +114,7 @@ const MessageComposerButtons: React.FC<IProps> = (props: IProps) => {
             ) : (
                 emojiButton(props)
             ),
-            <UploadButton key="upload" vm={roomUploadVM} />,
+            // InterCom: the upload button stands before the text (ComposerUploadButton)
         ];
         moreButtons = [
             showStickersButton(props),
