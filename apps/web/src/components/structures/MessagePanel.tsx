@@ -45,7 +45,7 @@ import { MainGrouper } from "./grouper/MainGrouper";
 import { CreationGrouper } from "./grouper/CreationGrouper";
 import { _t } from "../../languageHandler";
 import { getLateEventInfo } from "./grouper/LateEventGrouper";
-import { findGalleries } from "../../intercom/gallery/grouping";
+import { analyseGalleries, logGalleryDecisions } from "../../intercom/gallery/grouping";
 import { GalleryGroupContext } from "../../intercom/gallery/GalleryContext";
 import { findLastSuccessfulWeSent } from "../../viewmodels/room/timeline/event-tile/EventTileReceiptState";
 import { getReadReceiptsByShownEvent, getReadReceiptsForEvent, type ShownReadReceipt } from "../../utils/read-receipts";
@@ -738,20 +738,32 @@ export default class MessagePanel extends React.Component<IProps, IState> {
      */
     private findGalleries(events: WrappedEvent[]): Map<string, MatrixEvent[]> {
         const type = this.context.timelineRenderingType;
-        // Also with "show hidden events" on: what then has a tile between two pictures ends the run
-        if (
-            this.props.disableGrouping ||
-            (type !== TimelineRenderingType.Room && type !== TimelineRenderingType.Thread)
-        ) {
-            return new Map();
-        }
+        const enabled =
+            !this.props.disableGrouping &&
+            (type === TimelineRenderingType.Room || type === TimelineRenderingType.Thread);
         // The picture a permalink points at, or that is being edited, keeps its own tile
         const exclude = new Set<string>();
         if (this.props.highlightedEventId) exclude.add(this.props.highlightedEventId);
         const editing = this.props.editState?.getEvent().getId();
         if (editing) exclude.add(editing);
 
-        const found = findGalleries(events, exclude);
+        // With "show hidden events" on, what has a tile only because of that (call memberships,
+        // reactions, edits, …) does not part two pictures
+        const candidates = this.showHiddenEvents
+            ? events.map((wrapped) => ({
+                  ...wrapped,
+                  hiddenByDefault: wrapped.shouldShow && !this.shouldShowEvent(wrapped, true),
+              }))
+            : events;
+        const { galleries: found, decisions, decisionKeys } = analyseGalleries(candidates, exclude);
+        // For the diagnostics log: what was decided about every run of pictures, and why
+        logGalleryDecisions(decisions, decisionKeys, {
+            layout: this.props.layout,
+            timeline: type,
+            hiddenShown: this.showHiddenEvents,
+            grouping: enabled,
+        });
+        if (!enabled) return new Map();
         for (const [id, gallery] of found) {
             const before = this.galleries.get(id);
             if (before && before.length === gallery.length && before.every((ev, i) => ev === gallery[i])) {

@@ -395,6 +395,52 @@ describe("MessagePanel", function () {
         expect(container.getElementsByClassName("mx_IntercomGallery_cell")).toHaveLength(3);
     });
 
+    it("keeps a gallery together over a call's events, with hidden events shown or not", function () {
+        const ts = new Date(2026, 5, 1, 12, 0, 0).getTime();
+        const picture = (i: number): MatrixEvent =>
+            TestUtilsMatrix.mkEvent({
+                event: true,
+                type: "m.room.message",
+                room: "!room:id",
+                user: "@user:id",
+                ts: ts + i * 250,
+                content: {
+                    "msgtype": "m.image",
+                    "body": `picture${i}.png`,
+                    "url": `mxc://server/picture${i}`,
+                    "m.mentions": {},
+                    "io.intercom.gallery": { id: "batch", index: i, count: 4 },
+                },
+            });
+        const callMember = (i: number): MatrixEvent =>
+            TestUtilsMatrix.mkEvent({
+                event: true,
+                type: "org.matrix.msc3401.call.member",
+                room: "!room:id",
+                user: "@other:id",
+                skey: `_@other:id_DEVICE${i}_m.call`,
+                ts: ts + i * 250 + 100,
+                content: { application: "m.call", call_id: "", device_id: `DEVICE${i}` },
+            });
+        const timeline = [picture(0), callMember(0), picture(1), callMember(1), picture(2), picture(3)];
+
+        const plain = render(getComponent({ events: timeline }), clientAndSDKContextRenderOptions(client, sdkContext));
+        expect(plain.container.getElementsByClassName("mx_IntercomGallery_cell")).toHaveLength(4);
+        expect(plain.container.getElementsByClassName("mx_EventTile")).toHaveLength(1);
+        plain.unmount();
+
+        vi.spyOn(SettingsStore, "getValue").mockImplementation((arg) => {
+            return arg === "showDisplaynameChanges" || arg === "showHiddenEventsInTimeline";
+        });
+        const { container } = render(
+            getComponent({ events: timeline }, { showHiddenEvents: true }),
+            clientAndSDKContextRenderOptions(client, sdkContext),
+        );
+        // One gallery of all four; the call's events keep their (hidden event) tiles
+        expect(container.getElementsByClassName("mx_IntercomGallery")).toHaveLength(1);
+        expect(container.getElementsByClassName("mx_IntercomGallery_cell")).toHaveLength(4);
+    });
+
     it("should collapse adjacent member events", function () {
         const { container } = render(
             getComponent({ events: mkMelsEvents() }),

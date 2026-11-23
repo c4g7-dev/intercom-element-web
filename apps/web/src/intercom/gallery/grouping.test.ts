@@ -5,13 +5,15 @@ SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Com
 Please see LICENSE files in the repository root for full details.
 */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { EventStatus, EventType, MatrixEvent, MsgType } from "matrix-js-sdk/src/matrix";
 import { decryptExistingEvent, mkDecryptionFailureMatrixEvent } from "matrix-js-sdk/src/testing";
 import { DecryptionFailureCode } from "matrix-js-sdk/src/crypto-api";
 
 import {
+    analyseGalleries,
     findGalleries,
+    logGalleryDecisions,
     GALLERY_BATCH_FIELD,
     GALLERY_MAX_GAP_MS,
     galleryBatchId,
@@ -253,5 +255,205 @@ describe("galleryLayout", () => {
             const { spans } = galleryLayout(count);
             expect(spans.reduce((a, b) => a + b, 0) % 6).toBe(0);
         }
+    });
+});
+
+describe("pictures sent while a call is on, with what a real room has around them", () => {
+    const state = (type: string, sender: string, ts: number, content: Record<string, unknown> = {}): MatrixEvent =>
+        new MatrixEvent({
+            type,
+            state_key: `_${sender}_DEVICE_m.call`,
+            event_id: `$state${counter++}`,
+            room_id: "!room:example.org",
+            sender,
+            origin_server_ts: ts,
+            content,
+        });
+    const message = (type: string, sender: string, ts: number, content: Record<string, unknown> = {}): MatrixEvent =>
+        new MatrixEvent({
+            type,
+            event_id: `$other${counter++}`,
+            room_id: "!room:example.org",
+            sender,
+            origin_server_ts: ts,
+            content,
+        });
+    const batch = (index: number): Record<string, unknown> => ({
+        [GALLERY_BATCH_FIELD]: { id: "batch1", index, count: 4 },
+        "m.mentions": {},
+        "info": { mimetype: "image/png", size: 1656715, w: 2560, h: 1440 },
+        "url": undefined,
+        "file": { url: "mxc://example.org/enc", v: "v2" },
+    });
+    const pictures = (): MatrixEvent[] => [0, 1, 2, 3].map((i) => image("@a:x", T0 + i * 250, batch(i)));
+    const ids = (events: MatrixEvent[]): string[] => events.map((ev) => ev.getId()!);
+
+    /** What has no tile in a room: memberships of the call, its keys, reactions, edits, receipts of a call */
+    const untiled = (ts: number): MatrixEvent[] => [
+        state("org.matrix.msc3401.call.member", "@a:x", ts, { application: "m.call", device_id: "DEVICE" }),
+        state("org.matrix.msc3401.call.member", "@b:x", ts, {}),
+        message("org.matrix.msc4143.rtc.member", "@b:x", ts, { application: { type: "m.call" } }),
+        message("io.element.call.encryption_keys", "@b:x", ts, { keys: [] }),
+        message("m.reaction", "@b:x", ts, { "m.relates_to": { rel_type: "m.annotation", event_id: "$x", key: "+" } }),
+        message("m.room.redaction", "@b:x", ts, {}),
+        message(EventType.RoomMessage, "@b:x", ts, {
+            "msgtype": MsgType.Text,
+            "body": "* edited",
+            "m.new_content": { msgtype: MsgType.Text, body: "edited" },
+            "m.relates_to": { rel_type: "m.replace", event_id: "$x" },
+        }),
+    ];
+
+    it("groups them with the call's events between every two of them", () => {
+        const [a, b, c, d] = pictures();
+        const timeline = [
+            { event: a, shouldShow: true },
+            ...untiled(T0 + 100).map((event) => ({ event, shouldShow: false })),
+            { event: b, shouldShow: true },
+            ...untiled(T0 + 300).map((event) => ({ event, shouldShow: false })),
+            { event: c, shouldShow: true },
+            ...untiled(T0 + 600).map((event) => ({ event, shouldShow: false })),
+            { event: d, shouldShow: true },
+        ];
+        expect([...findGalleries(timeline).values()].map(ids)).toEqual([ids([a, b, c, d])]);
+    });
+
+    it("groups them with hidden events shown, when those are all that lies between", () => {
+        const [a, b, c, d] = pictures();
+        const timeline = [
+            { event: a, shouldShow: true },
+            ...untiled(T0 + 100).map((event) => ({ event, shouldShow: true, hiddenByDefault: true })),
+            { event: b, shouldShow: true },
+            { event: c, shouldShow: true },
+            ...untiled(T0 + 600).map((event) => ({ event, shouldShow: true, hiddenByDefault: true })),
+            { event: d, shouldShow: true },
+        ];
+        expect([...findGalleries(timeline).values()].map(ids)).toEqual([ids([a, b, c, d])]);
+    });
+
+    it("is still parted by what has a tile whatever the options: a message, a call's start", () => {
+        const [a, b, c, d] = pictures();
+        const ring = message("org.matrix.msc4075.rtc.notification", "@b:x", T0 + 300, { notification_type: "ring" });
+        const timeline = [
+            { event: a, shouldShow: true },
+            { event: b, shouldShow: true },
+            { event: ring, shouldShow: true, hiddenByDefault: false },
+            { event: c, shouldShow: true },
+            { event: d, shouldShow: true },
+        ];
+        expect([...findGalleries(timeline).values()].map(ids)).toEqual([ids([a, b]), ids([c, d])]);
+    });
+
+    it("takes a caption on the first picture (MSC2530: a body beside another file name)", () => {
+        const [a, b, c] = pictures();
+        const first = image("@a:x", T0 - 250, { ...batch(0), body: "Look at these", filename: "a.png" });
+        expect([...findGalleries(shown([first, a, b, c])).values()].map(ids)).toEqual([ids([first, a, b, c])]);
+        // A file name that is the body is no caption
+        const named = image("@a:x", T0 + 2000, { ...batch(3), body: "a.png", filename: "a.png" });
+        expect([...findGalleries(shown([a, b, named])).values()].map(ids)).toEqual([ids([a, b, named])]);
+    });
+
+    it("takes pictures as other clients send them: no mark, a file name, mentions", () => {
+        const plain = [0, 1, 2].map((i) =>
+            image("@b:x", T0 + i * 900, {
+                "body": `IMG_${i}.jpg`,
+                "filename": `IMG_${i}.jpg`,
+                "m.mentions": {},
+                "info": { "mimetype": "image/jpeg", "xyz.amorgan.blurhash": "L00000", "thumbnail_info": {} },
+            }),
+        );
+        expect([...findGalleries(shown(plain)).values()].map(ids)).toEqual([ids(plain)]);
+    });
+
+    describe("in the diagnostics log", () => {
+        let log: MockInstance<typeof console.log>;
+        const records = (): Record<string, any>[] =>
+            log.mock.calls
+                .map(([line]) => String(line))
+                .filter((line) => line.startsWith("[intercom-diag] "))
+                .map((line) => JSON.parse(line.slice("[intercom-diag] ".length)));
+        beforeEach(() => {
+            log = vi.spyOn(console, "log").mockImplementation(() => {});
+        });
+        afterEach(() => {
+            log.mockRestore();
+        });
+
+        it("says of every picture of a run whether it joined, and why not", () => {
+            const [a, b, c, d] = pictures();
+            const words = text("@a:x", T0 + 600);
+            const other = image("@b:x", T0 + 1200, { body: "secret-name.png" });
+            const timeline = [
+                { event: a, shouldShow: true },
+                ...untiled(T0 + 100).map((event) => ({ event, shouldShow: false })),
+                { event: b, shouldShow: true },
+                { event: words, shouldShow: true },
+                { event: c, shouldShow: true },
+                { event: d, shouldShow: true },
+                { event: other, shouldShow: true },
+            ];
+            const { decisions, decisionKeys } = analyseGalleries(timeline);
+            expect(decisions).toHaveLength(1);
+            expect(decisions[0].pictures).toBe(5);
+            expect(decisions[0].galleries).toEqual([2, 2]);
+            expect(decisions[0].items.map((item) => item.outcome)).toEqual([
+                "first",
+                "joined",
+                "tile_between",
+                "joined",
+                "sender",
+            ]);
+            expect(decisions[0].items[1]).toMatchObject({
+                sender: 0,
+                gapMs: 250,
+                batch: 0,
+                batchIndex: 1,
+                batchCount: 4,
+                caption: false,
+                hasFilename: false,
+                mimetype: "image/png",
+                thread: false,
+                shown: true,
+            });
+            expect(decisions[0].items[1].between).toContain("org.matrix.msc3401.call.member:no_tile,state");
+            expect(decisions[0].items[1].between).toContain("m.room.message/m.text:no_tile");
+            expect(decisions[0].items[2].between).toEqual(["m.room.message/m.text:tile"]);
+            expect(decisions[0].items[4]).toMatchObject({ sender: 1, batch: undefined });
+
+            logGalleryDecisions(decisions, decisionKeys, { layout: "group", timeline: "Room", hiddenShown: false });
+            expect(records()).toHaveLength(1);
+            expect(records()[0]).toMatchObject({ type: "gallery_decision", layout: "group", pictures: 5 });
+            // Nothing that says who, what or where
+            const written = JSON.stringify(records());
+            for (const secret of ["secret-name", "a.png", "mxc://", "@a:x", "@b:x", "$img", "batch1", "hello"]) {
+                expect(written).not.toContain(secret);
+            }
+
+            // The same decision again is not written again; a changed one is
+            logGalleryDecisions(decisions, decisionKeys, { layout: "group", timeline: "Room", hiddenShown: false });
+            expect(records()).toHaveLength(1);
+            const again = analyseGalleries(timeline.filter((entry) => entry.event !== words));
+            logGalleryDecisions(again.decisions, again.decisionKeys, { layout: "group" });
+            expect(records()).toHaveLength(2);
+            expect(records()[1].galleries).toEqual([4]);
+        });
+
+        it("names what kept a picture out: a reply, a caption, an event that cannot be read", () => {
+            const [a, b] = pictures();
+            const reply = image("@a:x", T0 + 600, { "m.relates_to": { "m.in_reply_to": { event_id: "$x" } } });
+            const captioned = image("@a:x", T0 + 900, { body: "words", filename: "a.png" });
+            const { decisions } = analyseGalleries(shown([a, b, reply, captioned]));
+            expect(decisions[0].items.map((item) => item.outcome)).toEqual(["first", "joined", "reply", "reply"]);
+            expect(decisions[0].items[2].relation).toBe("reply");
+            expect(decisions[0].items[3].caption).toBe(true);
+
+            const { decisions: two } = analyseGalleries(shown([a, b, captioned]));
+            expect(two[0].items.map((item) => item.outcome)).toEqual(["first", "joined", "caption"]);
+        });
+
+        it("writes nothing for a picture on its own", () => {
+            const { decisions } = analyseGalleries(shown([image("@a:x", T0), text("@a:x", T0 + 10)]));
+            expect(decisions).toEqual([]);
+        });
     });
 });
