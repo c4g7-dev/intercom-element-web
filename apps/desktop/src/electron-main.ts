@@ -269,7 +269,13 @@ app.on("ready", async () => {
     // InterCom: looks for a newer release on GitHub, see intercom-updater.ts
     initUpdater(args.update);
     // InterCom: a newer release is put in place before the window opens, see intercom-update-on-launch.ts
-    if (await updateOnLaunch({ allowed: args.update, hidden: args.hidden })) return;
+    // Whatever goes wrong in it, the app starts as it is. The small window, if it is open, stays
+    // until the main window is ready: closing the only window would end the app.
+    const replaced = await updateOnLaunch({ allowed: args.update, hidden: args.hidden }).catch((e) => {
+        console.error("[update-on-launch] failed, starting as it is", e);
+        return false;
+    });
+    if (replaced) return;
 
     console.debug("Opening main window");
     const preloadScript = path.normalize(`${__dirname}/preload.cjs`);
