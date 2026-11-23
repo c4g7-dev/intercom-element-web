@@ -9,6 +9,8 @@ import { TypedEventEmitter } from "matrix-js-sdk/src/matrix";
 import { type ClientWidgetApi, type IWidgetApiRequest } from "matrix-widget-api";
 
 import { attachVoiceStateBridge, VoiceStateStore } from "./VoiceStateStore";
+import { OwnCallCues } from "./OwnCallCues";
+import { attachSoundsBridge } from "./SoundsBridge";
 
 /** The widget action Element Call (InterCom build) tells the state of the call on. */
 export const CALL_STATE_WIDGET_ACTION = "io.intercom.call_state";
@@ -109,8 +111,11 @@ export function attachCallStateBridge(
     roomId: string | undefined,
     store: CallStateStore = CallStateStore.instance,
     voiceStore: VoiceStateStore = VoiceStateStore.instance,
+    ownCues: Pick<OwnCallCues, "joined" | "left"> = OwnCallCues.instance,
 ): () => void {
     if (!roomId) return () => {};
+    // The call asks whose sounds are whose, and for the user's own sound files
+    const detachSounds = attachSoundsBridge(widgetApi);
     // The user's mute and deafen are the app's: the call asks for them, is told their changes,
     // and what it reports of its own microphone and hearing goes back into them
     const detachVoice = attachVoiceStateBridge(widgetApi, roomId, voiceStore);
@@ -118,6 +123,8 @@ export function attachCallStateBridge(
         ev.preventDefault(); // stop the widget API from auto-rejecting this
         const state = parseCallState(ev.detail.data);
         store.setState(roomId, state);
+        // The call tells its state from when the user is in it: the first time is the join
+        ownCues.joined(roomId);
         voiceStore.handleCallReport(roomId, {
             muted: !state.audioEnabled,
             deafened: state.deafened,
@@ -129,6 +136,9 @@ export function attachCallStateBridge(
     return () => {
         widgetApi.off(`action:${CALL_STATE_WIDGET_ACTION}`, onAction);
         detachVoice();
+        detachSounds();
         store.clear(roomId);
+        // Left, or the call's view went away: the call cannot play the sound of that itself
+        ownCues.left(roomId);
     };
 }

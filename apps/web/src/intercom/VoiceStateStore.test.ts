@@ -36,7 +36,7 @@ const report = (muted: boolean, deafened = false, reconnecting = false): CallVoi
 
 describe("VoiceStateStore", () => {
     let storage: MemoryStorage;
-    let playCue: Mock<(on: boolean) => void>;
+    let playCue: Mock<(on: boolean, cue?: string) => void>;
     let log: Mock<(record: Record<string, unknown>) => void>;
     const create = (from: Pick<Storage, "getItem" | "setItem"> = storage): VoiceStateStore =>
         new VoiceStateStore({ storage: from, playCue, log });
@@ -67,7 +67,7 @@ describe("VoiceStateStore", () => {
 
         store.perform("toggle-mute", "panel");
         expect(store.state).toMatchObject({ muted: true, deafened: false });
-        expect(playCue.mock.calls).toEqual([[false]]);
+        expect(playCue.mock.calls).toEqual([[false, "mute"]]);
         expect(listener).toHaveBeenCalledTimes(1);
         expect(log).toHaveBeenLastCalledWith(
             expect.objectContaining({ type: "voice_state", source: "panel", muted: true, deafened: false, calls: 0 }),
@@ -82,7 +82,11 @@ describe("VoiceStateStore", () => {
         store.perform("toggle-deafen", "hotkey");
         store.perform("toggle-deafen", "tray");
         expect(store.state).toMatchObject({ muted: true, deafened: false });
-        expect(playCue.mock.calls).toEqual([[false], [false], [true]]);
+        expect(playCue.mock.calls).toEqual([
+            [false, "mute"],
+            [false, "deafen"],
+            [true, "undeafen"],
+        ]);
         expect(log.mock.calls.map(([record]) => record.source)).toEqual(["panel", "hotkey", "tray"]);
     });
 
@@ -176,7 +180,7 @@ describe("VoiceStateStore", () => {
         store.handleCallReport(ROOM, report(true));
         expect(store.state.muted).toBe(true);
         expect(listener).toHaveBeenCalledTimes(1);
-        expect(playCue.mock.calls).toEqual([[false]]);
+        expect(playCue.mock.calls).toEqual([[false, "mute"]]);
         expect(log).toHaveBeenLastCalledWith(expect.objectContaining({ source: "call", muted: true }));
 
         // Deafened and undeafened in the call, which puts its microphone back itself

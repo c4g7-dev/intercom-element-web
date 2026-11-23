@@ -70,6 +70,23 @@ An upload that fails without an answer from the server (or with a 5xx, 408 or 42
 more after 1.5 s before "Upload Failed" is shown. Every failure is an upload_failed record in the
 diagnostics log: HTTP status, kind of error, protocol (h2, h3, http/1.1), never a name or a URL.
 
+Sounds
+------
+
+The cues for joining and leaving a call and for mute, unmute, deafen and undeafen are InterCom's
+own: gen-sounds.py works them out from sine waves (two soft notes, rising for on, falling for
+off) and writes apps/web/res/media/intercom/*.ogg. Nothing is sampled from anywhere. The web app
+plays the user's own cues (src/intercom/Sounds.ts); the call plays the sounds of others joining
+and leaving, with its own copies of the join and leave files.
+
+A file named after a cue in <profile>/sounds/ (Linux: ~/.config/InterCom/sounds/, Windows:
+%APPDATA%\InterCom\sounds\) is played instead of the built-in sound: join, leave, mute, unmute,
+deafen, undeafen, as .ogg, .mp3 or .wav (the .ogg wins where there are several), 2 MB at most.
+The files are read when the app starts (src/intercom-sounds.ts), so a new file is heard after a
+restart. They stay on the machine: nothing from that directory is bundled, uploaded or logged,
+except that the diagnostics log names the files that were taken and those that were not
+(a "sound_pack" record).
+
 Updates
 -------
 

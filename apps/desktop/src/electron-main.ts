@@ -53,6 +53,7 @@ import { configureChromium, grantDisplayMedia, WINDOW_BACKGROUND } from "./inter
 import { initDiagnostics, labelDiagnosticsWindow, logDiagnostics } from "./intercom-diagnostics.js";
 import { initShareAudio } from "./intercom-share-audio.js";
 import { initUpdater } from "./intercom-updater.js";
+import { initSounds } from "./intercom-sounds.js";
 import { handleSecondInstanceCallAction, initCallShortcuts, parseCallAction } from "./intercom-call-actions.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -262,6 +263,8 @@ app.on("ready", async () => {
     initShareAudio();
     // InterCom: global mute and deafen shortcuts while a call is on (Windows; Linux through the portal on request)
     initCallShortcuts();
+    // InterCom: the user's own sound cues from the profile's sounds directory
+    initSounds();
     // InterCom: looks for a newer release on GitHub, see intercom-updater.ts
     initUpdater(args.update);
 

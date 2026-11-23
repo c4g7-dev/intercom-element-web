@@ -156,6 +156,11 @@ declare global {
         };
         // InterCom: updates from the GitHub releases (desktop only)
         intercomUpdater?: UpdaterApi;
+        // InterCom: the user's own sound cues from the profile's sounds directory (desktop only)
+        intercomSounds?: {
+            /** By cue (join, leave, mute, unmute, deafen, undeafen): the file's name, MIME type and base64 */
+            list(): Promise<Record<string, { name: string; type: string; data: string } | undefined>>;
+        };
     }
 
     interface DesktopCapturerSource {

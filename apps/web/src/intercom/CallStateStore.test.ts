@@ -106,6 +106,22 @@ describe("attachCallStateBridge", () => {
         expect(store.getState("!a:x")).toBeUndefined();
     });
 
+    it("says when the user's own call is joined and left, for the sounds of that", () => {
+        const api = widgetApi();
+        const ownCues = { joined: vi.fn(), left: vi.fn() };
+        const detach = attachCallStateBridge(api, "!a:x", new CallStateStore(), voiceStore(), ownCues);
+        expect(ownCues.joined).not.toHaveBeenCalled();
+
+        const event = { preventDefault: vi.fn(), detail: { data: {} } };
+        api.emit(`action:${CALL_STATE_WIDGET_ACTION}`, event);
+        api.emit(`action:${CALL_STATE_WIDGET_ACTION}`, event);
+        expect(ownCues.joined).toHaveBeenCalledWith("!a:x");
+        expect(ownCues.left).not.toHaveBeenCalled();
+
+        detach();
+        expect(ownCues.left).toHaveBeenCalledWith("!a:x");
+    });
+
     it("does nothing for a widget that belongs to no room", () => {
         const store = new CallStateStore();
         const api = widgetApi();

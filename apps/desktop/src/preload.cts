@@ -110,4 +110,9 @@ contextBridge.exposeInMainWorld("electron", {
         setAutoCheck: (on: boolean) => ipcRenderer.invoke("intercomUpdater", "setAutoCheck", on),
         openReleasePage: () => ipcRenderer.invoke("intercomUpdater", "openReleasePage"),
     },
+
+    // InterCom: the user's own sound cues from <profile>/sounds, see intercom-sounds.ts
+    intercomSounds: {
+        list: () => ipcRenderer.invoke("intercomSounds", "list"),
+    },
 });

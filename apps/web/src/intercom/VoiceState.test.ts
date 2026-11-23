@@ -15,6 +15,7 @@ import {
     reduceVoiceState,
     type VoiceAction,
     voiceCueFor,
+    voiceCueNameFor,
     type VoiceState,
     voiceStateToWire,
 } from "./VoiceState";
@@ -103,6 +104,17 @@ describe("the voice state", () => {
         // Muted by hand while deafened: nothing to hear of it
         expect(voiceCueFor(deafened, reduceVoiceState(deafened, "mute"))).toBeUndefined();
         expect(voiceCueFor(muted, muted)).toBeUndefined();
+    });
+
+    it("names the sound of a change: the microphone's, or the hearing's", () => {
+        const muted = run(["mute"]);
+        const deafened = run(["deafen"]);
+        expect(voiceCueNameFor(INITIAL_VOICE_STATE, muted)).toBe("mute");
+        expect(voiceCueNameFor(muted, INITIAL_VOICE_STATE)).toBe("unmute");
+        expect(voiceCueNameFor(INITIAL_VOICE_STATE, deafened)).toBe("deafen");
+        expect(voiceCueNameFor(deafened, INITIAL_VOICE_STATE)).toBe("undeafen");
+        expect(voiceCueNameFor(run(["mute", "deafen"]), muted)).toBe("undeafen");
+        expect(voiceCueNameFor(deafened, reduceVoiceState(deafened, "mute"))).toBeUndefined();
     });
 
     it("is stored and read back, and anything else is the initial state", () => {

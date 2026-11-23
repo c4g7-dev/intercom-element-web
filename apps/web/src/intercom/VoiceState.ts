@@ -126,6 +126,19 @@ export function voiceCueFor(before: VoiceState, after: VoiceState): "on" | "off"
     return undefined;
 }
 
+/**
+ * Which sound a change is worth: deafening and its end have their own, anything else that can
+ * be heard is the microphone's.
+ */
+export function voiceCueNameFor(
+    before: VoiceState,
+    after: VoiceState,
+): "mute" | "unmute" | "deafen" | "undeafen" | undefined {
+    if (before.deafened !== after.deafened) return after.deafened ? "deafen" : "undeafen";
+    if (before.muted !== after.muted) return after.muted ? "mute" : "unmute";
+    return undefined;
+}
+
 /** The state as it is stored and sent to a call. */
 export type VoiceStateWire = {
     muted: boolean;

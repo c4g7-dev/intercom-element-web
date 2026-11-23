@@ -16,12 +16,14 @@ import {
     sameVoiceState,
     type VoiceAction,
     voiceCueFor,
+    voiceCueNameFor,
     type VoiceSource,
     type VoiceState,
     voiceStateToWire,
     type VoiceStateWire,
 } from "./VoiceState";
 import { playVoiceCue } from "./VoiceCue";
+import { type SoundCue } from "./Sounds";
 
 /**
  * The widget action the voice state goes over, both ways, with Element Call (InterCom build):
@@ -63,7 +65,7 @@ interface CallLink {
 
 interface Dependencies {
     storage?: Pick<Storage, "getItem" | "setItem">;
-    playCue?: (on: boolean) => void;
+    playCue?: (on: boolean, cue?: SoundCue) => void;
     /** Writes a diagnostics record */
     log?: (record: Record<string, unknown>) => void;
     now?: () => number;
@@ -113,7 +115,7 @@ export class VoiceStateStore extends TypedEventEmitter<VoiceStateStoreEvent, Eve
     private current: VoiceState;
     private readonly links = new Map<string, CallLink>();
     private readonly storage: Pick<Storage, "getItem" | "setItem"> | undefined;
-    private readonly playCue: (on: boolean) => void;
+    private readonly playCue: (on: boolean, cue?: SoundCue) => void;
     private readonly log: (record: Record<string, unknown>) => void;
     private readonly now: () => number;
 
@@ -239,7 +241,7 @@ export class VoiceStateStore extends TypedEventEmitter<VoiceStateStoreEvent, Eve
             // Not kept over the restart then
         }
         const cue = voiceCueFor(before, next);
-        if (cue) this.playCue(cue === "on");
+        if (cue) this.playCue(cue === "on", voiceCueNameFor(before, next));
         for (const [roomId, link] of this.links) {
             if (roomId !== fromRoomId) this.push(roomId, link);
         }
