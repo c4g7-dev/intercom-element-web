@@ -58,7 +58,8 @@ import { arrayFastClone } from "../../utils/arrays";
 import { type ViewRoomPayload } from "../../dispatcher/payloads/ViewRoomPayload";
 import Modal from "../../Modal";
 import ErrorDialog from "../../components/views/dialogs/ErrorDialog";
-import { attachShareAudioBridge } from "../../intercom/ShareAudioBridge";
+import { attachShareAudioBridge, isBundledElementCall } from "../../intercom/ShareAudioBridge";
+import { attachCallStateBridge } from "../../intercom/CallStateStore";
 import { SDKContextClass } from "../../contexts/SDKContextClass";
 import { UPDATE_EVENT } from "../AsyncStore";
 
@@ -209,6 +210,7 @@ export class WidgetMessaging extends TypedEventEmitter<WidgetMessagingEvent, Wid
     }
 
     private detachShareAudio?: () => void;
+    private detachCallState?: () => void;
     private _widgetApi: ClientWidgetApi | null = null;
     private set widgetApi(value: ClientWidgetApi | null) {
         this._widgetApi = value;
@@ -318,6 +320,10 @@ export class WidgetMessaging extends TypedEventEmitter<WidgetMessagingEvent, Wid
         this.widgetApi.on(`action:${WidgetApiFromWidgetAction.OpenModalWidget}`, this.onOpenModal);
         // InterCom: the bundled Element Call may ask the desktop app for a sink's audio
         this.detachShareAudio = attachShareAudioBridge(this.widgetApi, this.embedUrl);
+        // InterCom: and it tells how the call stands, for the room list and the user panel
+        if (isBundledElementCall(this.embedUrl)) {
+            this.detachCallState = attachCallStateBridge(this.widgetApi, this.roomId);
+        }
 
         // When widgets are listening to events, we need to make sure they're only
         // receiving events for the right room
@@ -510,6 +516,8 @@ export class WidgetMessaging extends TypedEventEmitter<WidgetMessagingEvent, Wid
         this.widgetApi?.stop();
         this.detachShareAudio?.();
         this.detachShareAudio = undefined;
+        this.detachCallState?.();
+        this.detachCallState = undefined;
         // XXX is the removeAllListeners necessary here?
         this.widgetApi?.removeAllListeners(); // Insurance against resource leaks
         this.widgetApi = null;

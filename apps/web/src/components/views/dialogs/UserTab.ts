@@ -20,4 +20,6 @@ export enum UserTab {
     Mjolnir = "USER_MJOLNIR_TAB",
     Help = "USER_HELP_TAB",
     SessionManager = "USER_SESSION_MANAGER_TAB",
+    // InterCom: what is InterCom's own (its updates)
+    Intercom = "USER_INTERCOM_TAB",
 }

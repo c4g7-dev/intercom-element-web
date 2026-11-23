@@ -42,6 +42,7 @@ import DesktopCapturerSourcePicker from "../../components/views/elements/Desktop
 import { MatrixClientPeg } from "../../MatrixClientPeg";
 import { SeshatIndexManager } from "./SeshatIndexManager";
 import { installCallShortcuts, performCallAction } from "../../intercom/CallActions";
+import { startUpdateToasts } from "../../intercom/updater/UpdateToast";
 import { IPCManager } from "./IPCManager";
 import { _t } from "../../languageHandler";
 import { BadgeOverlayRenderer } from "../../favicon";
@@ -188,6 +189,8 @@ export default class ElectronPlatform extends BasePlatform {
             void performCallAction(action, "desktop");
         });
         installCallShortcuts();
+        // InterCom: tells when an update from the GitHub releases is ready
+        startUpdateToasts();
 
         this.electron.on("openDesktopCapturerSourcePicker", async () => {
             const { finished } = Modal.createDialog(DesktopCapturerSourcePicker);

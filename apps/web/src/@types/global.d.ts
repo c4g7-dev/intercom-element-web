@@ -38,6 +38,7 @@ import { type InitialCryptoSetupStore } from "../stores/InitialCryptoSetupStore"
 import { type ModuleApiType } from "../modules/Api.ts";
 import type { RoomListStoreV3Class } from "../stores/room-list-v3/RoomListStoreV3.ts";
 import { type SDKContextClass } from "../contexts/SDKContextClass.ts";
+import { type UpdaterApi } from "../intercom/updater/Updater";
 
 type ElectronChannel =
     | "app_onAction"
@@ -59,7 +60,8 @@ type ElectronChannel =
     | "homeserverUrl"
     | "serverSupportedVersions"
     | "showToast"
-    | "intercomCallAction";
+    | "intercomCallAction"
+    | "intercomUpdater";
 
 declare global {
     // use `number` as the return type in all cases for globalThis.set{Interval,Timeout},
@@ -149,6 +151,8 @@ declare global {
             prepareShareSource(sinkName: string): Promise<{ sourceName: string; description: string; reused: boolean }>;
             releaseShareSource(sinkName?: string): Promise<void>;
         };
+        // InterCom: updates from the GitHub releases (desktop only)
+        intercomUpdater?: UpdaterApi;
     }
 
     interface DesktopCapturerSource {

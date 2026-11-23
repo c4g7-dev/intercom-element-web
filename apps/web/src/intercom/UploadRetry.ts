@@ -6,7 +6,6 @@ Please see LICENSE files in the repository root for full details.
 */
 
 import { HTTPError, type MatrixClient, type UploadOpts, type UploadResponse } from "matrix-js-sdk/src/matrix";
-import { type FileType } from "matrix-js-sdk/src/http-api";
 
 /**
  * An upload that fails is tried once more after a short wait before the user is told: a request
@@ -86,7 +85,7 @@ interface RetryOptions {
  */
 export async function uploadContentWithRetry(
     client: MatrixClient,
-    body: FileType,
+    body: Parameters<MatrixClient["uploadContent"]>[0],
     opts: UploadOpts,
     { delayMs = UPLOAD_RETRY_DELAY_MS, protocol = lastUploadProtocol }: RetryOptions = {},
 ): Promise<UploadResponse> {

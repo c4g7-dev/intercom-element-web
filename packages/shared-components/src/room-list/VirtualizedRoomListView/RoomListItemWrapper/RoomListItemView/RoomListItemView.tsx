@@ -5,7 +5,7 @@
  * Please see LICENSE files in the repository root for full details.
  */
 
-import React, { type JSX, memo, useEffect, useRef, useState, type ReactNode, type Ref } from "react";
+import React, { type JSX, memo, useContext, useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import classNames from "classnames";
 import { useMergeRefs } from "react-merge-refs";
 
@@ -18,6 +18,7 @@ import styles from "./RoomListItemView.module.css";
 import { useViewModel, type ViewModel } from "../../../../core/viewmodel";
 import { type UserStatus } from "../../../../core/userStatus";
 import { _t } from "../../../../core/i18n/i18n";
+import { RoomListItemExtrasContext } from "../../../../intercom/RoomListItemExtras";
 
 /**
  * Opaque type representing a Room object from the parent application
@@ -186,6 +187,8 @@ export const RoomListItemView = memo(function RoomListItemView({
     const internalRef = useRef<HTMLButtonElement>(null);
     const mergedRef = useMergeRefs([ref, internalRef]);
     const item = useViewModel(vm);
+    // InterCom: what the application shows under the room (the people in a voice room's call)
+    const renderExtras = useContext(RoomListItemExtrasContext);
 
     // Reveal the hover menu when the row is focused via the keyboard (not the mouse), and keep it
     // revealed while focus moves onto the menu buttons so they stay reachable by Tab. A pure CSS
@@ -223,32 +226,35 @@ export const RoomListItemView = memo(function RoomListItemView({
     const a11yLabel = getA11yLabel(item.name, item.notification);
 
     return (
-        <RoomListItemContextMenu vm={vm}>
-            <Flex
-                as="button"
-                ref={mergedRef}
-                className={classNames(styles.roomListItem, "mx_RoomListItemView", {
-                    [styles.keyboardActive]: keyboardActive,
-                    [styles.selected]: isSelected,
-                    [styles.bold]: item.isBold,
-                    [styles.firstItem]: isFirstItem,
-                    [styles.lastItem]: isLastItem,
-                    [styles.dragSource]: isDragSource,
-                    mx_RoomListItemView_selected: isSelected,
-                })}
-                gap="var(--cpd-space-3x)"
-                align="stretch"
-                type="button"
-                aria-label={a11yLabel}
-                onClick={vm.onOpenRoom}
-                onFocus={onItemFocus}
-                onBlur={onItemBlur}
-                tabIndex={isFocused ? 0 : -1}
-                aria-selected={props.role === "option" ? isSelected : undefined}
-                {...props}
-            >
-                <RoomListItemContent vm={vm} renderAvatar={renderAvatar} />
-            </Flex>
-        </RoomListItemContextMenu>
+        <>
+            <RoomListItemContextMenu vm={vm}>
+                <Flex
+                    as="button"
+                    ref={mergedRef}
+                    className={classNames(styles.roomListItem, "mx_RoomListItemView", {
+                        [styles.keyboardActive]: keyboardActive,
+                        [styles.selected]: isSelected,
+                        [styles.bold]: item.isBold,
+                        [styles.firstItem]: isFirstItem,
+                        [styles.lastItem]: isLastItem,
+                        [styles.dragSource]: isDragSource,
+                        mx_RoomListItemView_selected: isSelected,
+                    })}
+                    gap="var(--cpd-space-3x)"
+                    align="stretch"
+                    type="button"
+                    aria-label={a11yLabel}
+                    onClick={vm.onOpenRoom}
+                    onFocus={onItemFocus}
+                    onBlur={onItemBlur}
+                    tabIndex={isFocused ? 0 : -1}
+                    aria-selected={props.role === "option" ? isSelected : undefined}
+                    {...props}
+                >
+                    <RoomListItemContent vm={vm} renderAvatar={renderAvatar} />
+                </Flex>
+            </RoomListItemContextMenu>
+            {renderExtras?.(item.room)}
+        </>
     );
 });

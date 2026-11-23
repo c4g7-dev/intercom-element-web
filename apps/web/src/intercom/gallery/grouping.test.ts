@@ -184,7 +184,12 @@ describe("findGalleries with events as an encrypted room has them", () => {
             event.setStatus(status);
             return event;
         };
-        const events = [echo(1, null), echo(2, EventStatus.SENT), echo(3, EventStatus.SENDING), echo(4, EventStatus.ENCRYPTING)];
+        const events = [
+            echo(1, null),
+            echo(2, EventStatus.SENT),
+            echo(3, EventStatus.SENDING),
+            echo(4, EventStatus.ENCRYPTING),
+        ];
         expect(events.every(isGalleryImage)).toBe(true);
         expect([...findGalleries(shown(events)).values()]).toEqual([events]);
 
@@ -208,7 +213,11 @@ describe("pictures of one batch", () => {
 
     it("are one gallery however long their uploads took", () => {
         const slow = GALLERY_MAX_GAP_MS * 3;
-        const events = [image("@a:x", T0, batch(0)), image("@a:x", T0 + slow, batch(1)), image("@a:x", T0 + 2 * slow, batch(2))];
+        const events = [
+            image("@a:x", T0, batch(0)),
+            image("@a:x", T0 + slow, batch(1)),
+            image("@a:x", T0 + 2 * slow, batch(2)),
+        ];
         expect(galleryBatchId(events[0])).toBe("batch1");
         expect([...findGalleries(shown(events)).values()]).toEqual([events]);
         // Without the mark the same pictures are too far apart

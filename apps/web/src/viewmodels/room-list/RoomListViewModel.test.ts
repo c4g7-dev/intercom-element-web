@@ -36,7 +36,12 @@ import SettingsStore from "../../settings/SettingsStore";
 import { SettingLevel } from "../../settings/SettingLevel";
 import { tagRoom } from "../../utils/room/tagRoom";
 import { getSectionTagForRoom } from "../../utils/room/getSectionTagForRoom";
-import { CHATS_TAG, CUSTOM_SECTION_TAG_PREFIX, type SectionExpansionState } from "../../stores/room-list-v3/section";
+import {
+    CHATS_TAG,
+    CUSTOM_SECTION_TAG_PREFIX,
+    type SectionExpansionState,
+    VOICE_TAG,
+} from "../../stores/room-list-v3/section";
 import { MetaSpace } from "../../stores/spaces";
 import { RoomNotificationStateStore } from "../../stores/notifications/RoomNotificationStateStore";
 import { type RoomNotificationState } from "../../stores/notifications/RoomNotificationState";
@@ -1444,7 +1449,9 @@ describe("RoomListViewModel", () => {
                 { tag: DefaultTagID.Favourite, showPeopleSection: false, title: "Favourites" },
                 // Without a People section, the Chats section holds the direct messages too
                 { tag: CHATS_TAG, showPeopleSection: false, title: "Chats" },
-                { tag: CHATS_TAG, showPeopleSection: true, title: "Rooms" },
+                // InterCom: beside the voice channels, the other rooms are the text channels
+                { tag: CHATS_TAG, showPeopleSection: true, title: "Text channels" },
+                { tag: VOICE_TAG, showPeopleSection: true, title: "Voice channels" },
                 { tag: DefaultTagID.DM, showPeopleSection: true, title: "People" },
             ])(
                 'should title the $tag section header "$title" when showPeopleSection is $showPeopleSection',
@@ -1492,7 +1499,7 @@ describe("RoomListViewModel", () => {
                 showPeopleSection = true;
                 watchCallback();
 
-                expect(viewModel.getSectionHeaderViewModel(CHATS_TAG).getSnapshot().title).toBe("Rooms");
+                expect(viewModel.getSectionHeaderViewModel(CHATS_TAG).getSnapshot().title).toBe("Text channels");
             });
 
             it("should reuse section header view models", () => {

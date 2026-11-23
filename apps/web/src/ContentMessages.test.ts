@@ -702,5 +702,14 @@ describe("InterCom upload pipeline", () => {
         expect(contents.map((c) => c.body)).toEqual(["our trip", "b.jpg", "c.jpg"]);
         expect(contents[0].filename).toBe("a.jpg");
         expect(contents[1].filename).toBeUndefined();
+        // The three are marked as one batch, in the order they were chosen
+        const marks = contents.map((c) => c["io.intercom.gallery"] as { id: string; index: number; count: number });
+        expect(marks.map((m) => [m.index, m.count])).toEqual([
+            [0, 3],
+            [1, 3],
+            [2, 3],
+        ]);
+        expect(typeof marks[0].id).toBe("string");
+        expect(new Set(marks.map((m) => m.id)).size).toBe(1);
     });
 });

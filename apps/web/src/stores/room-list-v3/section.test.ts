@@ -24,6 +24,7 @@ import {
     isSectionExpanded,
     setSectionExpanded,
     CHATS_TAG,
+    VOICE_TAG,
     CUSTOM_SECTION_TAG_PREFIX,
     isSectionTag,
     reorderSection,
@@ -542,7 +543,14 @@ describe("section", () => {
                 description: "pins Favourite at the top and LowPriority at the bottom",
                 stored: [customTag, CHATS_TAG],
                 showPeopleSection: false,
-                expected: [DefaultTagID.Invite, DefaultTagID.Favourite, customTag, CHATS_TAG, DefaultTagID.LowPriority],
+                expected: [
+                    DefaultTagID.Invite,
+                    DefaultTagID.Favourite,
+                    customTag,
+                    CHATS_TAG,
+                    VOICE_TAG,
+                    DefaultTagID.LowPriority,
+                ],
             },
             {
                 description: "includes the People tag when the setting is enabled",
@@ -554,6 +562,7 @@ describe("section", () => {
                     DefaultTagID.DM,
                     customTag,
                     CHATS_TAG,
+                    VOICE_TAG,
                     DefaultTagID.LowPriority,
                 ],
             },
@@ -561,7 +570,14 @@ describe("section", () => {
                 description: "drops the People tag when the setting is disabled, keeping the other sections in order",
                 stored: [customTag, CHATS_TAG, DefaultTagID.DM],
                 showPeopleSection: false,
-                expected: [DefaultTagID.Invite, DefaultTagID.Favourite, customTag, CHATS_TAG, DefaultTagID.LowPriority],
+                expected: [
+                    DefaultTagID.Invite,
+                    DefaultTagID.Favourite,
+                    customTag,
+                    CHATS_TAG,
+                    VOICE_TAG,
+                    DefaultTagID.LowPriority,
+                ],
             },
             {
                 description: "keeps the stored position of the People tag when the setting is enabled",
@@ -572,6 +588,7 @@ describe("section", () => {
                     DefaultTagID.Favourite,
                     customTag,
                     CHATS_TAG,
+                    VOICE_TAG,
                     DefaultTagID.DM,
                     DefaultTagID.LowPriority,
                 ],
@@ -579,6 +596,22 @@ describe("section", () => {
         ])("getOrderedSectionTags $description", ({ stored, showPeopleSection, expected }) => {
             mockStoredOrder(stored, showPeopleSection);
             expect(getOrderedSectionTags()).toEqual(expected);
+        });
+
+        it("puts the voice channels after the text channels, wherever those are", () => {
+            mockStoredOrder([CHATS_TAG, customTag, DefaultTagID.DM], true);
+            expect(getOrderedSectionTags()).toEqual([
+                DefaultTagID.Invite,
+                DefaultTagID.Favourite,
+                CHATS_TAG,
+                VOICE_TAG,
+                customTag,
+                DefaultTagID.DM,
+                DefaultTagID.LowPriority,
+            ]);
+            // The voice section is a default section, and not one the user orders
+            expect(isDefaultSectionTag(VOICE_TAG)).toBe(true);
+            expect(getOrderedReorderableSections()).not.toContain(VOICE_TAG);
         });
     });
 

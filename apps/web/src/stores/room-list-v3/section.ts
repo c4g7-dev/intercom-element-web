@@ -24,6 +24,13 @@ import { tagRoom } from "../../utils/room/tagRoom.ts";
 export const CHATS_TAG = "chats";
 
 /**
+ * InterCom: a synthetic tag for the "Voice channels" section, which holds the rooms that are
+ * their call (video rooms and call rooms) unless the user moved them to another section. Like
+ * the Chats tag it is never written to a room: a room is in it for what it is.
+ */
+export const VOICE_TAG = "io.intercom.voice";
+
+/**
  * Prefix for custom section tags.
  */
 export const CUSTOM_SECTION_TAG_PREFIX = "element.io.section.";
@@ -50,6 +57,7 @@ export function isDefaultSectionTag(tagId: TagID): boolean {
         tagId === DefaultTagID.Favourite ||
         tagId === DefaultTagID.LowPriority ||
         tagId === CHATS_TAG ||
+        tagId === VOICE_TAG ||
         tagId === DefaultTagID.DM
     );
 }
@@ -227,7 +235,11 @@ export function getOrderedReorderableSections(): ReorderableSection[] {
  */
 export function getOrderedSectionTags(): string[] {
     const showPeopleSection = SettingsStore.getValue("RoomList.showPeopleSection");
-    const reorderable = getOrderedReorderableSections().filter((tag) => showPeopleSection || tag !== DefaultTagID.DM);
+    const reorderable: string[] = getOrderedReorderableSections().filter(
+        (tag) => showPeopleSection || tag !== DefaultTagID.DM,
+    );
+    // InterCom: the voice channels follow the text ones, wherever the user put those
+    reorderable.splice(reorderable.indexOf(CHATS_TAG) + 1, 0, VOICE_TAG);
     return [DefaultTagID.Invite, DefaultTagID.Favourite, ...reorderable, DefaultTagID.LowPriority];
 }
 

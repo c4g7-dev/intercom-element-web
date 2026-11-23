@@ -20,6 +20,7 @@ import { type IState as IRovingTabIndexState } from "../../../../accessibility/R
 import { RoomListHeaderViewModel } from "../../../../viewmodels/room-list/RoomListHeaderViewModel";
 import { useMatrixClientContext } from "../../../../contexts/MatrixClientContext";
 import { SDKContext } from "../../../../contexts/SDKContext.ts";
+import { UserPanel } from "../../../../intercom/UserPanel";
 
 type RoomListPanelProps = {
     /**
@@ -80,6 +81,8 @@ export const RoomListPanel: React.FC<RoomListPanelProps> = ({ activeSpace }) => 
             {displayRoomSearch && <RoomListSearch activeSpace={activeSpace} />}
             <RoomListHeaderView vm={vm} />
             <RoomListView />
+            {/* InterCom: who you are and the controls of your call, under the list */}
+            <UserPanel />
         </Flex>
     );
 };

@@ -43,6 +43,7 @@ import {
     getCustomSectionData,
     isCustomSectionTag,
     isSectionExpanded,
+    VOICE_TAG,
     CHATS_TAG,
 } from "../../stores/room-list-v3/section";
 import { tagRoom } from "../../utils/room/tagRoom";
@@ -140,9 +141,12 @@ function getSectionTitle(tag: string): string {
         case CHATS_TAG:
             // Without a People section, this section holds the direct messages too, so it keeps its
             // broader name.
+            // InterCom: beside the voice channels, the other rooms are the text channels
             return SettingsStore.getValue("RoomList.showPeopleSection")
-                ? _t("common|rooms")
+                ? _t("room_list|section|text_channels")
                 : _t("room_list|section|chats");
+        case VOICE_TAG:
+            return _t("room_list|section|voice_channels");
         default:
             return (isCustomSectionTag(tag) && getCustomSectionData()[tag]?.name) || tag;
     }

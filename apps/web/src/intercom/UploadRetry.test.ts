@@ -5,12 +5,12 @@ SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Com
 Please see LICENSE files in the repository root for full details.
 */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { ConnectionError, HTTPError, MatrixError, type MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import { isRetryableUploadError, lastUploadProtocol, uploadContentWithRetry } from "./UploadRetry";
 
-function clientWith(uploadContent: ReturnType<typeof vi.fn>): MatrixClient {
+function clientWith(uploadContent: unknown): MatrixClient {
     return { uploadContent } as unknown as MatrixClient;
 }
 
@@ -44,12 +44,14 @@ describe("lastUploadProtocol", () => {
         ];
         expect(lastUploadProtocol(entries)).toBe("h3");
         expect(lastUploadProtocol(entries.slice(1, 2))).toBeUndefined();
-        expect(lastUploadProtocol([{ name: "https://hs/_matrix/media/v3/upload", nextHopProtocol: "" }])).toBeUndefined();
+        expect(
+            lastUploadProtocol([{ name: "https://hs/_matrix/media/v3/upload", nextHopProtocol: "" }]),
+        ).toBeUndefined();
     });
 });
 
 describe("uploadContentWithRetry", () => {
-    let log: ReturnType<typeof vi.spyOn>;
+    let log: MockInstance<typeof console.log>;
     const records = (): Record<string, unknown>[] =>
         log.mock.calls
             .map(([line]) => String(line))
@@ -124,7 +126,12 @@ describe("uploadContentWithRetry", () => {
     it("does not start the second try when the user cancels during the wait", async () => {
         const abortController = new AbortController();
         const upload = vi.fn().mockRejectedValue(new ConnectionError("x"));
-        const pending = uploadContentWithRetry(clientWith(upload), blob, { abortController }, { ...options, delayMs: 20 });
+        const pending = uploadContentWithRetry(
+            clientWith(upload),
+            blob,
+            { abortController },
+            { ...options, delayMs: 20 },
+        );
         await Promise.resolve();
         abortController.abort();
         await expect(pending).rejects.toThrow();

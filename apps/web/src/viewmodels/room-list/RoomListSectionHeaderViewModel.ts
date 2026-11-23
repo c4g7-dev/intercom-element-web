@@ -23,6 +23,7 @@ import RoomListStoreV3 from "../../stores/room-list-v3/RoomListStoreV3";
 import { DefaultTagID } from "../../stores/room-list-v3/skip-list/tag";
 import {
     CHATS_TAG,
+    VOICE_TAG,
     getCustomSectionData,
     isCustomSectionTag,
     isDefaultSectionTag,
@@ -45,6 +46,8 @@ function getAcceptedRoomKind(tag: string): AcceptedRoomKind {
     // Membership decides what is in the Invites section, so rooms can't be moved into it
     if (tag === DefaultTagID.Invite) return "none";
     if (tag === DefaultTagID.DM) return "dm";
+    // InterCom: what a room is decides whether it is a voice channel, so none can be moved there
+    if (tag === VOICE_TAG) return "none";
     if (tag === CHATS_TAG) {
         // Chats holds the direct messages too when the People section is not shown. The setting is
         // forced off when the sections are turned off, and that case has no drag and drop anyway.

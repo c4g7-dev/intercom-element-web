@@ -529,6 +529,23 @@ describe("RoomListItemViewModel", () => {
             });
         });
 
+        it("should join a voice channel with the click that opens it", () => {
+            vi.spyOn(room, "isCallRoom").mockReturnValue(true);
+            viewModel = new RoomListItemViewModel({ room, client: matrixClient });
+
+            const dispatchSpy = vi.spyOn(dispatcher, "dispatch");
+
+            viewModel.onOpenRoom();
+
+            expect(dispatchSpy).toHaveBeenCalledWith({
+                action: Action.ViewRoom,
+                room_id: "!room:server",
+                metricsTrigger: "RoomList",
+                view_call: true,
+                skipLobby: true,
+            });
+        });
+
         it("should return room object", () => {
             viewModel = new RoomListItemViewModel({ room, client: matrixClient });
 

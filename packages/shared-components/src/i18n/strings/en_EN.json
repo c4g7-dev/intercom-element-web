@@ -108,6 +108,67 @@
             "title": "This device cannot be used"
         }
     },
+    "intercom": {
+        "updater": {
+            "all_releases": "All releases",
+            "auto_check": "Check for updates automatically",
+            "auto_check_help": "Looks for a new release when InterCom starts and every six hours, and downloads it. You choose when to restart.",
+            "channel": "Channel",
+            "channel_stable": "Stable",
+            "check_now": "Check now",
+            "checking": "Checking for updates…",
+            "download_progress": "Download progress",
+            "downloading": "Downloading InterCom %(version)s… %(percent)s",
+            "error": "The update check failed: %(message)s",
+            "manual": "InterCom %(version)s is available. This install cannot replace itself: get it from the release page.",
+            "not_checked": "Not checked for updates yet.",
+            "ready": "InterCom %(version)s is ready. Restart to update.",
+            "release_notes": "Release notes",
+            "restart": "Restart to update",
+            "unsupported": {
+                "disabled_by_flag": "Updates are turned off: InterCom was started with --no-update.",
+                "no_version": "This build is not a release, so it does not update itself.",
+                "platform": "InterCom does not update itself on this system. New versions are on the release page.",
+                "unpackaged": "This build is not a release, so it does not update itself.",
+                "web": "Updates are for the desktop app."
+            },
+            "up_to_date_checked": "InterCom is up to date. Last checked %(when)s.",
+            "version": "InterCom version",
+            "version_unknown": "Not a release build"
+        },
+        "user_panel": {
+            "camera": "Camera",
+            "deafen": "Deafen",
+            "jump_to_call": "Show the call",
+            "label": "You and your call",
+            "leave": "Leave the call",
+            "mute": "Mute",
+            "not_controllable": "This call is controlled from its own window",
+            "not_in_call": "Join a call to use this",
+            "presence": {
+                "busy": "Busy",
+                "offline": "Offline",
+                "online": "Online",
+                "unavailable": "Away"
+            },
+            "profile": "%(name)s: your profile",
+            "reconnecting": "Reconnecting…",
+            "settings": "Settings",
+            "share_screen": "Share screen",
+            "stop_sharing": "Stop sharing",
+            "unavailable": "%(action)s: %(reason)s",
+            "undeafen": "Undeafen",
+            "unmute": "Unmute",
+            "voice_connected": "Voice connected"
+        },
+        "voice": {
+            "deafened": "Deafened",
+            "in_call_label": "In the call of %(roomName)s",
+            "live": "LIVE",
+            "muted": "Muted",
+            "sharing_screen": "Sharing a screen"
+        }
+    },
     "keyboard": {
         "shift": "Shift"
     },

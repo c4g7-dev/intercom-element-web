@@ -1,0 +1,83 @@
+/*
+ * Copyright 2026 InterCom contributors
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
+ */
+
+.list {
+    list-style: none;
+    margin: 0;
+    /* Under the room's name, which starts after the avatar */
+    padding: 0 var(--cpd-space-3x) var(--cpd-space-1x) var(--cpd-space-10x);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.participant {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: var(--cpd-space-2x);
+    width: 100%;
+    min-height: 32px;
+    padding: var(--cpd-space-1x) var(--cpd-space-2x);
+    border-radius: 6px;
+    cursor: pointer;
+    font: var(--cpd-font-body-sm-regular);
+    color: var(--cpd-color-text-secondary);
+}
+
+.participant:hover {
+    background-color: var(--cpd-color-bg-action-tertiary-hovered);
+    color: var(--cpd-color-text-primary);
+}
+
+.avatar {
+    display: flex;
+    flex: none;
+    border-radius: 50%;
+    /* Room for the ring, so that nothing moves when somebody starts to talk */
+    box-shadow: 0 0 0 2px transparent;
+    transition: box-shadow 80ms ease-out;
+}
+
+.speaking {
+    box-shadow: 0 0 0 2px var(--cpd-color-icon-success-primary);
+}
+
+.name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.speaking + .name {
+    color: var(--cpd-color-text-primary);
+}
+
+.icon {
+    flex: none;
+    color: var(--cpd-color-icon-tertiary);
+}
+
+.live {
+    flex: none;
+    padding: 0 var(--cpd-space-1-5x);
+    border-radius: 4px;
+    background-color: var(--cpd-color-bg-critical-primary);
+    color: var(--cpd-color-text-on-solid-primary);
+    font: var(--cpd-font-body-xs-semibold);
+    letter-spacing: 0.04em;
+    line-height: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .avatar {
+        transition: none;
+    }
+}

@@ -14,11 +14,26 @@ import WidgetUtils from "../utils/WidgetUtils";
 /**
  * What a shortcut can ask of the call that is on: from the keyboard while the window has the
  * focus, and from the desktop app while it has not (a global shortcut, or `intercom --toggle-mute`
- * run by the compositor's key binding).
+ * run by the compositor's key binding), and from the buttons of the user panel.
  */
-export type CallAction = "toggle-mute" | "mute" | "unmute" | "toggle-deafen" | "toggle-camera" | "leave-call";
+export type CallAction =
+    | "toggle-mute"
+    | "mute"
+    | "unmute"
+    | "toggle-deafen"
+    | "toggle-camera"
+    | "toggle-screenshare"
+    | "leave-call";
 
-const CALL_ACTIONS = new Set<string>(["toggle-mute", "mute", "unmute", "toggle-deafen", "toggle-camera", "leave-call"]);
+const CALL_ACTIONS = new Set<string>([
+    "toggle-mute",
+    "mute",
+    "unmute",
+    "toggle-deafen",
+    "toggle-camera",
+    "toggle-screenshare",
+    "leave-call",
+]);
 
 export function isCallAction(value: unknown): value is CallAction {
     return typeof value === "string" && CALL_ACTIONS.has(value);

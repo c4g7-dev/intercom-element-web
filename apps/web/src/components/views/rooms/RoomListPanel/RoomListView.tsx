@@ -8,6 +8,7 @@
 import React, { useCallback, type JSX, type ReactNode, useContext } from "react";
 import {
     RoomListView as SharedRoomListView,
+    RoomListItemExtrasContext,
     useCreateAutoDisposedViewModel,
     type Room as SharedRoom,
 } from "@element-hq/web-shared-components";
@@ -21,6 +22,7 @@ import { KeyBindingAction } from "../../../../accessibility/KeyboardShortcuts";
 import { Landmark, LandmarkNavigation } from "../../../../accessibility/LandmarkNavigation";
 import { RoomListViewModel } from "../../../../viewmodels/room-list/RoomListViewModel";
 import { SDKContext } from "../../../../contexts/SDKContext.ts";
+import { isVoiceChannel, VoiceChannelIcon, VoiceChannelParticipants } from "../../../../intercom/VoiceChannel";
 
 /**
  * RoomListView component using shared components with proper MVVM pattern.
@@ -40,6 +42,8 @@ export function RoomListView(): JSX.Element {
 
     // Render avatar for each room - memoized to prevent re-renders
     const renderAvatar = useCallback((room: SharedRoom): ReactNode => {
+        // InterCom: a voice channel is a place to talk rather than a conversation with a face
+        if (room instanceof Room && isVoiceChannel(room)) return <VoiceChannelIcon />;
         if (room instanceof Room) return <DecoratedRoomAvatarView room={room} />;
         // A preview item has no `Room`, only the data needed for its avatar
         if (room instanceof PreviewRoomAvatarData) return <RoomAvatar size="32px" oobData={room} />;
@@ -59,5 +63,15 @@ export function RoomListView(): JSX.Element {
         }
     }, []);
 
-    return <SharedRoomListView vm={vm} renderAvatar={renderAvatar} onKeyDown={onKeyDown} />;
+    // InterCom: under a voice channel, the people who are in its call
+    const renderExtras = useCallback((room: SharedRoom): ReactNode => {
+        if (room instanceof Room && isVoiceChannel(room)) return <VoiceChannelParticipants room={room} />;
+        return null;
+    }, []);
+
+    return (
+        <RoomListItemExtrasContext.Provider value={renderExtras}>
+            <SharedRoomListView vm={vm} renderAvatar={renderAvatar} onKeyDown={onKeyDown} />
+        </RoomListItemExtrasContext.Provider>
+    );
 }

@@ -12,7 +12,7 @@ import { logger } from "matrix-js-sdk/src/logger";
 import { DefaultTagID, type TagID } from "../../stores/room-list-v3/skip-list/tag";
 import RoomListActions from "../../actions/RoomListActions";
 import dis from "../../dispatcher/dispatcher";
-import { CHATS_TAG, isSectionTag } from "../../stores/room-list-v3/section";
+import { CHATS_TAG, isSectionTag, VOICE_TAG } from "../../stores/room-list-v3/section";
 import { getSectionTagForRoom } from "./getSectionTagForRoom";
 
 /**
@@ -24,7 +24,8 @@ import { getSectionTagForRoom } from "./getSectionTagForRoom";
  * @param showToast Whether the room list should surface the "chat moved" toast for this change. Defaults to false.
  */
 export function tagRoom(room: Room, tagId: TagID, showToast = false): void {
-    const isChatTag = tagId === CHATS_TAG;
+    // Neither Chats nor Voice is a tag of a room: moving a room there removes the tag it has
+    const isChatTag = tagId === CHATS_TAG || tagId === VOICE_TAG;
     const tag = isChatTag ? null : tagId;
 
     // The invite tag is a section tag, but it comes from the membership rather than from account

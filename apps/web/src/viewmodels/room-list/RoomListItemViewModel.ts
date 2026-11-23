@@ -32,6 +32,7 @@ import { RoomNotifState as ElementRoomNotifState } from "../../RoomNotifs";
 import { shouldShowComponent } from "../../customisations/helpers/UIComponents";
 import { UIComponent } from "../../settings/UIFeature";
 import { CallStore, CallStoreEvent } from "../../stores/CallStore";
+import { isVideoRoom } from "../../utils/video-rooms";
 import { clearRoomNotification, setMarkedUnreadState } from "../../utils/notifications";
 import { tagRoom } from "../../utils/room/tagRoom";
 import { keepIfSame } from "../../utils/keepIfSame";
@@ -424,6 +425,8 @@ export class RoomListItemViewModel
             action: Action.ViewRoom,
             room_id: this.props.room.roomId,
             metricsTrigger: "RoomList",
+            // InterCom: a voice channel is joined with the click that opens it, without the lobby
+            ...(isVideoRoom(this.props.room) && { view_call: true, skipLobby: true }),
         });
     };
 

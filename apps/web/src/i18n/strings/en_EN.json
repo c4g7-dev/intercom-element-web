@@ -64,6 +64,7 @@
         "import": "Import",
         "invite": "Invite",
         "join": "Join",
+        "later": "Later",
         "learn_more": "Learn more",
         "leave": "Leave",
         "leave_room": "Leave room",
@@ -1356,6 +1357,22 @@
         "impossible_dialog_description": "Your %(brand)s doesn't allow you to use an integration manager to do this. Please contact an admin.",
         "impossible_dialog_title": "Integrations not allowed"
     },
+    "intercom": {
+        "settings": {
+            "dialog_title": "<strong>Settings:</strong> InterCom",
+            "title": "InterCom"
+        },
+        "updater": {
+            "description": "InterCom updates itself from the releases of its GitHub repository. An update is downloaded and checked, and installed when you restart.",
+            "heading": "Updates",
+            "open_release_page": "Open the release page",
+            "release_notes": "Release notes",
+            "restart": "Restart to update",
+            "toast_manual": "This install cannot update itself. Get the new version from the release page.",
+            "toast_ready": "Restart to update.",
+            "toast_title": "InterCom %(version)s is available"
+        }
+    },
     "invite": {
         "confirm_unknown_users": {
             "invite_subtitle": "You don't have any chats with these contacts yet.",
@@ -2165,7 +2182,9 @@
             "chats": "Chats",
             "favourites": "Favourites",
             "invites": "Invites",
-            "low_priority": "Low Priority"
+            "low_priority": "Low Priority",
+            "text_channels": "Text channels",
+            "voice_channels": "Voice channels"
         },
         "show_less": "Show less"
     },

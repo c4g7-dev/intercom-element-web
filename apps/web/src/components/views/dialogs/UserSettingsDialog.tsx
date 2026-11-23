@@ -35,6 +35,9 @@ import SecurityUserSettingsTab from "../settings/tabs/user/SecurityUserSettingsT
 import NotificationUserSettingsTab from "../settings/tabs/user/NotificationUserSettingsTab";
 import PreferencesUserSettingsTab from "../settings/tabs/user/PreferencesUserSettingsTab";
 import VoiceUserSettingsTab from "../settings/tabs/user/VoiceUserSettingsTab";
+import DownloadIcon from "@vector-im/compound-design-tokens/assets/web/icons/download";
+
+import { IntercomUserSettingsTab } from "../../../intercom/updater/IntercomUserSettingsTab";
 import HelpUserSettingsTab from "../settings/tabs/user/HelpUserSettingsTab";
 import MjolnirUserSettingsTab from "../settings/tabs/user/MjolnirUserSettingsTab";
 import { UIFeature } from "../../../settings/UIFeature";
@@ -98,6 +101,8 @@ function titleForTabID(tabId: UserTab): React.ReactNode {
             return _t("settings|labs_mjolnir|dialog_title", undefined, subs);
         case UserTab.Help:
             return _t("setting|help_about|dialog_title", undefined, subs);
+        case UserTab.Intercom:
+            return _t("intercom|settings|dialog_title", undefined, subs);
     }
 }
 
@@ -245,6 +250,10 @@ export default function UserSettingsDialog(props: IProps): JSX.Element {
                 ),
             );
         }
+        // InterCom: its own tab, for now with the updates
+        tabs.push(
+            new Tab(UserTab.Intercom, _td("intercom|settings|title"), <DownloadIcon />, <IntercomUserSettingsTab />),
+        );
         tabs.push(
             new Tab(
                 UserTab.Help,
