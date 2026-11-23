@@ -64,7 +64,8 @@
     flex-shrink: 0;
     max-width: 100%;
     clear: both;
-    padding-top: 18px;
+    /* InterCom: the gap above a new sender's messages can be set by the theme */
+    padding-top: var(--event-tile-block-start, 18px);
 }
 
 /* Controls that are hidden until the reader shows interest in the event are

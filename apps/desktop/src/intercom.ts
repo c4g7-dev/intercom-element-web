@@ -20,7 +20,7 @@ import {
 } from "electron";
 
 /** Background painted before the web app has rendered; matches the default (dark) InterCom theme. */
-export const WINDOW_BACKGROUND = "#111317";
+export const WINDOW_BACKGROUND = "#1b1e24";
 
 /**
  * Element Call (InterCom build) pops a participant's video out with

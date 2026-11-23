@@ -1,0 +1,78 @@
+/*
+Copyright 2026 The InterCom contributors
+
+SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+Please see LICENSE files in the repository root for full details.
+*/
+
+/*
+ * InterCom's layout polish: the app reads as a place with text and voice channels. Three layers
+ * of surface (the space rail darkest, the room list between, the timeline lightest), tighter
+ * message groups, a compact room header. Colours come from the InterCom themes in config.json;
+ * with another theme the fallbacks keep everything as upstream has it.
+ *
+ * Like _flat.pcss this only restyles: it can be deleted without consequence.
+ */
+
+/* --- Layers ---------------------------------------------------------------------------- */
+
+.mx_MatrixChat {
+    /* Worked out here, above the room list, which then takes it for its canvas */
+    --ic-roomlist-bg: var(--roomlist-background-color, var(--cpd-color-bg-canvas-default));
+    --ic-rail-bg: var(--sidebar-color, var(--cpd-color-bg-canvas-default));
+    /* The height of the bars at the top: the search of the room list and the room's header */
+    --ic-topbar-height: 52px;
+}
+
+:root:root .mx_SpacePanel {
+    background-color: var(--ic-rail-bg);
+}
+
+:root:root .mx_RoomListPanel {
+    /* Everything in the list that paints the canvas (pinned section headers) paints the list's */
+    --cpd-color-bg-canvas-default: var(--ic-roomlist-bg);
+    background-color: var(--ic-roomlist-bg);
+    /* The user panel sits on the list as the rail sits beside it */
+    --intercom-user-panel-bg: var(--ic-rail-bg);
+}
+
+/* --- Room list ------------------------------------------------------------------------- */
+
+:root:root .mx_RoomListPanel [data-testid="room-list-search"] {
+    min-height: var(--ic-topbar-height);
+}
+
+/* A voice channel has a speaker where other rooms have their avatar */
+.mx_IntercomVoiceChannelIcon {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--ic-radius-md);
+    color: var(--cpd-color-icon-secondary);
+    background-color: var(--cpd-color-bg-action-tertiary-hovered);
+}
+
+.mx_RoomListItemView_selected .mx_IntercomVoiceChannelIcon {
+    color: var(--cpd-color-icon-accent-primary);
+}
+
+/* --- Room header ----------------------------------------------------------------------- */
+
+:root:root .mx_RoomHeader {
+    height: var(--ic-topbar-height);
+}
+
+/* --- Timeline -------------------------------------------------------------------------- */
+
+/*
+ * Lines of one sender sit close together, and a new sender starts 12px further down rather
+ * than 18px. Only in a room's timeline: the thread list and the cards set their own.
+ */
+:root:root .mx_RoomView_MessageList .mx_EventTile {
+    --event-tile-block-start: 12px;
+    --event-tile-group-line-spacing-block-start: 0px;
+    --event-tile-group-line-spacing-block-end: 1px;
+}
