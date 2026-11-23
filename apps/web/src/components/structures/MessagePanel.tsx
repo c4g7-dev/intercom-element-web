@@ -738,8 +738,8 @@ export default class MessagePanel extends React.Component<IProps, IState> {
      */
     private findGalleries(events: WrappedEvent[]): Map<string, MatrixEvent[]> {
         const type = this.context.timelineRenderingType;
+        // Also with "show hidden events" on: what then has a tile between two pictures ends the run
         if (
-            this.showHiddenEvents ||
             this.props.disableGrouping ||
             (type !== TimelineRenderingType.Room && type !== TimelineRenderingType.Thread)
         ) {

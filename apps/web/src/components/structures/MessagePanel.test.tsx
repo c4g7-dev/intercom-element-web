@@ -372,6 +372,29 @@ describe("MessagePanel", function () {
         expect(grids[0].closest(".mx_EventTile")).toBe(container.getElementsByClassName("mx_EventTile")[0]);
     });
 
+    it("shows a gallery with hidden events shown as well", function () {
+        const ts = new Date(2026, 5, 1, 12, 0, 0).getTime();
+        const gallery = [0, 1, 2].map((i) =>
+            TestUtilsMatrix.mkEvent({
+                event: true,
+                type: "m.room.message",
+                room: "!room:id",
+                user: "@user:id",
+                ts: ts + i * 1000,
+                content: { msgtype: "m.image", body: `picture${i}.png`, url: `mxc://server/picture${i}` },
+            }),
+        );
+        vi.spyOn(SettingsStore, "getValue").mockImplementation((arg) => {
+            return arg === "showDisplaynameChanges" || arg === "showHiddenEventsInTimeline";
+        });
+        const { container } = render(
+            getComponent({ events: gallery }, { showHiddenEvents: true }),
+            clientAndSDKContextRenderOptions(client, sdkContext),
+        );
+        expect(container.getElementsByClassName("mx_IntercomGallery")).toHaveLength(1);
+        expect(container.getElementsByClassName("mx_IntercomGallery_cell")).toHaveLength(3);
+    });
+
     it("should collapse adjacent member events", function () {
         const { container } = render(
             getComponent({ events: mkMelsEvents() }),

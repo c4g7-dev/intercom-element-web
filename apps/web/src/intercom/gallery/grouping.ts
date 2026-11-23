@@ -12,6 +12,24 @@ import { MediaEventHelper } from "../../utils/MediaEventHelper";
 /** Images sent further apart than this are not one gallery. */
 export const GALLERY_MAX_GAP_MS = 2 * 60 * 1000;
 
+/**
+ * The content field that marks the pictures confirmed together in the batch dialog:
+ * `{ id, index, count }`. Pictures with the same `id` are one gallery however long their uploads
+ * took; other clients ignore the field.
+ */
+export const GALLERY_BATCH_FIELD = "io.intercom.gallery";
+
+/** The batch a picture was sent in, if it says so. */
+export function galleryBatchId(event: MatrixEvent): string | undefined {
+    const id = event.getContent()[GALLERY_BATCH_FIELD]?.id;
+    return typeof id === "string" && id ? id : undefined;
+}
+
+function sameBatch(a: MatrixEvent, b: MatrixEvent): boolean {
+    const batch = galleryBatchId(a);
+    return batch !== undefined && batch === galleryBatchId(b);
+}
+
 /** One entry of a timeline: an event and whether it gets a tile. */
 export interface GalleryCandidate {
     event: MatrixEvent;
@@ -35,8 +53,8 @@ function sameDay(a: MatrixEvent, b: MatrixEvent): boolean {
 
 /**
  * Finds the runs of pictures that are shown as one gallery: at least two picture messages in a
- * row from one sender, each within two minutes of the one before, with nothing shown between
- * them. A caption is text, so only the first picture of a gallery may have one.
+ * row from one sender, each within two minutes of the one before (or marked as one batch), with
+ * nothing shown between them. A caption is text, so only the first picture of a gallery may have one.
  *
  * The events stay what they are, one m.image each; this is only how they are laid out.
  *
@@ -71,8 +89,9 @@ export function findGalleries(
         if (
             previous &&
             (previous.getSender() !== event.getSender() ||
-                Math.abs(event.getTs() - previous.getTs()) > GALLERY_MAX_GAP_MS ||
-                !sameDay(previous, event) ||
+                // Pictures of one batch belong together however long each took to upload
+                (!sameBatch(previous, event) &&
+                    (Math.abs(event.getTs() - previous.getTs()) > GALLERY_MAX_GAP_MS || !sameDay(previous, event))) ||
                 previous.threadRootId !== event.threadRootId ||
                 MediaEventHelper.hasCaption(event))
         ) {

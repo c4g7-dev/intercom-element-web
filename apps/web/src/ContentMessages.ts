@@ -60,7 +60,9 @@ import { blobIsAnimated, mayBeAnimated } from "./utils/Image.ts";
 import { PosthogAnalytics } from "./PosthogAnalytics.ts";
 import { cacheUploadedMedia } from "./utils/UploadedMediaCache";
 import { UploadTrace, type UploadTracePart } from "./intercom/UploadDiagnostics";
+import { secureRandomString } from "matrix-js-sdk/src/randomstring";
 import BatchUploadDialog from "./intercom/gallery/BatchUploadDialog";
+import { GALLERY_BATCH_FIELD } from "./intercom/gallery/grouping";
 
 // scraped out of a macOS hidpi (5660ppm) screenshot png
 //                  5669 px (x-axis)      , 5669 px (y-axis)      , per metre
@@ -585,6 +587,8 @@ export default class ContentMessages {
         let uploadAll = false;
         // Text sent with the first file, when the files were confirmed as one batch
         let caption: string | undefined;
+        // Set when the files were confirmed as one batch: marks them as one gallery
+        let batchId: string | undefined;
         if (okFiles.length > 1 && okFiles.every((file) => file.type.startsWith("image/"))) {
             // Several pictures chosen together are asked for once and sent as one batch, one after
             // the other, so that they arrive as the gallery they were chosen as.
@@ -593,6 +597,7 @@ export default class ContentMessages {
             if (confirmed) {
                 uploadAll = true;
                 caption = text;
+                batchId = secureRandomString(16);
             } else {
                 okFiles.length = 0;
             }
@@ -630,6 +635,7 @@ export default class ContentMessages {
                         replyToEvent ?? undefined,
                         loopPromiseBefore,
                         i === 0 ? caption : undefined,
+                        batchId ? { id: batchId, index: i, count: okFiles.length } : undefined,
                     ),
                 matrixClient,
             );
@@ -699,6 +705,7 @@ export default class ContentMessages {
         replyToEvent: MatrixEvent | undefined,
         promBefore?: Promise<any>,
         caption?: string,
+        batch?: { id: string; index: number; count: number },
     ): Promise<void> {
         const fileName = file.name || _t("common|attachment");
         const content: Omit<MediaEventContent, "info"> & { info: Partial<MediaEventInfo> } = {
@@ -708,6 +715,8 @@ export default class ContentMessages {
                 size: file.size,
             },
             msgtype: MsgType.File, // set more specifically later
+            // The pictures of one batch are one gallery, however far apart their uploads end
+            ...(batch ? { [GALLERY_BATCH_FIELD]: batch } : {}),
         };
 
         // Attach mentions, which really only applies if there's a replyToEvent.
