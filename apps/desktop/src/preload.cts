@@ -37,6 +37,8 @@ const CHANNELS = [
     "showToast",
     // InterCom: a call action from a global shortcut or a second instance's command line
     "intercomCallAction",
+    // InterCom: the state of the updater, pushed when it changes
+    "intercomUpdater",
 ];
 
 contextBridge.exposeInMainWorld("electron", {
@@ -98,5 +100,14 @@ contextBridge.exposeInMainWorld("electron", {
             ipcRenderer.invoke("intercomShareAudio", "prepareShareSource", sinkName),
         releaseShareSource: (sinkName?: string) =>
             ipcRenderer.invoke("intercomShareAudio", "releaseShareSource", sinkName),
+    },
+
+    // InterCom: updates from the GitHub releases, see intercom-updater.ts
+    intercomUpdater: {
+        getState: () => ipcRenderer.invoke("intercomUpdater", "getState"),
+        check: () => ipcRenderer.invoke("intercomUpdater", "check"),
+        install: () => ipcRenderer.invoke("intercomUpdater", "install"),
+        setAutoCheck: (on: boolean) => ipcRenderer.invoke("intercomUpdater", "setAutoCheck", on),
+        openReleasePage: () => ipcRenderer.invoke("intercomUpdater", "openReleasePage"),
     },
 });

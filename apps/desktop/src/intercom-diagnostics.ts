@@ -16,6 +16,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { getIntercomVersion } from "./build-config.js";
+
 /** Element Call (InterCom build) writes its diagnostics records to the console behind this. */
 const DIAG_PREFIX = "[intercom-diag] ";
 /** Element Call downloads a frame snapshot under a name that starts with this. */
@@ -300,6 +302,9 @@ function appStartRecord(): Json {
         ),
         argv: process.argv.slice(1).map(redactSecrets),
         hwVideoEnv: process.env.INTERCOM_NO_HW_VIDEO ?? null,
+        // HTTP/3 is off unless asked for (--enable-quic, INTERCOM_ENABLE_QUIC=1), see intercom.ts
+        quic: app.commandLine.hasSwitch("disable-quic") ? "disabled" : "enabled",
+        intercomVersion: getIntercomVersion() ?? null,
         gpuFeatureStatus,
     };
 }

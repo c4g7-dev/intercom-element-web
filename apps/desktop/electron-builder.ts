@@ -54,6 +54,8 @@ interface ExtraMetadata extends Metadata {
     electron_appId: string;
     electron_protocol: string;
     electron_windows_cert_sn?: string;
+    /** InterCom: the InterCom release being packaged, which the updater compares with the releases on GitHub. */
+    intercomVersion?: string;
 }
 
 /**
@@ -283,6 +285,15 @@ if (process.env.INTERCOM_TARGET === "win") {
  */
 if (process.env.VERSION) {
     config.extraMetadata.version = process.env.VERSION;
+}
+
+/**
+ * InterCom: the release being packaged (e.g. 1.12.35-intercom.5, set by tools/release.sh). The
+ * package version stays Element's, which is what About shows; a build without it never updates itself.
+ * @param {string} process.env.INTERCOM_VERSION
+ */
+if (process.env.INTERCOM_VERSION) {
+    config.extraMetadata.intercomVersion = process.env.INTERCOM_VERSION;
 }
 
 if (variant["linux.deb.name"]) {

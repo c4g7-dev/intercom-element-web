@@ -57,6 +57,67 @@ Audio
 - Element Call reaches this through the widget action io.intercom.share_audio, which Element Web
   answers for the bundled call widget only (apps/web/src/intercom/ShareAudioBridge.ts).
 
+Network
+-------
+
+HTTP/3 (QUIC) is off by default: src/intercom.ts appends --disable-quic. Behind some reverse proxies
+and tunnels uploads over HTTP/3 crawl and time out (measured: about 10 KB/s behind Traefik in a GRE
+tunnel, where HTTP/2 to the same server did 0.7 to 3.7 MB/s), and Chromium does not fall back.
+--enable-quic or INTERCOM_ENABLE_QUIC=1 leaves it on. The app_start record of the diagnostics log
+says which it was ("quic").
+
+An upload that fails without an answer from the server (or with a 5xx, 408 or 429) is tried once
+more after 1.5 s before "Upload Failed" is shown. Every failure is an upload_failed record in the
+diagnostics log: HTTP status, kind of error, protocol (h2, h3, http/1.1), never a name or a URL.
+
+Updates
+-------
+
+A release build updates itself from the releases of github.com/c4g7-dev/InterCom
+(src/intercom-updater.ts, src/intercom-updater-core.ts). It asks the GitHub API for the releases
+30 s after it started and every 6 hours, takes the newest tag of the form v<Element
+version>-intercom.<n> (drafts, pre-releases and the android-v… releases are passed over), downloads
+this platform's file and checks it against the release's SHA256SUMS. Then a toast offers "Restart
+to update"; nothing is installed before that click. Settings > InterCom has the switch for the
+automatic check, "Check now" and the state.
+
+- The app knows its own version from "intercomVersion" in its package.json, which the build
+  writes from INTERCOM_VERSION (tools/release.sh sets it). The package version stays Element's.
+  A build without it, an unpackaged run and a run with --no-update never look for updates.
+- Linux (the unpacked tar.gz): the archive is unpacked beside the install directory as
+  <dir>.new. On restart <dir> becomes <dir>.old (an older backup is deleted) and <dir>.new
+  becomes <dir>: two renames in one directory. Then the app starts again with the switches it
+  was started with; links it was opened with are left out. To go back: quit, and rename
+  <dir>.old to <dir>.
+  The directory and its parent must be writable. Where they are not (a package under /opt, an
+  AppImage) nothing is downloaded and the toast leads to the release page.
+- A launcher script should export INTERCOM_LAUNCHER=<its own absolute path>: the app is then
+  started again through it instead of through its executable, so that what the launcher sets
+  up is set up again. It gets no arguments unless the launcher also exports the ones it was
+  given, one per line, in INTERCOM_LAUNCHER_ARGS:
+
+      INTERCOM_LAUNCHER="$(readlink -f "$0")"
+      INTERCOM_LAUNCHER_ARGS="$(printf '%s\n' "$@")"
+      export INTERCOM_LAUNCHER INTERCOM_LAUNCHER_ARGS
+      exec /path/to/intercom/intercom --ozone-platform-hint=auto "$@"
+
+    Without the variable the executable is started with the arguments it had, the launcher's
+    switches among them, but not through the launcher.
+
+- Windows (NSIS, per user): the installer is downloaded to %APPDATA%\InterCom\updates and
+  checked. On restart it is run with "--updated /S --force-run", which installs silently and
+  starts the app again.
+- Why not electron-updater or Squirrel: the builds are not code signed, so neither could
+  verify more than the checksum does; both take the package version for the app's version,
+  which here is Element's; and electron-updater's GitHub provider reads the repository's
+  "latest" release, which may be an Android one.
+- SHA256SUMS comes from the same release as the file. It catches a broken download, not a
+  release that somebody tampered with.
+- Every step is an "updater" record in the diagnostics log (init, check, update_found,
+  download_start, download_verified, staged, ready, install_linux, install_windows, error).
+- Downloads are kept in ~/.cache/intercom-updates (XDG_CACHE_HOME) on Linux and removed once
+  the release they are of is running.
+
 Call shortcuts
 --------------
 

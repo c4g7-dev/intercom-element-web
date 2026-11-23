@@ -23,6 +23,9 @@ interface BuildConfig {
     // Subject name of the code signing cert used for Windows packages, if signed
     // used as a basis for the Tray GUID which must be rolled if the certificate changes.
     windowsCertSubjectName: string | undefined;
+    // InterCom: the InterCom release this build is, e.g. "1.12.35-intercom.5". Written into
+    // package.json when a release is packaged (INTERCOM_VERSION); absent from any other build.
+    intercomVersion: string | undefined;
 }
 
 export function getBuildConfig(): BuildConfig {
@@ -32,8 +35,14 @@ export function getBuildConfig(): BuildConfig {
             appId: (packageJson["electron_appId"] as string) || "chat.intercom.desktop",
             protocol: (packageJson["electron_protocol"] as string) || "com.c4g7.intercom",
             windowsCertSubjectName: packageJson["electron_windows_cert_sn"] as string,
+            intercomVersion: (packageJson["intercomVersion"] as string) || undefined,
         };
     }
 
     return buildConfig;
+}
+
+/** InterCom: the InterCom release this build is, or undefined for a build that is not a release. */
+export function getIntercomVersion(): string | undefined {
+    return getBuildConfig().intercomVersion;
 }
