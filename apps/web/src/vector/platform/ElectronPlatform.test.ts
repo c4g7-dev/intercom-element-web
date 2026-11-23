@@ -471,7 +471,10 @@ describe("ElectronPlatform", () => {
             true,
         );
 
-        const ipcMessage = mockElectron.send.mock.calls.find((call) => call[0] === "app_onAction");
+        // The platform also tells the app of the voice state: look for the action that was dispatched
+        const ipcMessage = mockElectron.send.mock.calls.find(
+            (call) => call[0] === "app_onAction" && call[1]?.action === "call_state",
+        );
         expect(ipcMessage![1]).toEqual({
             action: "call_state",
             state: "connected",
