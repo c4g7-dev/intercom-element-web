@@ -124,6 +124,20 @@ automatic check, "Check now" and the state.
 - Windows (NSIS, per user): the installer is downloaded to %APPDATA%\InterCom\updates and
   checked. On restart it is run with "--updated /S --force-run", which installs silently and
   starts the app again.
+- On start (src/intercom-update-on-launch.ts, decisions in src/intercom-update-on-launch-core.ts)
+  the updater is asked to check before the main window is made: 2 s for GitHub, 3 s in all when
+  nothing is found. A newer release is downloaded, verified, staged and installed as "Restart to
+  update" would, without a click, while a small window says what is happening (none with
+  --hidden). The start stops waiting after 20 s without progress or 5 minutes in all; the
+  download then goes on in the background and the update is offered in the app.
+  Skipped for: an unpackaged run, a build without intercomVersion, --no-update, either update
+  switch off, an install directory that is not writable, an AppImage.
+  <profile>/intercom-update-on-launch.json remembers an install that was begun. If the old
+  version runs again at the next start, that release is not installed at a start again (it stays
+  available behind "Restart to update") until something at least as new runs.
+  <profile>/intercom-updater.json holds both switches: {"autoCheck": true, "updateOnLaunch": true}.
+  Windows: a start with --hidden that updates comes back with its window shown, because the
+  installer starts the app without arguments.
 - Why not electron-updater or Squirrel: the builds are not code signed, so neither could
   verify more than the checksum does; both take the package version for the app's version,
   which here is Element's; and electron-updater's GitHub provider reads the repository's

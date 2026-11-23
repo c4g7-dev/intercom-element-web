@@ -87,10 +87,20 @@ export interface UpdaterState extends UpdaterMachine {
     /** The InterCom release that is running */
     currentVersion?: string;
     autoCheck: boolean;
+    /** Whether a start looks for an update before the window opens and installs it at once, see intercom-update-on-launch.ts */
+    updateOnLaunch: boolean;
     channel: "stable";
 }
 
-const state: UpdaterState = { supported: false, autoCheck: true, channel: "stable", ...initialUpdaterMachine() };
+const state: UpdaterState = {
+    supported: false,
+    autoCheck: true,
+    updateOnLaunch: true,
+    channel: "stable",
+    ...initialUpdaterMachine(),
+};
+/** How the last check failed, if it did; undefined after one that got its answer */
+let lastCheckFailure: "timeout" | "failed" | undefined;
 let prepared: { version: string; file: string } | undefined;
 let timer: NodeJS.Timeout | undefined;
 const listeners = new Set<(state: UpdaterState) => void>();
@@ -118,12 +128,29 @@ function settingsFile(): string {
     return path.join(app.getPath("userData"), "intercom-updater.json");
 }
 
-function readAutoCheck(): boolean {
+/** The updater's two switches, as the profile holds them; both are on until turned off. */
+function readSettings(): { autoCheck: boolean; updateOnLaunch: boolean } {
     try {
-        return JSON.parse(fs.readFileSync(settingsFile(), "utf8")).autoCheck !== false;
+        const stored = JSON.parse(fs.readFileSync(settingsFile(), "utf8"));
+        return { autoCheck: stored.autoCheck !== false, updateOnLaunch: stored.updateOnLaunch !== false };
     } catch {
-        return true;
+        return { autoCheck: true, updateOnLaunch: true };
     }
+}
+
+async function writeSettings(): Promise<void> {
+    const settings = { autoCheck: state.autoCheck, updateOnLaunch: state.updateOnLaunch };
+    await fsp.writeFile(settingsFile(), JSON.stringify(settings)).catch(() => {});
+}
+
+/** How the last check failed, if it did: by running out of time, or otherwise. */
+export function getLastCheckFailure(): "timeout" | "failed" | undefined {
+    return lastCheckFailure;
+}
+
+/** Whether this install can put a release in its own place: always on Windows, on Linux where its directory is the user's. */
+export async function canInstallItself(): Promise<boolean> {
+    return process.platform === "win32" || (!process.env.APPIMAGE && (await canReplaceDir(installDir())));
 }
 
 /** Where downloads are kept until they are installed. */
@@ -271,12 +298,13 @@ async function stage(archive: string): Promise<void> {
 }
 
 /** Asks GitHub for the releases and writes how long that took to the diagnostics log. */
-async function fetchReleases(manual: boolean): Promise<ReturnType<typeof selectUpdate>> {
+async function fetchReleases(manual: boolean, timeoutMs?: number): Promise<ReturnType<typeof selectUpdate>> {
     try {
         const check = await fetchReleasesCached({
             fetch: (url, init) => net.fetch(url, init),
             readCache: readReleaseCache,
             writeCache: writeReleaseCache,
+            timeoutMs,
         });
         logDiagnostics("update_check", {
             manual,
@@ -308,8 +336,10 @@ async function fetchReleases(manual: boolean): Promise<ReturnType<typeof selectU
  * Looks for a newer release and, where this install can replace itself, downloads it.
  * @param manual - whether the user asked for it. A check nobody asked for that fails (no network,
  *     GitHub not answering) is logged and not shown as an error.
+ * @param checkTimeoutMs - how long GitHub has to answer, where that is not the usual time: the
+ *     check at the start of the app has less
  */
-export async function checkForUpdate(manual = false): Promise<UpdaterState> {
+export async function checkForUpdate(manual = false, checkTimeoutMs?: number): Promise<UpdaterState> {
     if (!state.supported || isWorking(state.phase)) return state;
     // What is downloaded already is offered again rather than fetched again
     if (state.phase === "ready" && prepared) {
@@ -320,8 +350,9 @@ export async function checkForUpdate(manual = false): Promise<UpdaterState> {
     if (!dispatch({ type: "check" })) return state;
     log("check", { manual, current: state.currentVersion });
     let checking = true;
+    lastCheckFailure = undefined;
     try {
-        const candidate = await fetchReleases(manual);
+        const candidate = await fetchReleases(manual, checkTimeoutMs);
         checking = false;
         if (!candidate) {
             log("up_to_date");
@@ -331,8 +362,7 @@ export async function checkForUpdate(manual = false): Promise<UpdaterState> {
         const found = { version: candidate.version, releaseUrl: candidate.releaseUrl };
         log("update_found", { version: candidate.version, asset: Boolean(candidate.asset) });
 
-        const replaceable =
-            process.platform === "win32" || (!process.env.APPIMAGE && (await canReplaceDir(installDir())));
+        const replaceable = await canInstallItself();
         if (!candidate.asset || !candidate.sumsUrl || !replaceable) {
             // A release without this platform's file (yet), or an install that is not ours to replace
             log("manual", { asset: Boolean(candidate.asset), sums: Boolean(candidate.sumsUrl), replaceable });
@@ -352,6 +382,7 @@ export async function checkForUpdate(manual = false): Promise<UpdaterState> {
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         log("error", { message });
+        if (checking) lastCheckFailure = e instanceof ReleaseCheckError && e.timedOut ? "timeout" : "failed";
         dispatch({ type: "error", message, quiet: checking && !manual });
     }
     return state;
@@ -422,8 +453,14 @@ export function initUpdater(allowed: boolean): void {
     else if (!allowed) reason = "disabled-by-flag";
     else if (process.platform !== "linux" && process.platform !== "win32") reason = "platform";
 
-    Object.assign(state, { supported: !reason, reason, currentVersion, autoCheck: readAutoCheck() });
-    log("init", { supported: state.supported, reason, current: currentVersion, autoCheck: state.autoCheck });
+    Object.assign(state, { supported: !reason, reason, currentVersion, ...readSettings() });
+    log("init", {
+        supported: state.supported,
+        reason,
+        current: currentVersion,
+        autoCheck: state.autoCheck,
+        updateOnLaunch: state.updateOnLaunch,
+    });
 
     ipcMain.handle(CHANNEL, async (_ev, action: string, arg?: unknown): Promise<UpdaterState> => {
         switch (action) {
@@ -436,9 +473,15 @@ export function initUpdater(allowed: boolean): void {
                 break;
             case "setAutoCheck":
                 state.autoCheck = Boolean(arg);
-                await fsp.writeFile(settingsFile(), JSON.stringify({ autoCheck: state.autoCheck })).catch(() => {});
+                await writeSettings();
                 log("auto_check", { on: state.autoCheck });
                 schedule();
+                publish();
+                break;
+            case "setUpdateOnLaunch":
+                state.updateOnLaunch = Boolean(arg);
+                await writeSettings();
+                log("update_on_launch_setting", { on: state.updateOnLaunch });
                 publish();
                 break;
             case "openReleasePage":

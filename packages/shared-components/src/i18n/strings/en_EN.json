@@ -153,6 +153,8 @@
                 "web": "Updates are for the desktop app."
             },
             "up_to_date_checked": "InterCom is up to date. Last checked %(when)s.",
+            "update_on_launch": "Update automatically on launch",
+            "update_on_launch_help": "When InterCom starts and a new release is out, it is downloaded and installed before the window opens. A start that finds nothing is held up for a moment at most; without a connection InterCom starts as it is.",
             "verifying": "Verifying the checksum of InterCom %(version)s…",
             "version": "InterCom version",
             "version_unknown": "Not a release build"

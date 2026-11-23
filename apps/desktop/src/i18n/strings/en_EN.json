@@ -95,6 +95,13 @@
             "unsupported_keyring_use_plaintext": "Use no encryption"
         }
     },
+    "update_on_launch": {
+        "checking": "Checking for updates…",
+        "downloading": "Downloading update…",
+        "downloading_percent": "Downloading update · %(percent)s",
+        "installing": "Installing…",
+        "starting": "Starting…"
+    },
     "view_menu": {
         "actual_size": "Actual Size",
         "toggle_developer_tools": "Toggle Developer Tools",

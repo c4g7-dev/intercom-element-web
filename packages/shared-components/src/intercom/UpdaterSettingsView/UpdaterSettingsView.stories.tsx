@@ -18,8 +18,21 @@ import { useMockedViewModel } from "../../core/viewmodel";
 
 type Props = UpdaterSettingsViewSnapshot & UpdaterSettingsViewActions;
 
-const Wrapper = ({ onAutoCheckChange, onCheckNow, onRestart, onOpenReleasePage, ...rest }: Props): JSX.Element => {
-    const vm = useMockedViewModel(rest, { onAutoCheckChange, onCheckNow, onRestart, onOpenReleasePage });
+const Wrapper = ({
+    onAutoCheckChange,
+    onUpdateOnLaunchChange,
+    onCheckNow,
+    onRestart,
+    onOpenReleasePage,
+    ...rest
+}: Props): JSX.Element => {
+    const vm = useMockedViewModel(rest, {
+        onAutoCheckChange,
+        onUpdateOnLaunchChange,
+        onCheckNow,
+        onRestart,
+        onOpenReleasePage,
+    });
     return <UpdaterSettingsView vm={vm} />;
 };
 
@@ -31,9 +44,11 @@ const meta = {
         supported: true,
         currentVersion: "1.12.35-intercom.5",
         autoCheck: true,
+        updateOnLaunch: true,
         phase: "idle",
         lastChecked: "today at 14:02",
         onAutoCheckChange: fn(),
+        onUpdateOnLaunchChange: fn(),
         onCheckNow: fn(),
         onRestart: fn(),
         onOpenReleasePage: fn(),
@@ -44,6 +59,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const UpToDate: Story = {};
+
+/** Updates wait for "Restart to update": a start does not install them. */
+export const NotOnLaunch: Story = { args: { updateOnLaunch: false } };
+
+/** With the automatic check off nothing is asked of GitHub at a start either. */
+export const AutoCheckOff: Story = { args: { autoCheck: false } };
 
 export const NeverChecked: Story = { args: { lastChecked: undefined } };
 

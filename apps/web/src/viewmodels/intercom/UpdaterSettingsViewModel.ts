@@ -40,7 +40,13 @@ export class UpdaterSettingsViewModel
 
     public constructor(props: Props = {}) {
         const api = "api" in props ? props.api : getUpdaterApi();
-        super(props, { supported: false, reason: api ? undefined : "web", autoCheck: true, phase: "idle" });
+        super(props, {
+            supported: false,
+            reason: api ? undefined : "web",
+            autoCheck: true,
+            updateOnLaunch: true,
+            phase: "idle",
+        });
         this.api = api;
         if (!api) return;
 
@@ -56,6 +62,8 @@ export class UpdaterSettingsViewModel
             reason: state.reason,
             currentVersion: state.currentVersion,
             autoCheck: state.autoCheck,
+            // A desktop app that does not say is one that has no such switch: shown as on, as it is by default
+            updateOnLaunch: state.updateOnLaunch !== false,
             phase: state.phase,
             latestVersion: state.latestVersion,
             progress: state.progress,
@@ -68,6 +76,12 @@ export class UpdaterSettingsViewModel
         // Shown at once; the desktop app's answer follows
         this.snapshot.merge({ autoCheck: on });
         this.api?.setAutoCheck(on).then(this.onState, () => {});
+    };
+
+    public onUpdateOnLaunchChange = (on: boolean): void => {
+        // Shown at once; the desktop app's answer follows
+        this.snapshot.merge({ updateOnLaunch: on });
+        this.api?.setUpdateOnLaunch(on).then(this.onState, () => {});
     };
 
     public onCheckNow = (): void => {

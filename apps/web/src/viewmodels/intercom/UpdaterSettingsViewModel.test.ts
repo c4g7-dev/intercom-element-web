@@ -29,6 +29,7 @@ function setUp(initial: UpdaterState = idle): {
         check: vi.fn().mockResolvedValue({ ...initial, phase: "checking" }),
         install: vi.fn().mockResolvedValue(initial),
         setAutoCheck: vi.fn().mockImplementation(async (on: boolean) => ({ ...initial, autoCheck: on })),
+        setUpdateOnLaunch: vi.fn().mockImplementation(async (on: boolean) => ({ ...initial, updateOnLaunch: on })),
         openReleasePage: vi.fn().mockResolvedValue(initial),
     };
     let listener: ((state: UpdaterState) => void) | undefined;
@@ -58,6 +59,7 @@ describe("UpdaterSettingsViewModel", () => {
         vm.onRestart();
         vm.onOpenReleasePage();
         vm.onAutoCheckChange(false);
+        vm.onUpdateOnLaunchChange(false);
         vm.dispose();
     });
 
@@ -70,12 +72,22 @@ describe("UpdaterSettingsViewModel", () => {
             reason: undefined,
             currentVersion: "1.12.35-intercom.5",
             autoCheck: true,
+            // A desktop app that does not name the switch has it on
+            updateOnLaunch: true,
             phase: "idle",
             latestVersion: undefined,
             progress: undefined,
             error: undefined,
             lastChecked: "at 1234",
         });
+    });
+
+    it("shows whether a start installs updates", async () => {
+        const { vm, push } = setUp({ ...idle, updateOnLaunch: false });
+        await settled();
+        expect(vm.getSnapshot().updateOnLaunch).toBe(false);
+        push({ ...idle, updateOnLaunch: true });
+        expect(vm.getSnapshot().updateOnLaunch).toBe(true);
     });
 
     it("follows what the desktop app pushes", async () => {
@@ -103,6 +115,13 @@ describe("UpdaterSettingsViewModel", () => {
         expect(api.setAutoCheck).toHaveBeenCalledWith(false);
         await settled();
         expect(vm.getSnapshot().autoCheck).toBe(false);
+
+        vm.onUpdateOnLaunchChange(false);
+        // Shown before the answer is there
+        expect(vm.getSnapshot().updateOnLaunch).toBe(false);
+        expect(api.setUpdateOnLaunch).toHaveBeenCalledWith(false);
+        await settled();
+        expect(vm.getSnapshot().updateOnLaunch).toBe(false);
 
         vm.onCheckNow();
         await settled();

@@ -21,6 +21,8 @@ import { MockViewModel } from "../../core/viewmodel/MockViewModel";
 
 const {
     UpToDate,
+    NotOnLaunch,
+    AutoCheckOff,
     NeverChecked,
     Downloading,
     Verifying,
@@ -34,6 +36,7 @@ const {
 
 class TestViewModel extends MockViewModel<UpdaterSettingsViewSnapshot> implements UpdaterSettingsViewActions {
     public onAutoCheckChange = vi.fn();
+    public onUpdateOnLaunchChange = vi.fn();
     public onCheckNow = vi.fn();
     public onRestart = vi.fn();
     public onOpenReleasePage = vi.fn();
@@ -46,7 +49,21 @@ describe("UpdaterSettingsView", () => {
         expect(screen.getByText("Stable")).toBeInTheDocument();
         expect(screen.getByRole("status")).toHaveTextContent("InterCom is up to date. Last checked today at 14:02.");
         expect(screen.getByRole("switch", { name: "Check for updates automatically" })).toBeChecked();
+        expect(screen.getByRole("switch", { name: "Update automatically on launch" })).toBeChecked();
         expect(screen.queryByRole("button", { name: "Restart to update" })).toBeNull();
+    });
+
+    it("shows that a start does not install updates when that is off", () => {
+        render(<NotOnLaunch />);
+        expect(screen.getByRole("switch", { name: "Update automatically on launch" })).not.toBeChecked();
+        expect(screen.getByRole("switch", { name: "Update automatically on launch" })).toBeEnabled();
+    });
+
+    it("has no update on launch without the automatic check", () => {
+        render(<AutoCheckOff />);
+        const onLaunch = screen.getByRole("switch", { name: "Update automatically on launch" });
+        expect(onLaunch).not.toBeChecked();
+        expect(onLaunch).toBeDisabled();
     });
 
     it("says so before the first check", () => {
@@ -104,13 +121,16 @@ describe("UpdaterSettingsView", () => {
             supported: true,
             currentVersion: "1.12.35-intercom.5",
             autoCheck: true,
+            updateOnLaunch: true,
             phase: "ready",
             latestVersion: "1.12.35-intercom.6",
         });
         render(<UpdaterSettingsView vm={vm} />);
         const user = userEvent.setup();
-        await user.click(screen.getByRole("switch"));
+        await user.click(screen.getByRole("switch", { name: "Check for updates automatically" }));
         expect(vm.onAutoCheckChange).toHaveBeenCalledWith(false);
+        await user.click(screen.getByRole("switch", { name: "Update automatically on launch" }));
+        expect(vm.onUpdateOnLaunchChange).toHaveBeenCalledWith(false);
         await user.click(screen.getByRole("button", { name: "Check now" }));
         await user.click(screen.getByRole("button", { name: "Restart to update" }));
         await user.click(screen.getByRole("button", { name: "Release notes" }));

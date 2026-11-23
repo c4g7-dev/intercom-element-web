@@ -400,6 +400,7 @@ describe.runIf(process.platform === "linux")("the updater, from the check to the
         expect(electron.fetch).toHaveBeenCalledTimes(2);
         expect(JSON.parse(fs.readFileSync(path.join(electron.userData, "intercom-updater.json"), "utf8"))).toEqual({
             autoCheck: false,
+            updateOnLaunch: true,
         });
 
         const next = await load();
@@ -409,5 +410,53 @@ describe.runIf(process.platform === "linux")("the updater, from the check to the
         // Asked for by hand it still checks
         await ipc()({}, "check");
         await asked(3);
+    });
+    it("keeps both switches in the profile, each as it was left", async () => {
+        const updater = await load();
+        updater.initUpdater(true);
+        expect(updater.getUpdaterState()).toMatchObject({ autoCheck: true, updateOnLaunch: true });
+        const settings = (): unknown =>
+            JSON.parse(fs.readFileSync(path.join(electron.userData, "intercom-updater.json"), "utf8"));
+
+        const handler = ipc() as unknown as (ev: unknown, action: string, arg?: unknown) => Promise<unknown>;
+        expect(await handler({}, "setUpdateOnLaunch", false)).toMatchObject({ updateOnLaunch: false, autoCheck: true });
+        expect(settings()).toEqual({ autoCheck: true, updateOnLaunch: false });
+        await handler({}, "setAutoCheck", false);
+        expect(settings()).toEqual({ autoCheck: false, updateOnLaunch: false });
+
+        const next = await load();
+        next.initUpdater(true);
+        expect(next.getUpdaterState()).toMatchObject({ autoCheck: false, updateOnLaunch: false });
+        // A file from 1.12.35-intercom.6, which knew one switch
+        fs.writeFileSync(path.join(electron.userData, "intercom-updater.json"), JSON.stringify({ autoCheck: true }));
+        const later = await load();
+        later.initUpdater(true);
+        expect(later.getUpdaterState()).toMatchObject({ autoCheck: true, updateOnLaunch: true });
+    });
+
+    it("gives a check as little time as it is told to, and says that it ran out", async () => {
+        vi.useRealTimers();
+        const updater = await load();
+        updater.initUpdater(true);
+        // GitHub answers when the request is given up, not before
+        electron.fetch.mockImplementation(
+            (_url: string, init: { signal?: AbortSignal }) =>
+                new Promise((_resolve, reject) => {
+                    init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+                }),
+        );
+        const started = Date.now();
+        await updater.checkForUpdate(false, 50);
+        expect(Date.now() - started).toBeLessThan(2000);
+        expect(updater.getUpdaterState().phase).toBe("idle");
+        expect(updater.getLastCheckFailure()).toBe("timeout");
+
+        // A check that fails otherwise, and one that gets its answer
+        electron.fetch.mockResolvedValue(new Response("no", { status: 500 }));
+        await updater.checkForUpdate(false, 50);
+        expect(updater.getLastCheckFailure()).toBe("failed");
+        electron.fetch.mockResolvedValue(new Response("[]"));
+        await updater.checkForUpdate(false, 50);
+        expect(updater.getLastCheckFailure()).toBeUndefined();
     });
 });

@@ -41,6 +41,7 @@ function setUp(initial: UpdaterState = base): {
         check: vi.fn(),
         install: vi.fn().mockResolvedValue(initial),
         setAutoCheck: vi.fn(),
+        setUpdateOnLaunch: vi.fn(),
         openReleasePage: vi.fn().mockResolvedValue(initial),
     };
     const toasts = { addOrReplaceToast: vi.fn(), dismissToast: vi.fn() };

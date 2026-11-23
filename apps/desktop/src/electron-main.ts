@@ -53,6 +53,7 @@ import { configureChromium, grantDisplayMedia, WINDOW_BACKGROUND } from "./inter
 import { initDiagnostics, labelDiagnosticsWindow, logDiagnostics } from "./intercom-diagnostics.js";
 import { initShareAudio } from "./intercom-share-audio.js";
 import { initUpdater } from "./intercom-updater.js";
+import { closeLaunchSplash, updateOnLaunch } from "./intercom-update-on-launch.js";
 import { initSounds } from "./intercom-sounds.js";
 import { handleSecondInstanceCallAction, initCallShortcuts, parseCallAction } from "./intercom-call-actions.js";
 
@@ -267,6 +268,8 @@ app.on("ready", async () => {
     initSounds();
     // InterCom: looks for a newer release on GitHub, see intercom-updater.ts
     initUpdater(args.update);
+    // InterCom: a newer release is put in place before the window opens, see intercom-update-on-launch.ts
+    if (await updateOnLaunch({ allowed: args.update, hidden: args.hidden })) return;
 
     console.debug("Opening main window");
     const preloadScript = path.normalize(`${__dirname}/preload.cjs`);
@@ -324,6 +327,8 @@ app.on("ready", async () => {
     if (store.get("minimizeToTray")) await tray.create();
 
     global.mainWindow.once("ready-to-show", () => {
+        // InterCom: the small window of the start has done its part
+        closeLaunchSplash();
         if (!global.mainWindow) return;
         mainWindowState.manage(global.mainWindow);
 

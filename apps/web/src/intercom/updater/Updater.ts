@@ -23,6 +23,8 @@ export interface UpdaterState {
     reason?: "unpackaged" | "no-version" | "disabled-by-flag" | "platform";
     currentVersion?: string;
     autoCheck: boolean;
+    /** Whether a start installs a newer release before the window opens; absent from a desktop app older than 1.12.35-intercom.7 */
+    updateOnLaunch?: boolean;
     channel: "stable";
     phase: UpdaterPhase;
     latestVersion?: string;
@@ -43,6 +45,7 @@ export interface UpdaterApi {
     check(): Promise<UpdaterState>;
     install(): Promise<UpdaterState>;
     setAutoCheck(on: boolean): Promise<UpdaterState>;
+    setUpdateOnLaunch(on: boolean): Promise<UpdaterState>;
     openReleasePage(): Promise<UpdaterState>;
 }
 

@@ -31,6 +31,7 @@ function setUp(initial: UpdaterState = idle): {
         check: vi.fn().mockResolvedValue({ ...initial, phase: "checking" }),
         install: vi.fn().mockResolvedValue(initial),
         setAutoCheck: vi.fn().mockResolvedValue(initial),
+        setUpdateOnLaunch: vi.fn().mockResolvedValue(initial),
         openReleasePage: vi.fn().mockResolvedValue(initial),
     };
     let listener: ((state: UpdaterState) => void) | undefined;

@@ -108,6 +108,7 @@ contextBridge.exposeInMainWorld("electron", {
         check: () => ipcRenderer.invoke("intercomUpdater", "check"),
         install: () => ipcRenderer.invoke("intercomUpdater", "install"),
         setAutoCheck: (on: boolean) => ipcRenderer.invoke("intercomUpdater", "setAutoCheck", on),
+        setUpdateOnLaunch: (on: boolean) => ipcRenderer.invoke("intercomUpdater", "setUpdateOnLaunch", on),
         openReleasePage: () => ipcRenderer.invoke("intercomUpdater", "openReleasePage"),
     },
 

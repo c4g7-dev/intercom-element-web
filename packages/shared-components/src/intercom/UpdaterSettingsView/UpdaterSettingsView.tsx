@@ -41,6 +41,8 @@ export interface UpdaterSettingsViewSnapshot {
     currentVersion?: string;
     /** Whether the app looks for updates by itself */
     autoCheck: boolean;
+    /** Whether the app installs a newer release when it starts, before its window opens */
+    updateOnLaunch: boolean;
     phase: UpdaterPhase;
     /** The newer release, once one is known */
     latestVersion?: string;
@@ -55,6 +57,8 @@ export interface UpdaterSettingsViewSnapshot {
 export interface UpdaterSettingsViewActions {
     /** Turns the automatic check on or off */
     onAutoCheckChange: (on: boolean) => void;
+    /** Turns updating when the app starts on or off */
+    onUpdateOnLaunchChange: (on: boolean) => void;
     /** Looks for an update now */
     onCheckNow: () => void;
     /** Installs the update that is ready and starts the app again */
@@ -73,12 +77,22 @@ interface UpdaterSettingsViewProps {
 
 /**
  * The update settings of InterCom: the version that runs, whether to look for updates
- * automatically, a button to look now, and what was found.
+ * automatically and to install them when the app starts, a button to look now, and what was found.
  */
 export function UpdaterSettingsView({ vm }: Readonly<UpdaterSettingsViewProps>): JSX.Element {
     const { translate: _t } = useI18n();
-    const { supported, reason, currentVersion, autoCheck, phase, latestVersion, progress, error, lastChecked } =
-        useViewModel(vm);
+    const {
+        supported,
+        reason,
+        currentVersion,
+        autoCheck,
+        updateOnLaunch,
+        phase,
+        latestVersion,
+        progress,
+        error,
+        lastChecked,
+    } = useViewModel(vm);
 
     let status: string;
     switch (phase) {
@@ -150,6 +164,15 @@ export function UpdaterSettingsView({ vm }: Readonly<UpdaterSettingsViewProps>):
                         helpMessage={_t("intercom|updater|auto_check_help")}
                         checked={autoCheck}
                         onChange={(e) => vm.onAutoCheckChange(e.target.checked)}
+                    />
+                    <SettingsToggleInput
+                        name="intercom_update_on_launch"
+                        label={_t("intercom|updater|update_on_launch")}
+                        helpMessage={_t("intercom|updater|update_on_launch_help")}
+                        // Nothing is asked of GitHub unasked while the automatic check is off
+                        checked={updateOnLaunch && autoCheck}
+                        disabled={!autoCheck}
+                        onChange={(e) => vm.onUpdateOnLaunchChange(e.target.checked)}
                     />
                     <div className={styles.status}>
                         <Text size="md" role="status" className={phase === "error" ? styles.error : undefined}>
