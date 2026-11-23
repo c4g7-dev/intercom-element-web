@@ -73,8 +73,6 @@
         "maximise": "Maximise",
         "mention": "Mention",
         "minimise": "Minimise",
-        "new_room": "New room",
-        "new_video_room": "New video room",
         "next": "Next",
         "no": "No",
         "not_now": "Not now",
@@ -656,7 +654,6 @@
     "console_wait": "Wait!",
     "create_room": {
         "action_create_room": "Create room",
-        "action_create_video_room": "Create video room",
         "encrypted_video_room_warning": "You can't disable this later. The room will be encrypted but the embedded call will not.",
         "encrypted_warning": "You can't disable this later. Bridges & most bots won't work yet.",
         "encryption_forced": "Your server requires encryption to be enabled in private rooms.",
@@ -677,7 +674,6 @@
         "state_encryption_label": "Encrypt state events",
         "title_private_room": "Create a private room",
         "title_public_room": "Create a public room",
-        "title_video_room": "Create a video room",
         "topic_label": "Topic (optional)",
         "unfederated": "Block anyone not part of %(serverName)s from ever joining this room.",
         "unfederated_label_default_off": "You might enable this if the room will only be used for collaborating with internal teams on your service. This cannot be changed later.",
@@ -1358,6 +1354,18 @@
         "impossible_dialog_title": "Integrations not allowed"
     },
     "intercom": {
+        "channels": {
+            "create_text_channel": "Create text channel",
+            "create_text_channel_title": "Create a text channel",
+            "create_voice_channel": "Create voice channel",
+            "create_voice_channel_title": "Create a voice channel",
+            "create_voice_room": "Create voice room",
+            "create_voice_room_title": "Create a voice room",
+            "new_text_channel": "New text channel",
+            "new_voice_channel": "New voice channel",
+            "text_channel": "Text channel",
+            "voice_channel": "Voice channel"
+        },
         "settings": {
             "dialog_title": "<strong>Settings:</strong> InterCom",
             "title": "InterCom"

@@ -361,7 +361,7 @@ test.describe("Room list", () => {
                 .getByLabel("Room options")
                 .getByRole("button", { name: "New" })
                 .click();
-            await page.getByRole("menuitem", { name: "New video room" }).click();
+            await page.getByRole("menuitem", { name: "New voice room" }).click();
             await page.getByRole("textbox", { name: "Name" }).fill("video room");
             // Make it public to avoid any crypto setup toasts
             await page.getByRole("button", { name: "Room visibility" }).click();

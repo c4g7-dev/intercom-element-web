@@ -47,6 +47,7 @@ import { awaitRoomDownSync } from "../utils/RoomUpgrade";
 import { UPDATE_EVENT } from "./AsyncStore";
 import { type SDKContextClass } from "../contexts/SDKContextClass";
 import { CallStore } from "./CallStore";
+import { leaveOtherCalls } from "../intercom/VoiceSwitch";
 import { type ThreadPayload } from "../dispatcher/payloads/ThreadPayload";
 import { type ActionPayload } from "../dispatcher/payloads";
 import { type CancelAskToJoinPayload } from "../dispatcher/payloads/CancelAskToJoinPayload";
@@ -393,7 +394,13 @@ export class RoomViewStore extends EventEmitter {
                 // Immediately start the call. This will connect to all required widget events
                 // and allow the widget to show the lobby.
                 if (call.connectionState === ConnectionState.Disconnected) {
-                    void call.start({ skipLobby: payload.skipLobby, voiceOnly: payload.voiceOnly });
+                    const startCall = (): Promise<unknown> =>
+                        call.start({ skipLobby: payload.skipLobby, voiceOnly: payload.voiceOnly });
+                    // InterCom: a join without the lobby (a click on a voice channel) first leaves the
+                    // call the user is in, so that the two never sound at once. A call joined from its
+                    // lobby is covered by VoiceSwitcher.
+                    if (payload.skipLobby) void leaveOtherCalls(call.roomId).then(startCall);
+                    else void startCall();
                 }
             }
             // If we switch to a different room from the call, we are no longer presenting it

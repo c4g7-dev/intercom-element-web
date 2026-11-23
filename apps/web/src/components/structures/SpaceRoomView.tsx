@@ -126,7 +126,7 @@ const SpaceLandingAddButton: React.FC<{ space: Room }> = ({ space }) => {
                     {canCreateRoom && (
                         <>
                             <IconizedContextMenuOption
-                                label={_t("action|new_room")}
+                                label={_t("intercom|channels|new_text_channel")}
                                 icon={<PlusIcon />}
                                 onClick={async (e): Promise<void> => {
                                     e.preventDefault();
@@ -141,7 +141,7 @@ const SpaceLandingAddButton: React.FC<{ space: Room }> = ({ space }) => {
                             />
                             {videoRoomsEnabled && (
                                 <IconizedContextMenuOption
-                                    label={_t("action|new_video_room")}
+                                    label={_t("intercom|channels|new_voice_channel")}
                                     icon={<VideoCallSolidIcon />}
                                     onClick={async (e): Promise<void> => {
                                         e.preventDefault();

@@ -549,6 +549,76 @@ describe("RoomViewStore", function () {
         expect(roomViewStore.isViewingCall()).toEqual(false);
     });
 
+    it("leaves the call the user is in before joining another without the lobby (InterCom)", async () => {
+        const order: string[] = [];
+        const hangup = Promise.withResolvers<void>();
+        const other = {
+            roomId: "!other:example.org",
+            connected: true,
+            disconnect: vi.fn(() => {
+                order.push("left the other call");
+                return hangup.promise;
+            }),
+        } as unknown as Call;
+        const call = {
+            roomId,
+            presented: false,
+            connectionState: ConnectionState.Disconnected,
+            widget: { id: "!widget:example.org" },
+            participants: new Map(),
+            start: vi.fn(async () => {
+                order.push("started this call");
+                return null;
+            }),
+        } as unknown as Call;
+        vi.spyOn(CallStore.instance, "getCall").mockReturnValue(call);
+        vi.spyOn(CallStore.instance, "connectedCalls", "get").mockReturnValue(new Set([other]));
+        await setupAsyncStoreWithClient(CallStore.instance, MatrixClientPeg.safeGet());
+
+        // As dispatched by a click on a voice channel in the room list
+        dis.dispatch<ViewRoomPayload>({
+            action: Action.ViewRoom,
+            room_id: roomId,
+            view_call: true,
+            skipLobby: true,
+            metricsTrigger: undefined,
+        });
+        await untilDispatch(Action.ViewRoom, dis);
+
+        expect(other.disconnect).toHaveBeenCalledTimes(1);
+        // Not before the other call is left
+        expect(call.start).not.toHaveBeenCalled();
+        hangup.resolve();
+        await vi.waitFor(() => expect(call.start).toHaveBeenCalledWith(expect.objectContaining({ skipLobby: true })));
+        expect(order).toEqual(["left the other call", "started this call"]);
+    });
+
+    it("keeps the other call while a call is only shown with its lobby", async () => {
+        const other = { roomId: "!other:example.org", connected: true, disconnect: vi.fn() } as unknown as Call;
+        const call = {
+            roomId,
+            presented: false,
+            connectionState: ConnectionState.Disconnected,
+            widget: { id: "!widget:example.org" },
+            participants: new Map(),
+            start: vi.fn(),
+        } as unknown as Call;
+        vi.spyOn(CallStore.instance, "getCall").mockReturnValue(call);
+        vi.spyOn(CallStore.instance, "connectedCalls", "get").mockReturnValue(new Set([other]));
+        await setupAsyncStoreWithClient(CallStore.instance, MatrixClientPeg.safeGet());
+
+        dis.dispatch<ViewRoomPayload>({
+            action: Action.ViewRoom,
+            room_id: roomId,
+            view_call: true,
+            metricsTrigger: undefined,
+        });
+        await untilDispatch(Action.ViewRoom, dis);
+
+        expect(call.start).toHaveBeenCalled();
+        expect(other.disconnect).not.toHaveBeenCalled();
+    });
+
     it("opens a video-intent call maximised in the room", async () => {
         const call = {
             presented: false,

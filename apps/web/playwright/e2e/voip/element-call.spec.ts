@@ -466,7 +466,7 @@ test.describe("Element Call", () => {
                 .getByLabel("Room options")
                 .getByRole("button", { name: "New" })
                 .click();
-            await page.getByRole("menuitem", { name: "New video room" }).click();
+            await page.getByRole("menuitem", { name: "New voice room" }).click();
             await page.getByRole("textbox", { name: "Name" }).fill("Test room");
             await page.getByRole("button", { name: "Create video room" }).click();
             await expect(page).toHaveURL(new RegExp(`/#/room/`));

@@ -76,8 +76,52 @@
     line-height: 16px;
 }
 
+/* Somebody who just joined comes in from the side */
+.joining {
+    animation: voice-participant-in 240ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* Somebody who left stays a moment, dimmed, then fades: 1.5s in all, as long as the view model keeps the row */
+.leaving {
+    opacity: 0.45;
+    animation: voice-participant-out 600ms ease-in 900ms both;
+}
+
+.leaving .participant {
+    text-decoration: line-through;
+    text-decoration-color: var(--cpd-color-text-disabled);
+}
+
+@keyframes voice-participant-in {
+    from {
+        opacity: 0;
+        transform: translateX(-6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes voice-participant-out {
+    from {
+        opacity: 0.45;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .avatar {
         transition: none;
+    }
+
+    /* No movement and no fade: the row is there, dimmed while leaving, and then gone */
+    .joining,
+    .leaving {
+        animation: none;
     }
 }

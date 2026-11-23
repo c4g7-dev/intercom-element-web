@@ -126,7 +126,7 @@ describe("SpaceRoomView", () => {
             const addButton = screen.getByRole("button", { name: /add/i });
             fireEvent.click(addButton);
 
-            expect(await screen.findByText(/new room/i)).toBeInTheDocument();
+            expect(await screen.findByText(/new text channel/i)).toBeInTheDocument();
             expect(screen.getByText(/add existing room/i)).toBeInTheDocument();
         });
     });

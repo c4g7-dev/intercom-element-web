@@ -26,6 +26,8 @@ const {
     NoMessagePreview,
     WithHoverMenu,
     WithoutHoverMenu,
+    VoiceChannel,
+    VoiceChannelConnected,
 } = composeStories(stories);
 
 describe("<RoomListItemView />", () => {
@@ -131,6 +133,29 @@ describe("<RoomListItemView />", () => {
     it("should hide hover menu when showMoreOptionsMenu is false", () => {
         const { container } = render(<WithoutHoverMenu />);
         expect(container.querySelector('[aria-label="More Options"]')).toBeNull();
+    });
+
+    it("says of a voice channel that a click joins it", () => {
+        const { container } = render(<VoiceChannel />);
+        expect(screen.getByRole("option", { name: "Join voice channel Lounge" })).toBeInTheDocument();
+        const hint = container.querySelector(".mx_IntercomVoiceHint");
+        expect(hint).toHaveTextContent("Join voice");
+        expect(hint).toHaveAttribute("data-state", "join");
+        // The row's label says it to a screen reader
+        expect(hint).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("says of the voice channel the user is in that they are connected", () => {
+        const { container } = render(<VoiceChannelConnected />);
+        expect(
+            screen.getByRole("option", { name: "Voice channel Lounge, connected. Show the call" }),
+        ).toBeInTheDocument();
+        expect(container.querySelector(".mx_IntercomVoiceHint")).toHaveTextContent("Connected");
+    });
+
+    it("has no voice hint on other rooms", () => {
+        const { container } = render(<Default />);
+        expect(container.querySelector(".mx_IntercomVoiceHint")).toBeNull();
     });
 
     it("reveals the hover menu on keyboard focus and clears it when focus leaves", async () => {

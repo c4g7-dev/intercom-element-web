@@ -31,6 +31,11 @@ export interface VoiceParticipant {
     deafened: boolean;
     /** Whether they are sharing a screen */
     live: boolean;
+    /**
+     * Set for a moment when the participant comes or goes: "joining" right after they joined the
+     * call, "leaving" while they are still listed after having left it.
+     */
+    transition?: "joining" | "leaving";
 }
 
 export interface VoiceParticipantsViewSnapshot {
@@ -70,8 +75,27 @@ export function VoiceParticipantsView({ vm }: Readonly<VoiceParticipantsViewProp
             data-testid="voice-participants"
         >
             {participants.map((participant) => (
-                <li key={participant.id}>
-                    <button type="button" className={styles.participant} onClick={vm.onJoin} tabIndex={-1}>
+                <li
+                    key={participant.id}
+                    className={classNames({
+                        [styles.joining]: participant.transition === "joining",
+                        [styles.leaving]: participant.transition === "leaving",
+                    })}
+                    data-transition={participant.transition}
+                >
+                    <button
+                        type="button"
+                        className={styles.participant}
+                        onClick={vm.onJoin}
+                        tabIndex={-1}
+                        title={
+                            participant.transition === "joining"
+                                ? _t("intercom|voice|joined", { name: participant.name })
+                                : participant.transition === "leaving"
+                                  ? _t("intercom|voice|left", { name: participant.name })
+                                  : undefined
+                        }
+                    >
                         <span
                             className={classNames(styles.avatar, { [styles.speaking]: participant.speaking })}
                             data-speaking={participant.speaking}

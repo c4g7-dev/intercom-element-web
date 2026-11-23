@@ -68,6 +68,7 @@ import { type URLParams } from "./vector/url_utils.ts";
 import { type OnLoggedInPayload } from "./dispatcher/payloads/OnLoggedInPayload.ts";
 import { clearUploadedMediaCache } from "./utils/UploadedMediaCache";
 import { CallStatusListener } from "./CallStatusListener.ts";
+import { VoiceSwitcher } from "./intercom/VoiceSwitch.ts";
 import { CallStore } from "./stores/CallStore.ts";
 import { ModuleApi } from "./modules/Api.ts";
 
@@ -1133,6 +1134,8 @@ async function startMatrixClient(
     DeviceListener.sharedInstance().start(client);
 
     CallStatusListener.sharedInstance().start(CallStore.instance, client);
+    // InterCom: one call at a time, joining another leaves the one before
+    VoiceSwitcher.sharedInstance().start(CallStore.instance);
 
     // Similarly, don't start sending presence updates until we've started the client
     if (!SettingsStore.getValue("lowBandwidth")) {
@@ -1269,6 +1272,7 @@ export function stopMatrixClient(unsetClient = true): void {
     Mjolnir.sharedInstance().stop();
     DeviceListener.sharedInstance().stop();
     CallStatusListener.sharedInstance().stop();
+    VoiceSwitcher.sharedInstance().stop();
     DMRoomMap.shared()?.stop();
     EventIndexPeg.stop();
     const cli = MatrixClientPeg.get();

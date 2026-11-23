@@ -707,7 +707,7 @@ export class ElementCall extends Call {
     private static getRoomIntent(
         client: MatrixClient,
         roomId: string,
-        { voiceOnly }: WidgetGenerationParameters,
+        { voiceOnly, skipLobby }: WidgetGenerationParameters,
     ): { intent?: ElementCallIntent; returnToLobby?: boolean; skipLobby?: boolean } {
         const room = client.getRoom(roomId);
         if (!room) {
@@ -719,8 +719,9 @@ export class ElementCall extends Call {
                 intent: ElementCallIntent.JoinExisting,
                 // Video rooms should always return to lobby.
                 returnToLobby: true,
-                // Never skip the lobby, we always want to give the caller a chance to explicitly join.
-                skipLobby: false,
+                // The lobby gives the caller a chance to explicitly join. InterCom: a click on a voice
+                // channel in the room list is that explicit join, and asks for the lobby to be skipped.
+                skipLobby: skipLobby === true,
             };
         }
 
@@ -914,6 +915,9 @@ export class ElementCall extends Call {
         if (intent !== undefined) params.append("intent", intent);
         if (config.returnToLobby !== undefined) params.append("returnToLobby", config.returnToLobby.toString());
         if (config.skipLobby !== undefined) params.append("skipLobby", config.skipLobby.toString());
+        // InterCom: joining a voice channel is dropping in, not calling its members: no notification
+        const room = client.getRoom(roomId);
+        if (room && isVideoRoom(room)) params.append("sendNotificationType", "none");
 
         const rageshakeSubmitUrl = SdkConfig.get("bug_report_endpoint_url");
         if (rageshakeSubmitUrl && rageshakeSubmitUrl !== BugReportEndpointURLLocal) {

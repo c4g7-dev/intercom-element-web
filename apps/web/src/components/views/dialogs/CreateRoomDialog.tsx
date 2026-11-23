@@ -423,9 +423,14 @@ export default class CreateRoomDialog extends React.Component<IProps, IState> {
         }
 
         let title: string;
+        // InterCom: a room made in a space is one of its channels, for text or for voice
         if (isVideoRoom) {
-            title = _t("create_room|title_video_room");
-        } else if (this.props.parentSpace || this.state.joinRule === JoinRule.Knock) {
+            title = this.props.parentSpace
+                ? _t("intercom|channels|create_voice_channel_title")
+                : _t("intercom|channels|create_voice_room_title");
+        } else if (this.props.parentSpace) {
+            title = _t("intercom|channels|create_text_channel_title");
+        } else if (this.state.joinRule === JoinRule.Knock) {
             title = _t("action|create_a_room");
         } else {
             title =
@@ -500,7 +505,13 @@ export default class CreateRoomDialog extends React.Component<IProps, IState> {
                 </div>
                 <DialogButtons
                     primaryButton={
-                        isVideoRoom ? _t("create_room|action_create_video_room") : _t("create_room|action_create_room")
+                        isVideoRoom
+                            ? this.props.parentSpace
+                                ? _t("intercom|channels|create_voice_channel")
+                                : _t("intercom|channels|create_voice_room")
+                            : this.props.parentSpace
+                              ? _t("intercom|channels|create_text_channel")
+                              : _t("create_room|action_create_room")
                     }
                     onPrimaryButtonClick={this.onOk}
                     onCancel={this.onCancel}

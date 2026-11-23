@@ -19,7 +19,7 @@ import {
 } from "./VoiceParticipantsView";
 import { MockViewModel } from "../../core/viewmodel/MockViewModel";
 
-const { Default, Empty } = composeStories(stories);
+const { Default, Empty, ComingAndGoing } = composeStories(stories);
 
 describe("VoiceParticipantsView", () => {
     it("lists who is in the call with what is on and off", () => {
@@ -50,6 +50,17 @@ describe("VoiceParticipantsView", () => {
     it("renders nothing while nobody is in the call", () => {
         const { container } = render(<Empty />);
         expect(container.querySelector("ul")).toBeNull();
+    });
+
+    it("marks who just joined and who is leaving", () => {
+        render(<ComingAndGoing />);
+        const rows = [...screen.getByRole("list").querySelectorAll("li")];
+        expect(rows.map((row) => row.getAttribute("data-transition"))).toEqual([null, "joining", "leaving"]);
+        expect(rows[1].querySelector("button")?.getAttribute("title")).toBe("Ben joined");
+        expect(rows[2].querySelector("button")?.getAttribute("title")).toBe("Cy left");
+        // The two are told apart by their style, too
+        expect(rows[1].className).not.toBe(rows[2].className);
+        expect(rows[0].className).toBe("");
     });
 
     it("joins when somebody in the list is clicked", async () => {

@@ -259,6 +259,22 @@ export const WithoutHoverMenu: Story = {
     },
 };
 
+/** InterCom: a voice channel, which a click joins. Point at it for "Join voice". */
+export const VoiceChannel: Story = {
+    args: {
+        name: "Lounge",
+        voiceChannel: "join",
+    },
+};
+
+/** InterCom: the voice channel the user is in. */
+export const VoiceChannelConnected: Story = {
+    args: {
+        name: "Lounge",
+        voiceChannel: "connected",
+    },
+};
+
 export const WithLargeFont: Story = {
     args: {
         isSelected: true,

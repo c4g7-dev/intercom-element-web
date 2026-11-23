@@ -30,6 +30,7 @@ import { type RoomScrollStateStore } from "../stores/RoomScrollStateStore";
 import { type ConsoleLogger, type IndexedDBLogStore } from "../rageshake/rageshake";
 import type ActiveWidgetStore from "../stores/ActiveWidgetStore";
 import type { CallStatusListener } from "../CallStatusListener";
+import type { VoiceSwitcher } from "../intercom/VoiceSwitch";
 import { type IConfigOptions } from "../IConfigOptions";
 import { type MatrixDispatcher } from "../dispatcher/dispatcher";
 import { type DeepReadonly } from "./common";
@@ -89,6 +90,8 @@ declare global {
         mxToastStore: ToastStore;
         mxDeviceListener: DeviceListener;
         mxCallStatusListener: CallStatusListener;
+        // InterCom: leaves the call the user was in when they join another
+        mxIntercomVoiceSwitcher?: VoiceSwitcher;
         getRoomListStoreV3: () => RoomListStoreV3Class;
         mxPlatformPeg: PlatformPeg;
         mxIntegrationManagers: typeof IntegrationManagers;

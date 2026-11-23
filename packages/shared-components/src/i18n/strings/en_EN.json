@@ -19,7 +19,6 @@
         "new_conversation": "New",
         "new_room": "New room",
         "new_section": "New section",
-        "new_video_room": "New video room",
         "no": "No",
         "open_menu": "Open menu",
         "pause": "Pause",
@@ -183,10 +182,19 @@
             "voice_connected": "Voice connected"
         },
         "voice": {
+            "a11y_connected": "Voice channel %(roomName)s, connected. Show the call",
+            "a11y_join": "Join voice channel %(roomName)s",
+            "connected": "Connected",
             "deafened": "Deafened",
             "in_call_label": "In the call of %(roomName)s",
+            "join": "Join voice",
+            "joined": "%(name)s joined",
+            "left": "%(name)s left",
             "live": "LIVE",
             "muted": "Muted",
+            "new_text_channel": "New text channel",
+            "new_voice_channel": "New voice channel",
+            "new_voice_room": "New voice room",
             "sharing_screen": "Sharing a screen"
         }
     },

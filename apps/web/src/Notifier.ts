@@ -46,6 +46,7 @@ import { localNotificationsAreSilenced, createLocalNotificationSettingsIfNeeded 
 import { getIncomingCallToastKey, getNotificationEventSendTs, IncomingCallToast } from "./toasts/IncomingCallToast";
 import ToastStore from "./stores/ToastStore";
 import { stripPlainReply } from "./utils/Reply";
+import { isVideoRoom } from "./utils/video-rooms";
 import { BackgroundAudio } from "./audio/BackgroundAudio";
 import { type MatrixDispatcher } from "./dispatcher/dispatcher.ts";
 
@@ -660,6 +661,10 @@ export default class Notifier extends TypedEventEmitter<keyof EmittedEvents, Emi
             // If we're already joined to the session, don't notify.
             return;
         }
+
+        // InterCom: a voice channel is dropped into, it does not call anybody. Who is in it is
+        // shown under it in the room list.
+        if (isVideoRoom(room)) return;
 
         // XXX: Should use parseCallNotificationContent once the types are exported.
         const content = ev.getContent() as IRTCNotificationContent;

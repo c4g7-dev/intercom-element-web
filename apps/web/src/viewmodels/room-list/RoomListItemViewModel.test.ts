@@ -47,6 +47,7 @@ vi.mock("../../stores/CallStore", () => ({
     CallStore: {
         instance: {
             getCall: vi.fn(),
+            getActiveCall: vi.fn(),
             on: vi.fn(),
             off: vi.fn(),
             emit: vi.fn(),
@@ -544,6 +545,30 @@ describe("RoomListItemViewModel", () => {
                 view_call: true,
                 skipLobby: true,
             });
+        });
+
+        it("should say that a click joins a voice channel, and that the user is in it once connected", () => {
+            vi.spyOn(room, "isCallRoom").mockReturnValue(true);
+            const getActiveCall = vi.spyOn(CallStore.instance, "getActiveCall").mockReturnValue(null);
+            viewModel = new RoomListItemViewModel({ room, client: matrixClient });
+            expect(viewModel.getSnapshot().voiceChannel).toBe("join");
+
+            // The store says that the calls the user is connected to have changed
+            getActiveCall.mockReturnValue({} as unknown as Call);
+            const onConnectedCalls = (CallStore.instance.on as Mock).mock.calls.find(
+                ([event]) => event === "connected_calls",
+            )![1];
+            onConnectedCalls();
+            expect(viewModel.getSnapshot().voiceChannel).toBe("connected");
+
+            getActiveCall.mockReturnValue(null);
+            onConnectedCalls();
+            expect(viewModel.getSnapshot().voiceChannel).toBe("join");
+        });
+
+        it("should not mark a room that is no voice channel", () => {
+            viewModel = new RoomListItemViewModel({ room, client: matrixClient });
+            expect(viewModel.getSnapshot().voiceChannel).toBeUndefined();
         });
 
         it("should return room object", () => {

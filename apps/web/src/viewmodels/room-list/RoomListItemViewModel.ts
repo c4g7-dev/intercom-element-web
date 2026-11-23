@@ -129,6 +129,10 @@ export class RoomListItemViewModel
 
         // Subscribe to call state changes
         this.disposables.trackListener(CallStore.instance, CallStoreEvent.Call, this.onCallStateChanged);
+        // InterCom: a voice channel says whether a click joins it or the user is in it
+        if (isVideoRoom(props.room)) {
+            this.disposables.trackListener(CallStore.instance, CallStoreEvent.ConnectedCalls, this.onConnectedCalls);
+        }
         // If there is an active call for this room, listen to participant changes
         this.listenToCallParticipants();
 
@@ -235,6 +239,19 @@ export class RoomListItemViewModel
             this.updateItem();
         }
     };
+
+    private readonly onConnectedCalls = (): void => {
+        this.snapshot.merge({ voiceChannel: RoomListItemViewModel.getVoiceChannelState(this.props.room) });
+    };
+
+    /**
+     * InterCom: where the user stands with a voice channel (a room that is its call): in its
+     * call, or a click away from it. Undefined for every other room.
+     */
+    private static getVoiceChannelState(room: Room): RoomListItemViewSnapshot["voiceChannel"] {
+        if (!isVideoRoom(room)) return undefined;
+        return CallStore.instance.getActiveCall(room.roomId) ? "connected" : "join";
+    }
 
     private onRoomChanged = (): void => {
         this.updateItem();
@@ -417,6 +434,7 @@ export class RoomListItemViewModel
             sections,
             areSectionsEnabled,
             canChangeSection,
+            voiceChannel: RoomListItemViewModel.getVoiceChannelState(room),
         };
     }
 

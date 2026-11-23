@@ -36,8 +36,21 @@ describe("<ComposeMenuView />", () => {
         await user.click(button);
 
         expect(screen.getByRole("menuitem", { name: "Start chat" })).toBeInTheDocument();
+        expect(screen.getByRole("menuitem", { name: "New text channel" })).toBeInTheDocument();
+        expect(screen.getByRole("menuitem", { name: "New voice channel" })).toBeInTheDocument();
+    });
+
+    it("should speak of rooms rather than channels outside a space", async () => {
+        const user = userEvent.setup();
+
+        const vm = new MockedViewModel({ ...defaultSnapshot, displaySpaceMenu: false });
+        render(<ComposeMenuView vm={vm} />);
+
+        await user.click(screen.getByRole("button", { name: "New" }));
+
         expect(screen.getByRole("menuitem", { name: "New room" })).toBeInTheDocument();
-        expect(screen.getByRole("menuitem", { name: "New video room" })).toBeInTheDocument();
+        expect(screen.getByRole("menuitem", { name: "New voice room" })).toBeInTheDocument();
+        expect(screen.queryByRole("menuitem", { name: "New text channel" })).not.toBeInTheDocument();
     });
 
     it("should hide new room option when canCreateRoom is false", async () => {
@@ -49,7 +62,7 @@ describe("<ComposeMenuView />", () => {
         const button = screen.getByRole("button", { name: "New" });
         await user.click(button);
 
-        expect(screen.queryByRole("menuitem", { name: "New room" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("menuitem", { name: "New text channel" })).not.toBeInTheDocument();
         expect(screen.getByRole("menuitem", { name: "Start chat" })).toBeInTheDocument();
     });
 
@@ -62,7 +75,7 @@ describe("<ComposeMenuView />", () => {
         const button = screen.getByRole("button", { name: "New" });
         await user.click(button);
 
-        expect(screen.queryByRole("menuitem", { name: "New video room" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("menuitem", { name: "New voice channel" })).not.toBeInTheDocument();
         expect(screen.getByRole("menuitem", { name: "Start chat" })).toBeInTheDocument();
     });
 
@@ -78,26 +91,26 @@ describe("<ComposeMenuView />", () => {
         expect(vm.createChatRoom).toHaveBeenCalledTimes(1);
     });
 
-    it("should call createRoom when New room is clicked", async () => {
+    it("should call createRoom when New text channel is clicked", async () => {
         const user = userEvent.setup();
 
         const vm = new MockedViewModel(defaultSnapshot);
         render(<ComposeMenuView vm={vm} />);
 
         await user.click(screen.getByRole("button", { name: "New" }));
-        await user.click(screen.getByRole("menuitem", { name: "New room" }));
+        await user.click(screen.getByRole("menuitem", { name: "New text channel" }));
 
         expect(vm.createRoom).toHaveBeenCalledTimes(1);
     });
 
-    it("should call createVideoRoom when New video room is clicked", async () => {
+    it("should call createVideoRoom when New voice channel is clicked", async () => {
         const user = userEvent.setup();
 
         const vm = new MockedViewModel(defaultSnapshot);
         render(<ComposeMenuView vm={vm} />);
 
         await user.click(screen.getByRole("button", { name: "New" }));
-        await user.click(screen.getByRole("menuitem", { name: "New video room" }));
+        await user.click(screen.getByRole("menuitem", { name: "New voice channel" }));
 
         expect(vm.createVideoRoom).toHaveBeenCalledTimes(1);
     });

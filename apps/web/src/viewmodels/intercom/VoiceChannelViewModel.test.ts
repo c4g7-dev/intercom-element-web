@@ -7,10 +7,10 @@ Please see LICENSE files in the repository root for full details.
 
 // oxlint-disable element-web/require-test-teardown -- the stores here are emitters made per test, with nothing to release
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Room, type RoomMember, TypedEventEmitter } from "matrix-js-sdk/src/matrix";
 
-import { VoiceChannelViewModel } from "./VoiceChannelViewModel";
+import { JOIN_MARK_MS, LEAVE_LINGER_MS, VoiceChannelViewModel } from "./VoiceChannelViewModel";
 import { type CallStore, CallStoreEvent } from "../../stores/CallStore";
 import { type Call, CallEvent } from "../../models/Call";
 import { CallStateStore, CallStateStoreEvent, parseCallState } from "../../intercom/CallStateStore";
@@ -133,8 +133,10 @@ describe("VoiceChannelViewModel", () => {
         call.setParticipants([ben, ada]);
         expect(vm.getSnapshot().participants.map((p) => p.id)).toEqual(["@ada:x", "@ben:x"]);
         call.setParticipants([]);
-        expect(vm.getSnapshot().participants).toEqual([]);
+        // Who left is listed a moment longer (see "coming and going")
+        expect(vm.getSnapshot().participants.map((p) => p.transition)).toEqual(["leaving", "leaving"]);
         expect(listener).toHaveBeenCalledTimes(3);
+        vm.dispose();
     });
 
     it("shows who speaks, is muted, deafened or shares once the user is in the call", () => {
@@ -174,6 +176,119 @@ describe("VoiceChannelViewModel", () => {
 
         callStateStore.clear(ROOM);
         expect(vm.getSnapshot().participants.every((p) => !p.speaking && !p.muted && !p.live)).toBe(true);
+    });
+
+    describe("coming and going", () => {
+        const transitions = (vm: VoiceChannelViewModel): Record<string, string | undefined> =>
+            Object.fromEntries(vm.getSnapshot().participants.map((p) => [p.name, p.transition]));
+
+        beforeEach(() => {
+            vi.useFakeTimers();
+            callStore.call = call;
+            call.participants = new Map([[ada, new Set(["D"])]]);
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it("does not mark who is in the call when the list is first shown", () => {
+            const vm = create();
+            expect(transitions(vm)).toEqual({ Ada: undefined });
+            vm.dispose();
+        });
+
+        it("marks somebody who joins for a moment", () => {
+            const vm = create();
+            call.setParticipants([ada, ben]);
+            expect(transitions(vm)).toEqual({ Ada: undefined, Ben: "joining" });
+
+            vi.advanceTimersByTime(JOIN_MARK_MS - 1);
+            expect(transitions(vm)).toEqual({ Ada: undefined, Ben: "joining" });
+            vi.advanceTimersByTime(1);
+            expect(transitions(vm)).toEqual({ Ada: undefined, Ben: undefined });
+            vm.dispose();
+        });
+
+        it("keeps somebody who left for a moment, as leaving, then drops them", () => {
+            call.participants = new Map([
+                [ada, new Set(["D"])],
+                [ben, new Set(["D"])],
+            ]);
+            const vm = create();
+            call.setParticipants([ada]);
+            expect(transitions(vm)).toEqual({ Ada: undefined, Ben: "leaving" });
+
+            vi.advanceTimersByTime(LEAVE_LINGER_MS - 1);
+            expect(transitions(vm)).toEqual({ Ada: undefined, Ben: "leaving" });
+            vi.advanceTimersByTime(1);
+            expect(transitions(vm)).toEqual({ Ada: undefined });
+            vm.dispose();
+        });
+
+        it("shows the last one to leave until their moment is over", () => {
+            const vm = create();
+            call.setParticipants([]);
+            expect(transitions(vm)).toEqual({ Ada: "leaving" });
+            vi.advanceTimersByTime(LEAVE_LINGER_MS);
+            expect(vm.getSnapshot().participants).toEqual([]);
+            vm.dispose();
+        });
+
+        it("does not show somebody who left as speaking or sharing", () => {
+            call.participants = new Map([
+                [ada, new Set(["D"])],
+                [ben, new Set(["D"])],
+            ]);
+            call.connected = true;
+            callStateStore.setState(
+                ROOM,
+                parseCallState({
+                    audio_enabled: true,
+                    video_enabled: false,
+                    deafened: false,
+                    screen_sharing: false,
+                    reconnecting: false,
+                    participants: [{ user_id: "@ben:x", speaking: true, audio_enabled: true, screen_sharing: true }],
+                })!,
+            );
+            const vm = create();
+            expect(vm.getSnapshot().participants.find((p) => p.id === "@ben:x")).toMatchObject({
+                speaking: true,
+                live: true,
+            });
+            call.setParticipants([ada]);
+            expect(vm.getSnapshot().participants.find((p) => p.id === "@ben:x")).toMatchObject({
+                transition: "leaving",
+                speaking: false,
+                live: false,
+            });
+            vm.dispose();
+        });
+
+        it("takes somebody who comes back at once as having joined", () => {
+            call.participants = new Map([
+                [ada, new Set(["D"])],
+                [ben, new Set(["D"])],
+            ]);
+            const vm = create();
+            call.setParticipants([ada]);
+            vi.advanceTimersByTime(500);
+            call.setParticipants([ada, ben]);
+            expect(transitions(vm)).toEqual({ Ada: undefined, Ben: "joining" });
+            // The timer of their leaving is gone with it
+            vi.advanceTimersByTime(LEAVE_LINGER_MS);
+            expect(transitions(vm)).toEqual({ Ada: undefined, Ben: undefined });
+            vm.dispose();
+        });
+
+        it("drops its timers when disposed", () => {
+            const vm = create();
+            call.setParticipants([ben]);
+            expect(vi.getTimerCount()).toBe(2);
+            vm.dispose();
+            expect(vi.getTimerCount()).toBe(0);
+        });
     });
 
     it("joins without the lobby when clicked", () => {

@@ -7,7 +7,7 @@
 
 import React, { useState, type JSX } from "react";
 import { IconButton, Menu, MenuItem, ReleaseAnnouncement } from "@vector-im/compound-web";
-import VideoCallIcon from "@vector-im/compound-design-tokens/assets/web/icons/video-call";
+import VolumeOnIcon from "@vector-im/compound-design-tokens/assets/web/icons/volume-on";
 import ChatIcon from "@vector-im/compound-design-tokens/assets/web/icons/chat";
 import RoomIcon from "@vector-im/compound-design-tokens/assets/web/icons/room";
 import SectionIcon from "@vector-im/compound-design-tokens/assets/web/icons/section";
@@ -36,8 +36,15 @@ interface ComposeMenuViewProps {
 export function ComposeMenuView({ vm }: ComposeMenuViewProps): JSX.Element {
     const { translate: _t } = useI18n();
     const [open, setOpen] = useState(false);
-    const { canCreateRoom, canCreateVideoRoom, displaySectionReleaseAnnouncement, areSectionsEnabled } =
-        useViewModel(vm);
+    const {
+        canCreateRoom,
+        canCreateVideoRoom,
+        displaySectionReleaseAnnouncement,
+        areSectionsEnabled,
+        displaySpaceMenu,
+    } = useViewModel(vm);
+    // InterCom: in a space the rooms are its channels, for text or for voice
+    const inSpace = displaySpaceMenu;
 
     // 28px button with a 20px icon
     const button = (
@@ -71,12 +78,17 @@ export function ComposeMenuView({ vm }: ComposeMenuViewProps): JSX.Element {
         >
             <MenuItem Icon={ChatIcon} label={_t("action|start_chat")} onSelect={vm.createChatRoom} hideChevron />
             {canCreateRoom && (
-                <MenuItem Icon={RoomIcon} label={_t("action|new_room")} onSelect={vm.createRoom} hideChevron />
+                <MenuItem
+                    Icon={RoomIcon}
+                    label={inSpace ? _t("intercom|voice|new_text_channel") : _t("action|new_room")}
+                    onSelect={vm.createRoom}
+                    hideChevron
+                />
             )}
             {canCreateVideoRoom && (
                 <MenuItem
-                    Icon={VideoCallIcon}
-                    label={_t("action|new_video_room")}
+                    Icon={VolumeOnIcon}
+                    label={inSpace ? _t("intercom|voice|new_voice_channel") : _t("intercom|voice|new_voice_room")}
                     onSelect={vm.createVideoRoom}
                     hideChevron
                 />

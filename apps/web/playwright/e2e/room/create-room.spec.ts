@@ -79,7 +79,7 @@ test.describe("Create Room", () => {
         await app.settings.setValue("feature_video_rooms", null, SettingLevel.DEVICE, true);
         await rejectToast(page, "Verify this device");
 
-        const dialog = await app.openCreateRoomDialog("New video room");
+        const dialog = await app.openCreateRoomDialog("New voice room");
         // Fill name & topic
         await dialog.getByRole("textbox", { name: "Name" }).fill(name);
         await dialog.getByRole("textbox", { name: "Topic" }).fill(topic);

@@ -63,3 +63,14 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const Empty: Story = { args: { participants: [] } };
+
+/** Ben has just joined the call and Cy has just left it. */
+export const ComingAndGoing: Story = {
+    args: {
+        participants: [
+            person("@ada:example.org", "Ada"),
+            person("@ben:example.org", "Ben", { transition: "joining" }),
+            person("@cy:example.org", "Cy", { transition: "leaving" }),
+        ],
+    },
+};

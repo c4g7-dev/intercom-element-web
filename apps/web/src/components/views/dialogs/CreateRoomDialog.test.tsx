@@ -11,7 +11,7 @@ Please see LICENSE files in the repository root for full details.
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent, render, screen, within } from "test-utils-rtl";
-import { type Room, JoinRule, MatrixError, Preset, Visibility } from "matrix-js-sdk/src/matrix";
+import { type Room, JoinRule, MatrixError, Preset, RoomType, Visibility } from "matrix-js-sdk/src/matrix";
 import { flushPromises, getMockClientWithEventEmitter, mkSpace, mockClientMethodsUser } from "test-utils";
 
 import CreateRoomDialog from "./CreateRoomDialog";
@@ -437,6 +437,34 @@ describe("<CreateRoomDialog />", () => {
             parentSpace = mkSpace(mockClient, "!space:server") as unknown as Room;
         });
 
+        it("should call a room made in a space a text channel", async () => {
+            render(<CreateRoomDialog parentSpace={parentSpace} onFinished={vi.fn()} />);
+            await flushPromises();
+            expect(screen.getByRole("dialog", { name: "Create a text channel" })).toBeInTheDocument();
+            expect(screen.getByText("Create text channel")).toBeInTheDocument();
+        });
+
+        it("should make a voice channel that the space's members can join", async () => {
+            const onFinished = vi.fn();
+            render(<CreateRoomDialog parentSpace={parentSpace} type={RoomType.UnstableCall} onFinished={onFinished} />);
+            await flushPromises();
+            expect(screen.getByRole("dialog", { name: "Create a voice channel" })).toBeInTheDocument();
+
+            fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Lounge" } });
+            fireEvent.click(screen.getByText("Create voice channel"));
+            await flushPromises();
+
+            // Restricted to the space without anything having been chosen
+            expect(onFinished).toHaveBeenCalledWith(
+                true,
+                expect.objectContaining({
+                    roomType: RoomType.UnstableCall,
+                    joinRule: JoinRule.Restricted,
+                    parentSpace,
+                }),
+            );
+        });
+
         it("should create a room with restricted join rule when selected", async () => {
             const onFinished = vi.fn();
             render(<CreateRoomDialog parentSpace={parentSpace} onFinished={onFinished} />);
@@ -447,7 +475,7 @@ describe("<CreateRoomDialog />", () => {
             fireEvent.click(screen.getByLabelText("Room visibility"));
             fireEvent.click(screen.getByRole("option", { name: "Standard" }));
 
-            fireEvent.click(screen.getByText("Create room"));
+            fireEvent.click(screen.getByText("Create text channel"));
             await flushPromises();
 
             expect(onFinished).toHaveBeenCalledWith(
@@ -471,7 +499,7 @@ describe("<CreateRoomDialog />", () => {
             fireEvent.change(screen.getByLabelText("Room address"), { target: { value: "testroom" } });
 
             // Create the room.
-            fireEvent.click(screen.getByText("Create room"));
+            fireEvent.click(screen.getByText("Create text channel"));
             await flushPromises();
 
             expect(onFinished).toHaveBeenCalledWith(
@@ -488,6 +516,13 @@ describe("<CreateRoomDialog />", () => {
                 }),
             );
         });
+    });
+
+    it("should call a call room made outside a space a voice room", async () => {
+        render(<CreateRoomDialog type={RoomType.UnstableCall} onFinished={vi.fn()} />);
+        await flushPromises();
+        expect(screen.getByRole("dialog", { name: "Create a voice room" })).toBeInTheDocument();
+        expect(screen.getByText("Create voice room")).toBeInTheDocument();
     });
 
     describe("keyboard shortcuts", () => {

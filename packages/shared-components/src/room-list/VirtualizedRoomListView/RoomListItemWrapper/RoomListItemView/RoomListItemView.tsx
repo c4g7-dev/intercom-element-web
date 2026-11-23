@@ -19,6 +19,7 @@ import { useViewModel, type ViewModel } from "../../../../core/viewmodel";
 import { type UserStatus } from "../../../../core/userStatus";
 import { _t } from "../../../../core/i18n/i18n";
 import { RoomListItemExtrasContext } from "../../../../intercom/RoomListItemExtras";
+import { type VoiceChannelState } from "../../../../intercom/VoiceJoinHint";
 
 /**
  * Opaque type representing a Room object from the parent application
@@ -28,8 +29,17 @@ export type Room = unknown;
 /**
  * Generate an accessible label for a room based on its notification state.
  */
-function getA11yLabel(roomName: string, notification: NotificationDecorationData): string {
-    if (notification.isUnsentMessage) {
+function getA11yLabel(
+    roomName: string,
+    notification: NotificationDecorationData,
+    voiceChannel?: VoiceChannelState,
+): string {
+    // InterCom: a voice channel is joined with the click that opens it
+    if (voiceChannel === "connected") {
+        return _t("intercom|voice|a11y_connected", { roomName });
+    } else if (voiceChannel === "join") {
+        return _t("intercom|voice|a11y_join", { roomName });
+    } else if (notification.isUnsentMessage) {
         return _t("room_list|a11y|unsent_message", { roomName });
     } else if (notification.invited) {
         return _t("room_list|a11y|invitation", { roomName });
@@ -107,6 +117,11 @@ export interface RoomListItemViewSnapshot {
      * that assign a section (Favourited, Low priority and "Move to").
      */
     canChangeSection: boolean;
+    /**
+     * InterCom: set for a voice channel (a room that is its call). "join" when a click on the
+     * item joins the call, "connected" when the user is in it.
+     */
+    voiceChannel?: VoiceChannelState;
 }
 
 /**
@@ -223,7 +238,7 @@ export const RoomListItemView = memo(function RoomListItemView({
     };
 
     // Generate a11y label from notification state and room name
-    const a11yLabel = getA11yLabel(item.name, item.notification);
+    const a11yLabel = getA11yLabel(item.name, item.notification, item.voiceChannel);
 
     return (
         <>

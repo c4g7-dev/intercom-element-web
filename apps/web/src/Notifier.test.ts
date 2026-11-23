@@ -803,6 +803,12 @@ describe("Notifier", () => {
             );
         });
 
+        it("shows no toast for a call in a voice channel (InterCom)", () => {
+            vi.spyOn(testRoom, "isCallRoom").mockReturnValue(true);
+            emitCallNotificationEvent();
+            expect(ToastStore.sharedInstance().addOrReplaceToast).not.toHaveBeenCalled();
+        });
+
         it("shows group call toast once for multiple notifications to the same call", () => {
             // Call the same function twice.
             emitCallNotificationEvent();

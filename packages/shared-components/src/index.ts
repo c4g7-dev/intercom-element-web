@@ -25,6 +25,7 @@ export * from "./intercom/RoomListItemExtras";
 export * from "./intercom/UpdateStatusView";
 export * from "./intercom/UpdaterSettingsView";
 export * from "./intercom/UserPanelView";
+export * from "./intercom/VoiceJoinHint";
 export * from "./intercom/VoiceParticipantsView";
 export * from "./menus/UserMenu";
 export * from "./notifications/NotificationBadgeView";

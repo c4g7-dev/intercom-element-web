@@ -802,6 +802,24 @@ describe("ElementCall", () => {
             expect(urlParams.get("intent")).toBe(ElementCallIntent.StartCall);
         });
 
+        it("asks for no call notification in a voice channel, and leaves it alone elsewhere (InterCom)", async () => {
+            ElementCall.create(room);
+            const inRoom = Call.get(room);
+            if (!(inRoom instanceof ElementCall)) throw new Error("Failed to create call");
+            expect(
+                new URLSearchParams(new URL(inRoom.widget.url).hash.slice(1)).get("sendNotificationType"),
+            ).toBeNull();
+            inRoom.destroy();
+
+            vi.spyOn(room, "isElementVideoRoom").mockReturnValue(true);
+            ElementCall.create(room);
+            const inChannel = Call.get(room);
+            if (!(inChannel instanceof ElementCall)) throw new Error("Failed to create call");
+            expect(new URLSearchParams(new URL(inChannel.widget.url).hash.slice(1)).get("sendNotificationType")).toBe(
+                "none",
+            );
+        });
+
         it("requests correct intent when joining a non-DM call", async () => {
             roomSession.memberships = [{} as CallMembership]; // Remote party is already there
             ElementCall.create(room);
@@ -1260,12 +1278,20 @@ describe("ElementCall with the React component embedding", () => {
             expect(config.skipLobby).toBeUndefined();
         });
 
-        it("always returns to the lobby and never skips it in video rooms", () => {
+        it("always returns to the lobby in video rooms, and shows it unless asked to skip it", () => {
+            vi.spyOn(room, "isElementVideoRoom").mockReturnValue(true);
+            call.widgetGenerationParameters = {};
+            const { intent, config } = call.getCallOptions();
+            expect(intent).toBe(ElementCallIntent.JoinExisting);
+            expect(config).toMatchObject({ returnToLobby: true, skipLobby: false });
+        });
+
+        it("skips the lobby of a video room for a join from the room list (InterCom)", () => {
             vi.spyOn(room, "isElementVideoRoom").mockReturnValue(true);
             call.widgetGenerationParameters = { skipLobby: true };
             const { intent, config } = call.getCallOptions();
             expect(intent).toBe(ElementCallIntent.JoinExisting);
-            expect(config).toMatchObject({ returnToLobby: true, skipLobby: false });
+            expect(config).toMatchObject({ returnToLobby: true, skipLobby: true });
         });
 
         it("detects DMs and voice calls like the widget URL does", () => {

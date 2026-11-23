@@ -180,7 +180,7 @@ const SpaceContextMenu: React.FC<IProps> = ({ space, hideHeader, onFinished, ...
                     <IconizedContextMenuOption
                         data-testid="new-room-option"
                         icon={<PlusIcon />}
-                        label={_t("common|room")}
+                        label={_t("intercom|channels|text_channel")}
                         onClick={onNewRoomClick}
                     />
                 )}
@@ -188,11 +188,9 @@ const SpaceContextMenu: React.FC<IProps> = ({ space, hideHeader, onFinished, ...
                     <IconizedContextMenuOption
                         data-testid="new-video-room-option"
                         icon={<PlusIcon />}
-                        label={_t("common|video_room")}
+                        label={_t("intercom|channels|voice_channel")}
                         onClick={onNewVideoRoomClick}
-                    >
-                        <BetaPill />
-                    </IconizedContextMenuOption>
+                    />
                 )}
                 {canAddSubSpaces && (
                     <IconizedContextMenuOption

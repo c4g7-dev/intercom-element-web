@@ -15,6 +15,7 @@ import { NotificationDecoration } from "./NotificationDecoration";
 import { RoomListItemHoverMenu } from "./RoomListItemHoverMenu";
 import { type Room, type RoomListItemViewModel } from "./RoomListItemView";
 import styles from "./RoomListItemView.module.css";
+import { VoiceJoinHint } from "../../../../intercom/VoiceJoinHint";
 
 /**
  * Props for {@link RoomListItemContent}.
@@ -69,6 +70,8 @@ export const RoomListItemContent = memo(function RoomListItemContent({
                         </Text>
                     )}
                 </div>
+                {/* InterCom: what a click on a voice channel does, shown while the row is pointed at */}
+                {!isDragging && item.voiceChannel && <VoiceJoinHint state={item.voiceChannel} />}
                 {!isDragging && (item.showMoreOptionsMenu || item.showNotificationMenu) && (
                     <RoomListItemHoverMenu
                         showMoreOptionsMenu={item.showMoreOptionsMenu}

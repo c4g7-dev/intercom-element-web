@@ -1,0 +1,29 @@
+/*
+ * Copyright 2026 InterCom contributors
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
+ */
+
+.hint {
+    display: none;
+    flex: none;
+    padding: 0 var(--cpd-space-2x);
+    border-radius: 999px;
+    background-color: var(--cpd-color-bg-subtle-primary);
+    color: var(--cpd-color-text-primary);
+    font: var(--cpd-font-body-xs-medium);
+    line-height: 20px;
+    white-space: nowrap;
+}
+
+.connected {
+    background-color: transparent;
+    color: var(--cpd-color-text-success-primary);
+}
+
+/* Shown with the row's hover menu: while the row is pointed at or focused from the keyboard */
+:global(.mx_RoomListItemView):hover .hint,
+:global(.mx_RoomListItemView):focus-visible .hint {
+    display: inline-block;
+}
