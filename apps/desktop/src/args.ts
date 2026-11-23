@@ -148,6 +148,10 @@ export function getArgs(protocolHandler: ProtocolHandler): Args {
         );
         console.log("  --hw-video-zero-copy: Linux: also enable zero-copy hardware video decode (experimental).");
         console.log(
+            `  --enable-quic:        Leave HTTP/3 (QUIC) on. Off by default: uploads stall behind some proxies and tunnels.\n` +
+                `                         Also INTERCOM_ENABLE_QUIC=1.`,
+        );
+        console.log(
             `  --toggle-mute, --mute, --unmute, --toggle-deafen, --toggle-camera, --leave-call:\n` +
                 `                         Act on the call of the InterCom that is already running, and exit. For\n` +
                 `                         global shortcuts, bind them in the compositor or desktop.`,

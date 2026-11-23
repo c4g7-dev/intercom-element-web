@@ -107,11 +107,23 @@ export function getEnabledFeatures(
 }
 
 /**
+ * Whether HTTP/3 (QUIC) is left on: `--enable-quic` or `INTERCOM_ENABLE_QUIC=1`.
+ *
+ * InterCom turns it off by default. Behind some reverse proxies and tunnels (measured: Traefik
+ * advertising h3 behind a GRE tunnel) HTTP/3 uploads crawl at about 10 KB/s and time out, where
+ * HTTP/2 to the same server does megabytes per second; Chromium does not fall back on its own.
+ */
+export function isQuicEnabled(argv: string[] = process.argv, env: NodeJS.ProcessEnv = process.env): boolean {
+    return argv.includes("--enable-quic") || ["1", "true"].includes(env.INTERCOM_ENABLE_QUIC ?? "");
+}
+
+/**
  * Apply InterCom's Chromium switches. Must run before the app is ready.
  */
 export function configureChromium(): void {
     addFeatures("disable-features", DISABLED_FEATURES);
     addFeatures("enable-features", getEnabledFeatures());
+    if (!isQuicEnabled()) app.commandLine.appendSwitch("disable-quic");
 }
 
 /** The system audio devices Electron can attach to a screen share. */

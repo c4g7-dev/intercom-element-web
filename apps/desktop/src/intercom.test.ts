@@ -15,6 +15,7 @@ import {
     getPopoutWindowResponse,
     grantDisplayMedia,
     isHwVideoDisabled,
+    isQuicEnabled,
     mergeFeatureList,
     setupPopoutWindow,
 } from "./intercom.js";
@@ -84,6 +85,21 @@ describe("configureChromium", () => {
             "disable-features",
             "UserFeature,HardwareMediaKeyHandling,MediaSessionService,WebRtcAllowInputVolumeAdjustment",
         );
+    });
+});
+
+describe("QUIC", () => {
+    it("is off unless asked for", () => {
+        expect(isQuicEnabled(["intercom"], {})).toBe(false);
+        expect(isQuicEnabled(["intercom", "--enable-quic"], {})).toBe(true);
+        expect(isQuicEnabled(["intercom"], { INTERCOM_ENABLE_QUIC: "1" })).toBe(true);
+        expect(isQuicEnabled(["intercom"], { INTERCOM_ENABLE_QUIC: "0" })).toBe(false);
+    });
+
+    it("is switched off in Chromium by default", () => {
+        vi.mocked(app.commandLine.appendSwitch).mockClear();
+        configureChromium();
+        expect(app.commandLine.appendSwitch).toHaveBeenCalledWith("disable-quic");
     });
 });
 
