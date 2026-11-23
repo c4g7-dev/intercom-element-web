@@ -63,6 +63,7 @@ import { UploadTrace, type UploadTracePart } from "./intercom/UploadDiagnostics"
 import { secureRandomString } from "matrix-js-sdk/src/randomstring";
 import BatchUploadDialog from "./intercom/gallery/BatchUploadDialog";
 import { GALLERY_BATCH_FIELD } from "./intercom/gallery/grouping";
+import { uploadContentWithRetry } from "./intercom/UploadRetry";
 
 // scraped out of a macOS hidpi (5660ppm) screenshot png
 //                  5669 px (x-axis)      , 5669 px (y-axis)      , per metre
@@ -457,7 +458,8 @@ export async function uploadFile(
             ({ content_uri: url } = await timed(
                 "http",
                 () =>
-                    matrixClient.uploadContent(blob, {
+                    // Tried once more when the connection fails, see UploadRetry
+                    uploadContentWithRetry(matrixClient, blob, {
                         progressHandler,
                         abortController,
                         includeFilename: false,
@@ -487,7 +489,7 @@ export async function uploadFile(
         try {
             ({ content_uri: url } = await timed(
                 "http",
-                () => matrixClient.uploadContent(file, { progressHandler, abortController }),
+                () => uploadContentWithRetry(matrixClient, file, { progressHandler, abortController }),
                 { sent: file.size, encrypted: false },
             ));
         } catch (e) {
