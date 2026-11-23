@@ -18,6 +18,8 @@ import { getBuildConfig } from "./build-config.js";
 import { getIconPath } from "./icon.js";
 import { getConfig } from "./config.js";
 import { openDiagnosticsFolder } from "./intercom-diagnostics.js";
+import { getUpdaterState, installUpdate, onUpdaterState } from "./intercom-updater.js";
+import { onVoiceTrayChange, voiceTrayItems } from "./intercom-voice-state.js";
 
 // This hardcoded uuid is an arbitrary v4 uuid generated on https://www.uuidgenerator.net/version4
 const UUID_NAMESPACE = "9fc9c6a0-9ffe-45c9-9cd7-5639ae38b232";
@@ -70,6 +72,18 @@ export async function create(): Promise<void> {
     initApplicationMenu();
     trayIcon.on("click", toggleWin);
 
+    // InterCom: "Restart to update" comes and goes with an update being ready
+    let updateOffered = getUpdaterState().phase === "ready";
+    onUpdaterState((state) => {
+        const ready = state.phase === "ready";
+        if (ready === updateOffered) return;
+        updateOffered = ready;
+        initApplicationMenu();
+    });
+
+    // InterCom: the mute and deafen entries are checked as the web app says they stand
+    onVoiceTrayChange(() => initApplicationMenu());
+
     // See also, badge.ts
     let lastFavicon: string | null = null;
     global.mainWindow?.webContents.on("page-favicon-updated", async function (ev, favicons) {
@@ -115,11 +129,24 @@ export function initApplicationMenu(): void {
         return;
     }
 
+    const updater = getUpdaterState();
     const contextMenu = Menu.buildFromTemplate([
+        // InterCom: an update that is downloaded and checked is one click away
+        ...(updater.phase === "ready"
+            ? [
+                  {
+                      label: _t("action|restart_to_update", { version: updater.latestVersion ?? "" }),
+                      click: (): void => void installUpdate(),
+                  },
+                  { type: "separator" as const },
+              ]
+            : []),
         {
             label: _t("action|show_hide"),
             click: toggleWin,
         },
+        // InterCom: mute and deafen, which hold with or without a call
+        ...voiceTrayItems({ mute: _t("action|voice_mute"), deafen: _t("action|voice_deafen") }),
         {
             label: _t("action|open_diagnostics_folder"),
             click: openDiagnosticsFolder,

@@ -5,6 +5,18 @@ SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Com
 Please see LICENSE files in the repository root for full details.
 */
 
+/** Where an update stands; see apps/desktop/src/intercom-updater-state.ts. */
+export type UpdaterPhase =
+    | "idle"
+    | "checking"
+    | "downloading"
+    | "verifying"
+    | "unpacking"
+    | "ready"
+    | "installing"
+    | "manual"
+    | "error";
+
 /** How the desktop app's updater stands; see apps/desktop/src/intercom-updater.ts. */
 export interface UpdaterState {
     supported: boolean;
@@ -12,12 +24,17 @@ export interface UpdaterState {
     currentVersion?: string;
     autoCheck: boolean;
     channel: "stable";
-    phase: "idle" | "checking" | "downloading" | "ready" | "manual" | "error";
+    phase: UpdaterPhase;
     latestVersion?: string;
     releaseUrl?: string;
+    /** 0 to 1 while downloading */
     progress?: number;
+    /** While downloading: bytes received, bytes in all (0 if unknown) and the speed */
+    download?: { done: number; total: number; bytesPerSecond: number };
     error?: string;
     lastChecked?: number;
+    /** The updater's last steps, oldest first; absent from a desktop app older than 1.12.35-intercom.6 */
+    log?: Array<{ t: number; text: string }>;
 }
 
 /** The desktop app's updater, as the window reaches it. */

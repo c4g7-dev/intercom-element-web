@@ -8,10 +8,11 @@ Please see LICENSE files in the repository root for full details.
 /**
  * InterCom updates itself from the releases of its GitHub repository.
  *
- * A check asks the GitHub API for the releases, picks the newest desktop one (tags
- * `v<Element version>-intercom.<n>`; the Android releases of the same repository are passed over),
- * downloads this platform's file and checks it against the release's SHA256SUMS. Then the window
- * is told, and the user decides when to restart:
+ * A check asks the GitHub API for the newest releases (a short list, with the ETag of the last
+ * answer, so that "nothing new" is one small request; see intercom-updater-check.ts), picks the
+ * newest desktop one (tags `v<Element version>-intercom.<n>`; the Android releases of the same
+ * repository are passed over), downloads this platform's file and checks it against the release's
+ * SHA256SUMS. Then the window is told, and the user decides when to restart:
  *
  *  - Linux (unpacked tar.gz): the archive is unpacked beside the install directory; on restart
  *    the two directories are swapped (the old one is kept as `<dir>.old`) and the app is started
@@ -26,7 +27,9 @@ Please see LICENSE files in the repository root for full details.
  * truncated download, not a release that was tampered with.
  *
  * A build that is not a packaged release (no `intercomVersion` in package.json) never updates.
- * Every step is written to the diagnostics log as an `updater` record.
+ * Every step is written to the diagnostics log as an `updater` record, and how long each check
+ * took as an `update_check` record. Where the update stands (intercom-updater-state.ts) is pushed
+ * to the window with every change, with the last steps as lines to show.
  */
 
 import { app, ipcMain, net, shell } from "electron";
@@ -41,10 +44,10 @@ import { promisify } from "node:util";
 
 import { getIntercomVersion } from "./build-config.js";
 import { logDiagnostics } from "./intercom-diagnostics.js";
+import { fetchReleasesCached, type ReleaseCache, ReleaseCheckError } from "./intercom-updater-check.js";
 import {
     canReplaceDir,
     compareIntercomVersions,
-    type GithubRelease,
     isReleaseUrl,
     looksLikeInstall,
     parseIntercomVersion,
@@ -57,16 +60,27 @@ import {
     verifyDownload,
     WINDOWS_INSTALLER_ARGS,
 } from "./intercom-updater-core.js";
+import {
+    initialUpdaterMachine,
+    isWorking,
+    SpeedMeter,
+    type UpdaterEvent,
+    type UpdaterMachine,
+    updaterTransition,
+} from "./intercom-updater-state.js";
 
 const INITIAL_CHECK_DELAY_MS = 30 * 1000;
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
-const RELEASES_URL = `https://api.github.com/repos/${UPDATE_REPO}/releases?per_page=30`;
+/** How long the release's SHA256SUMS, a few hundred bytes, may take. */
+const SUMS_TIMEOUT_MS = 15 * 1000;
+/** How often the window is told how far a download is. */
+const PROGRESS_INTERVAL_MS = 250;
 const RELEASES_PAGE = `https://github.com/${UPDATE_REPO}/releases`;
 /** The IPC channel of the updater: requests from the window, and state pushed to it. */
 const CHANNEL = "intercomUpdater";
 
-/** What the window shows of the updater. */
-export interface UpdaterState {
+/** What the window shows of the updater: what this install can do, and where an update stands. */
+export interface UpdaterState extends UpdaterMachine {
     /** False where the app cannot look for updates at all; `reason` then says why */
     supported: boolean;
     reason?: "unpackaged" | "no-version" | "disabled-by-flag" | "platform";
@@ -74,24 +88,26 @@ export interface UpdaterState {
     currentVersion?: string;
     autoCheck: boolean;
     channel: "stable";
-    /**
-     * idle: nothing newer is known. ready: downloaded and checked, a restart installs it.
-     * manual: there is a newer release but this install cannot replace itself.
-     */
-    phase: "idle" | "checking" | "downloading" | "ready" | "manual" | "error";
-    latestVersion?: string;
-    releaseUrl?: string;
-    /** 0 to 1 while downloading */
-    progress?: number;
-    error?: string;
-    /** When the last check ended, in ms since the epoch */
-    lastChecked?: number;
 }
 
-const state: UpdaterState = { supported: false, autoCheck: true, channel: "stable", phase: "idle" };
+const state: UpdaterState = { supported: false, autoCheck: true, channel: "stable", ...initialUpdaterMachine() };
 let prepared: { version: string; file: string } | undefined;
-let busy = false;
 let timer: NodeJS.Timeout | undefined;
+const listeners = new Set<(state: UpdaterState) => void>();
+
+/** Where the updater stands. The object is the updater's own: it changes, and is not to be changed. */
+export function getUpdaterState(): Readonly<UpdaterState> {
+    return state;
+}
+
+/**
+ * Tells `listener` whenever the updater's state changes (the tray menu, for its "Restart to update").
+ * @returns what stops the telling
+ */
+export function onUpdaterState(listener: (state: UpdaterState) => void): () => void {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+}
 
 function log(step: string, fields: Record<string, string | number | boolean | null | undefined> = {}): void {
     console.log(`[updater] ${step}`, JSON.stringify(fields));
@@ -124,28 +140,63 @@ function installDir(): string {
     return path.dirname(process.execPath);
 }
 
-function publish(change: Partial<UpdaterState>): void {
+function publish(change: Partial<UpdaterState> = {}): void {
     Object.assign(state, change);
     const window = global.mainWindow;
     if (window && !window.isDestroyed()) window.webContents.send(CHANNEL, state);
+    for (const listener of listeners) {
+        try {
+            listener(state);
+        } catch (e) {
+            console.error("[updater] listener failed", e);
+        }
+    }
 }
 
-async function download(url: string, file: string, onProgress?: (fraction: number) => void): Promise<void> {
+/**
+ * Takes the update a step further and tells the window.
+ * @returns false if the step does not follow from where the update stands, and nothing changed
+ */
+function dispatch(event: UpdaterEvent): boolean {
+    const next = updaterTransition(state, event, Date.now());
+    if (next === state) return false;
+    publish(next);
+    return true;
+}
+
+function cacheFile(): string {
+    return path.join(app.getPath("userData"), "intercom-updater-releases.json");
+}
+
+async function readReleaseCache(): Promise<ReleaseCache | undefined> {
+    return JSON.parse(await fsp.readFile(cacheFile(), "utf8")) as ReleaseCache;
+}
+
+async function writeReleaseCache(cache: ReleaseCache): Promise<void> {
+    await fsp.writeFile(cacheFile(), JSON.stringify(cache));
+}
+
+async function download(
+    url: string,
+    file: string,
+    onProgress?: (done: number, total: number, bytesPerSecond: number) => void,
+): Promise<void> {
     if (!isReleaseUrl(url)) throw new Error("Not a release URL");
     const response = await net.fetch(url, { redirect: "follow" });
     if (!response.ok || !response.body) throw new Error(`Download failed: HTTP ${response.status}`);
     const total = Number(response.headers.get("content-length")) || 0;
     let done = 0;
     let lastTold = 0;
+    const speed = new SpeedMeter();
     // The stream types of the DOM and of Node differ in name only
     // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- needed by tsc, see above
     const body = Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]);
     body.on("data", (chunk: Buffer) => {
         done += chunk.length;
         const now = Date.now();
-        if (total && onProgress && now - lastTold > 500) {
+        if (onProgress && now - lastTold >= PROGRESS_INTERVAL_MS) {
             lastTold = now;
-            onProgress(done / total);
+            onProgress(done, total, speed.note(done, now));
         }
     });
     const part = `${file}.part`;
@@ -158,21 +209,41 @@ async function fetchVerified(candidate: UpdateCandidate): Promise<string> {
     const asset = candidate.asset!;
     const dir = cacheDir();
     await fsp.mkdir(dir, { recursive: true });
-    const sumsResponse = await net.fetch(candidate.sumsUrl!, { redirect: "follow" });
+    const sumsResponse = await net.fetch(candidate.sumsUrl!, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(SUMS_TIMEOUT_MS),
+    });
     if (!sumsResponse.ok) throw new Error(`SHA256SUMS: HTTP ${sumsResponse.status}`);
     const sums = await sumsResponse.text();
     const file = path.join(dir, asset.name);
 
-    try {
-        await verifyDownload(file, asset.name, sums);
-        log("download_reused", { version: candidate.version });
-        return file;
-    } catch {
-        // Not there, or not whole: fetch it
+    if (
+        await fsp.access(file).then(
+            () => true,
+            () => false,
+        )
+    ) {
+        dispatch({ type: "verify" });
+        try {
+            await verifyDownload(file, asset.name, sums);
+            log("download_reused", { version: candidate.version });
+            return file;
+        } catch {
+            // Not whole: fetch it again
+            dispatch({
+                type: "download",
+                version: candidate.version,
+                releaseUrl: candidate.releaseUrl,
+                total: asset.size,
+            });
+        }
     }
     log("download_start", { version: candidate.version, bytes: asset.size });
     const started = Date.now();
-    await download(asset.url, file, (progress) => publish({ progress }));
+    await download(asset.url, file, (done, total, bytesPerSecond) =>
+        dispatch({ type: "progress", done, total: total || asset.size || 0, bytesPerSecond }),
+    );
+    dispatch({ type: "verify" });
     const sha256 = await verifyDownload(file, asset.name, sums).catch(async (e) => {
         await fsp.rm(file, { force: true });
         throw e;
@@ -199,34 +270,65 @@ async function stage(archive: string): Promise<void> {
     log("staged", { beside: true });
 }
 
-async function fetchReleases(): Promise<GithubRelease[]> {
-    const response = await net.fetch(RELEASES_URL, { headers: { Accept: "application/vnd.github+json" } });
-    if (!response.ok) throw new Error(`GitHub: HTTP ${response.status}`);
-    return (await response.json()) as GithubRelease[];
+/** Asks GitHub for the releases and writes how long that took to the diagnostics log. */
+async function fetchReleases(manual: boolean): Promise<ReturnType<typeof selectUpdate>> {
+    try {
+        const check = await fetchReleasesCached({
+            fetch: (url, init) => net.fetch(url, init),
+            readCache: readReleaseCache,
+            writeCache: writeReleaseCache,
+        });
+        logDiagnostics("update_check", {
+            manual,
+            ok: true,
+            ms: check.ms,
+            headersMs: check.headersMs,
+            status: check.status,
+            cached: check.cached,
+            bytes: check.bytes,
+            requests: check.requests,
+            releases: check.releases.length,
+        });
+        return selectUpdate(check.releases, state.currentVersion!, process.platform, process.arch);
+    } catch (e) {
+        if (e instanceof ReleaseCheckError) {
+            logDiagnostics("update_check", {
+                manual,
+                ok: false,
+                ms: e.ms,
+                status: e.status ?? null,
+                timedOut: e.timedOut,
+            });
+        }
+        throw e;
+    }
 }
 
 /**
  * Looks for a newer release and, where this install can replace itself, downloads it.
- * @param manual - whether the user asked for it (logged only)
+ * @param manual - whether the user asked for it. A check nobody asked for that fails (no network,
+ *     GitHub not answering) is logged and not shown as an error.
  */
 export async function checkForUpdate(manual = false): Promise<UpdaterState> {
-    if (!state.supported || busy) return state;
+    if (!state.supported || isWorking(state.phase)) return state;
     // What is downloaded already is offered again rather than fetched again
     if (state.phase === "ready" && prepared) {
-        publish({});
+        publish();
         return state;
     }
-    busy = true;
-    publish({ phase: "checking", error: undefined, progress: undefined });
+    // "Checking…" is shown before anything is asked
+    if (!dispatch({ type: "check" })) return state;
     log("check", { manual, current: state.currentVersion });
+    let checking = true;
     try {
-        const candidate = selectUpdate(await fetchReleases(), state.currentVersion!, process.platform, process.arch);
+        const candidate = await fetchReleases(manual);
+        checking = false;
         if (!candidate) {
             log("up_to_date");
-            publish({ phase: "idle", latestVersion: undefined, releaseUrl: undefined, lastChecked: Date.now() });
+            dispatch({ type: "up_to_date" });
             return state;
         }
-        const found = { latestVersion: candidate.version, releaseUrl: candidate.releaseUrl, lastChecked: Date.now() };
+        const found = { version: candidate.version, releaseUrl: candidate.releaseUrl };
         log("update_found", { version: candidate.version, asset: Boolean(candidate.asset) });
 
         const replaceable =
@@ -234,22 +336,23 @@ export async function checkForUpdate(manual = false): Promise<UpdaterState> {
         if (!candidate.asset || !candidate.sumsUrl || !replaceable) {
             // A release without this platform's file (yet), or an install that is not ours to replace
             log("manual", { asset: Boolean(candidate.asset), sums: Boolean(candidate.sumsUrl), replaceable });
-            publish({ phase: "manual", ...found });
+            dispatch({ type: "manual", ...found });
             return state;
         }
 
-        publish({ phase: "downloading", progress: 0, ...found });
+        dispatch({ type: "download", ...found, total: candidate.asset.size });
         const file = await fetchVerified(candidate);
-        if (process.platform === "linux") await stage(file);
+        if (process.platform === "linux") {
+            dispatch({ type: "unpack" });
+            await stage(file);
+        }
         prepared = { version: candidate.version, file };
         log("ready", { version: candidate.version });
-        publish({ phase: "ready", progress: undefined });
+        dispatch({ type: "ready" });
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         log("error", { message });
-        publish({ phase: "error", error: message, progress: undefined, lastChecked: Date.now() });
-    } finally {
-        busy = false;
+        dispatch({ type: "error", message, quiet: checking && !manual });
     }
     return state;
 }
@@ -257,6 +360,7 @@ export async function checkForUpdate(manual = false): Promise<UpdaterState> {
 /** Installs what {@link checkForUpdate} prepared and starts the app again. */
 export async function installUpdate(): Promise<void> {
     if (state.phase !== "ready" || !prepared) return;
+    dispatch({ type: "install" });
     try {
         if (process.platform === "win32") {
             // The installer closes what is left of the app, replaces it and starts it again
@@ -276,7 +380,9 @@ export async function installUpdate(): Promise<void> {
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         log("install_error", { message });
-        publish({ phase: "error", error: message });
+        // What was staged is of no use any more: the next check prepares it again
+        prepared = undefined;
+        dispatch({ type: "error", message });
         return;
     }
     global.appQuitting = true;
@@ -333,7 +439,7 @@ export function initUpdater(allowed: boolean): void {
                 await fsp.writeFile(settingsFile(), JSON.stringify({ autoCheck: state.autoCheck })).catch(() => {});
                 log("auto_check", { on: state.autoCheck });
                 schedule();
-                publish({});
+                publish();
                 break;
             case "openReleasePage":
                 await shell.openExternal(isReleaseUrl(state.releaseUrl) ? state.releaseUrl! : RELEASES_PAGE);

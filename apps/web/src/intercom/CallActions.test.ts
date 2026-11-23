@@ -15,6 +15,7 @@ import {
     installCallShortcuts,
     isCallAction,
     performCallAction,
+    voiceSourceFor,
 } from "./CallActions";
 import { type Call } from "../models/Call";
 
@@ -41,6 +42,9 @@ vi.mock("../stores/widgets/WidgetMessagingStore", () => ({
         },
     },
 }));
+// Mute and deafen are the app's own state: all that matters here is that they are asked of it
+const { voicePerform } = vi.hoisted(() => ({ voicePerform: vi.fn() }));
+vi.mock("./VoiceStateStore", () => ({ VoiceStateStore: { instance: { perform: voicePerform } } }));
 vi.mock("../utils/WidgetUtils", () => ({
     default: { getWidgetUid: (widget: { id: string }): string => `uid:${widget.id}` },
 }));
@@ -58,7 +62,10 @@ describe("call actions", () => {
         calls = next;
         state.calls = next;
     };
-    beforeEach(() => setCalls([]));
+    beforeEach(() => {
+        setCalls([]);
+        voicePerform.mockClear();
+    });
     afterEach(() => setCalls([]));
 
     it("knows the actions and nothing else", () => {
@@ -84,13 +91,37 @@ describe("call actions", () => {
         expect(callActionForKey(key("m", { ctrlKey: true, shiftKey: true, metaKey: true }))).toBeUndefined();
     });
 
-    it("passes mute, deafen and camera to the call's widget", async () => {
+    it("passes the camera and the screen share to the call's widget", async () => {
         setCalls([fakeCall("call1")]);
-        for (const action of ["toggle-mute", "mute", "unmute", "toggle-deafen", "toggle-camera"]) {
+        for (const action of ["toggle-camera", "toggle-screenshare"]) {
             expect(await performCallAction(action, "test")).toBe(1);
             expect(calls[0].send).toHaveBeenLastCalledWith(CALL_ACTION_WIDGET_ACTION, { action });
         }
         expect(calls[0].disconnect).not.toHaveBeenCalled();
+        expect(voicePerform).not.toHaveBeenCalled();
+    });
+
+    it("asks mute and deafen of the app's own state, with or without a call", async () => {
+        expect(await performCallAction("toggle-mute", "desktop:command-line")).toBe(0);
+        expect(voicePerform).toHaveBeenLastCalledWith("toggle-mute", "cli");
+        setCalls([fakeCall("call1")]);
+        expect(await performCallAction("mute", "user-panel")).toBe(1);
+        expect(voicePerform).toHaveBeenLastCalledWith("mute", "panel");
+        expect(await performCallAction("unmute", "desktop:tray")).toBe(1);
+        expect(voicePerform).toHaveBeenLastCalledWith("unmute", "tray");
+        expect(await performCallAction("toggle-deafen", "keyboard")).toBe(1);
+        expect(voicePerform).toHaveBeenLastCalledWith("toggle-deafen", "hotkey");
+        // The call is told by the store, not with a call action
+        expect(calls[0].send).not.toHaveBeenCalled();
+    });
+
+    it("names where a change came from", () => {
+        expect(voiceSourceFor("user-panel")).toBe("panel");
+        expect(voiceSourceFor("keyboard")).toBe("hotkey");
+        expect(voiceSourceFor("desktop:global-shortcut")).toBe("hotkey");
+        expect(voiceSourceFor("desktop:command-line")).toBe("cli");
+        expect(voiceSourceFor("desktop")).toBe("cli");
+        expect(voiceSourceFor("desktop:tray")).toBe("tray");
     });
 
     it("leaves the call by disconnecting it", async () => {
@@ -101,7 +132,7 @@ describe("call actions", () => {
     });
 
     it("does nothing without a call, and nothing for what is not an action", async () => {
-        expect(await performCallAction("toggle-mute", "test")).toBe(0);
+        expect(await performCallAction("toggle-camera", "test")).toBe(0);
         setCalls([fakeCall("call1")]);
         for (const bogus of ["quit", "", undefined, null, { action: "mute" }]) {
             expect(await performCallAction(bogus, "test")).toBe(0);
@@ -113,7 +144,7 @@ describe("call actions", () => {
     it("carries on past a call whose widget refuses", async () => {
         setCalls([fakeCall("call1"), fakeCall("call2")]);
         calls[0].send.mockRejectedValue(new Error("Unknown or unsupported action"));
-        expect(await performCallAction("toggle-mute", "test")).toBe(1);
+        expect(await performCallAction("toggle-camera", "test")).toBe(1);
         expect(calls[1].send).toHaveBeenCalled();
     });
 
@@ -136,9 +167,17 @@ describe("call actions", () => {
             document.body.removeEventListener("keydown", appBinding);
             expect(ev.defaultPrevented).toBe(true);
             expect(appBinding).not.toHaveBeenCalled();
+            await vi.waitFor(() => expect(voicePerform).toHaveBeenCalledWith("toggle-deafen", "hotkey"));
+            press("V");
             await vi.waitFor(() =>
-                expect(calls[0].send).toHaveBeenCalledWith(CALL_ACTION_WIDGET_ACTION, { action: "toggle-deafen" }),
+                expect(calls[0].send).toHaveBeenCalledWith(CALL_ACTION_WIDGET_ACTION, { action: "toggle-camera" }),
             );
+        });
+
+        it("mute without a call too", async () => {
+            const ev = press("M");
+            expect(ev.defaultPrevented).toBe(true);
+            await vi.waitFor(() => expect(voicePerform).toHaveBeenCalledWith("toggle-mute", "hotkey"));
         });
 
         it("leave the keys alone outside a call", () => {
@@ -156,8 +195,8 @@ describe("call actions", () => {
             expect(press("m", { ctrlKey: true }).defaultPrevented).toBe(false);
             press("M");
             press("M", { ctrlKey: true, shiftKey: true, repeat: true });
-            await vi.waitFor(() => expect(calls[0].send).toHaveBeenCalled());
-            expect(calls[0].send).toHaveBeenCalledTimes(1);
+            await vi.waitFor(() => expect(voicePerform).toHaveBeenCalled());
+            expect(voicePerform).toHaveBeenCalledTimes(1);
         });
 
         it("are gone once removed", () => {

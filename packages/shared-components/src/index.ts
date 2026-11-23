@@ -22,6 +22,7 @@ export * from "./crypto/SasEmoji";
 export * from "./crypto/LegacyCryptoUnsupportedView";
 export * from "./crypto/DeleteKeyStorageView";
 export * from "./intercom/RoomListItemExtras";
+export * from "./intercom/UpdateStatusView";
 export * from "./intercom/UpdaterSettingsView";
 export * from "./intercom/UserPanelView";
 export * from "./intercom/VoiceParticipantsView";

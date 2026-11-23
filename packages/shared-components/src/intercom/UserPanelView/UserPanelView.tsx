@@ -51,18 +51,18 @@ export interface UserPanelViewSnapshot {
     avatarUrl?: string;
     /** The user's presence, or undefined where the homeserver has none */
     presence?: UserPanelPresence;
-    /** Whether the microphone is off in the call */
+    /** Whether the microphone is off: in the call, and in the next one, as it holds without a call too */
     muted: boolean;
-    /** Whether the user is deafened in the call */
+    /** Whether the user is deafened (hears no call and is muted); holds without a call too */
     deafened: boolean;
     /** The call the user is in, if any */
     call?: UserPanelCall;
 }
 
 export interface UserPanelViewActions {
-    /** Mutes or unmutes the microphone in the call */
+    /** Mutes or unmutes the microphone, with or without a call */
     onToggleMute: () => void;
-    /** Deafens or undeafens the user in the call */
+    /** Deafens or undeafens the user, with or without a call */
     onToggleDeafen: () => void;
     /** Opens the settings */
     onOpenSettings: () => void;
@@ -84,6 +84,8 @@ export type UserPanelViewModel = ViewModel<UserPanelViewSnapshot, UserPanelViewA
 interface UserPanelViewProps {
     /** The view model */
     vm: UserPanelViewModel;
+    /** Whether an update of the app is downloaded and waits for a restart: a dot on the settings button says so */
+    updateReady?: boolean;
 }
 
 /** Three bars: all of them lit while connected, one while the connection is being re-established. */
@@ -111,7 +113,7 @@ function SignalBars({ lit }: { lit: number }): JSX.Element {
  * buttons beside it, and, while you are in a call, a strip above it that says so, leads to the
  * call and holds its camera, screen share and leave buttons.
  */
-export function UserPanelView({ vm }: Readonly<UserPanelViewProps>): JSX.Element {
+export function UserPanelView({ vm, updateReady = false }: Readonly<UserPanelViewProps>): JSX.Element {
     const { translate: _t } = useI18n();
     const { userId, displayName, avatarUrl, presence, muted, deafened, call } = useViewModel(vm);
 
@@ -123,12 +125,14 @@ export function UserPanelView({ vm }: Readonly<UserPanelViewProps>): JSX.Element
     };
     const presenceLabel = presence ? presenceLabels[presence] : userId;
     const canControl = call?.controllable === true;
-    const reason = call ? _t("intercom|user_panel|not_controllable") : _t("intercom|user_panel|not_in_call");
-    // What a button of the call says: what it does, or why it does nothing right now
-    const callTooltip = (action: string): string =>
-        canControl ? action : _t("intercom|user_panel|unavailable", { action, reason });
-    const muteLabel = muted && canControl ? _t("intercom|user_panel|unmute") : _t("intercom|user_panel|mute");
-    const deafenLabel = deafened && canControl ? _t("intercom|user_panel|undeafen") : _t("intercom|user_panel|deafen");
+    // Mute and deafen hold with or without a call, so their buttons always work and always show it.
+    // Deafened means muted too: the microphone button then says why it is off.
+    const muteLabel = deafened
+        ? _t("intercom|user_panel|unmute_deafened")
+        : muted
+          ? _t("intercom|user_panel|unmute")
+          : _t("intercom|user_panel|mute");
+    const deafenLabel = deafened ? _t("intercom|user_panel|undeafen") : _t("intercom|user_panel|deafen");
 
     return (
         <section
@@ -212,32 +216,43 @@ export function UserPanelView({ vm }: Readonly<UserPanelViewProps>): JSX.Element
                 </button>
                 <IconButton
                     size="32px"
-                    className={classNames({ [styles.off]: muted && canControl })}
-                    disabled={!canControl}
-                    aria-pressed={canControl ? muted : undefined}
-                    tooltip={callTooltip(muteLabel)}
+                    className={classNames(styles.voice, { [styles.off]: muted })}
+                    aria-pressed={muted}
+                    data-state={muted ? "muted" : "unmuted"}
+                    tooltip={muteLabel}
                     onClick={vm.onToggleMute}
                 >
-                    {muted && canControl ? <MicOffSolidIcon /> : <MicOnSolidIcon />}
+                    {muted ? <MicOffSolidIcon /> : <MicOnSolidIcon />}
                 </IconButton>
                 <IconButton
                     size="32px"
-                    className={classNames({ [styles.off]: deafened && canControl })}
-                    disabled={!canControl}
-                    aria-pressed={canControl ? deafened : undefined}
-                    tooltip={callTooltip(deafenLabel)}
+                    className={classNames(styles.voice, { [styles.off]: deafened })}
+                    aria-pressed={deafened}
+                    data-state={deafened ? "deafened" : "hearing"}
+                    tooltip={deafenLabel}
                     onClick={vm.onToggleDeafen}
                 >
-                    {deafened && canControl ? <HeadphonesOffSolidIcon /> : <HeadphonesSolidIcon />}
+                    {deafened ? <HeadphonesOffSolidIcon /> : <HeadphonesSolidIcon />}
                 </IconButton>
-                <IconButton
-                    size="32px"
-                    tooltip={_t("intercom|user_panel|settings")}
-                    aria-label={_t("intercom|user_panel|settings")}
-                    onClick={vm.onOpenSettings}
-                >
-                    <SettingsSolidIcon />
-                </IconButton>
+                <span className={styles.settings}>
+                    <IconButton
+                        size="32px"
+                        tooltip={
+                            updateReady
+                                ? _t("intercom|user_panel|settings_update_ready")
+                                : _t("intercom|user_panel|settings")
+                        }
+                        aria-label={
+                            updateReady
+                                ? _t("intercom|user_panel|settings_update_ready")
+                                : _t("intercom|user_panel|settings")
+                        }
+                        onClick={vm.onOpenSettings}
+                    >
+                        <SettingsSolidIcon />
+                    </IconButton>
+                    {updateReady && <span className={styles.updateDot} data-testid="intercom-update-dot" />}
+                </span>
             </div>
         </section>
     );

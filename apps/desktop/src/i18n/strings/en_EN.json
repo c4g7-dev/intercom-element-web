@@ -13,9 +13,12 @@
         "paste_match_style": "Paste and Match Style",
         "quit": "Quit",
         "redo": "Redo",
+        "restart_to_update": "Restart to update (%(version)s)",
         "select_all": "Select All",
         "show_hide": "Show/Hide",
         "undo": "Undo",
+        "voice_deafen": "Deafen",
+        "voice_mute": "Mute",
         "zoom_in": "Zoom In",
         "zoom_out": "Zoom Out"
     },

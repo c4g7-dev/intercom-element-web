@@ -21,6 +21,7 @@ import { RoomListHeaderViewModel } from "../../../../viewmodels/room-list/RoomLi
 import { useMatrixClientContext } from "../../../../contexts/MatrixClientContext";
 import { SDKContext } from "../../../../contexts/SDKContext.ts";
 import { UserPanel } from "../../../../intercom/UserPanel";
+import { UpdateStatus } from "../../../../intercom/updater/UpdateStatus";
 
 type RoomListPanelProps = {
     /**
@@ -81,6 +82,8 @@ export const RoomListPanel: React.FC<RoomListPanelProps> = ({ activeSpace }) => 
             {displayRoomSearch && <RoomListSearch activeSpace={activeSpace} />}
             <RoomListHeaderView vm={vm} />
             <RoomListView />
+            {/* InterCom: where an update of the app stands, while there is something to say */}
+            <UpdateStatus />
             {/* InterCom: who you are and the controls of your call, under the list */}
             <UserPanel />
         </Flex>

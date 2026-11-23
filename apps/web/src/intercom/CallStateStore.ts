@@ -8,6 +8,8 @@ Please see LICENSE files in the repository root for full details.
 import { TypedEventEmitter } from "matrix-js-sdk/src/matrix";
 import { type ClientWidgetApi, type IWidgetApiRequest } from "matrix-widget-api";
 
+import { attachVoiceStateBridge, VoiceStateStore } from "./VoiceStateStore";
+
 /** The widget action Element Call (InterCom build) tells the state of the call on. */
 export const CALL_STATE_WIDGET_ACTION = "io.intercom.call_state";
 
@@ -106,16 +108,27 @@ export function attachCallStateBridge(
     widgetApi: ClientWidgetApi,
     roomId: string | undefined,
     store: CallStateStore = CallStateStore.instance,
+    voiceStore: VoiceStateStore = VoiceStateStore.instance,
 ): () => void {
     if (!roomId) return () => {};
+    // The user's mute and deafen are the app's: the call asks for them, is told their changes,
+    // and what it reports of its own microphone and hearing goes back into them
+    const detachVoice = attachVoiceStateBridge(widgetApi, roomId, voiceStore);
     const onAction = (ev: CustomEvent<IWidgetApiRequest>): void => {
         ev.preventDefault(); // stop the widget API from auto-rejecting this
-        store.setState(roomId, parseCallState(ev.detail.data));
+        const state = parseCallState(ev.detail.data);
+        store.setState(roomId, state);
+        voiceStore.handleCallReport(roomId, {
+            muted: !state.audioEnabled,
+            deafened: state.deafened,
+            reconnecting: state.reconnecting,
+        });
         widgetApi.transport.reply(ev.detail, {});
     };
     widgetApi.on(`action:${CALL_STATE_WIDGET_ACTION}`, onAction);
     return () => {
         widgetApi.off(`action:${CALL_STATE_WIDGET_ACTION}`, onAction);
+        detachVoice();
         store.clear(roomId);
     };
 }

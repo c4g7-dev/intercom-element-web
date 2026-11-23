@@ -51,6 +51,12 @@ export const Downloading: Story = {
     args: { phase: "downloading", latestVersion: "1.12.35-intercom.6", progress: 0.42 },
 };
 
+export const Verifying: Story = { args: { phase: "verifying", latestVersion: "1.12.35-intercom.6" } };
+
+export const Unpacking: Story = { args: { phase: "unpacking", latestVersion: "1.12.35-intercom.6" } };
+
+export const Installing: Story = { args: { phase: "installing", latestVersion: "1.12.35-intercom.6" } };
+
 export const Ready: Story = { args: { phase: "ready", latestVersion: "1.12.35-intercom.6" } };
 
 export const Manual: Story = { args: { phase: "manual", latestVersion: "1.12.35-intercom.6" } };

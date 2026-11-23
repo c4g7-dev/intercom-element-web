@@ -42,6 +42,8 @@ import DesktopCapturerSourcePicker from "../../components/views/elements/Desktop
 import { MatrixClientPeg } from "../../MatrixClientPeg";
 import { SeshatIndexManager } from "./SeshatIndexManager";
 import { installCallShortcuts, performCallAction } from "../../intercom/CallActions";
+import { VoiceStateStore, VoiceStateStoreEvent } from "../../intercom/VoiceStateStore";
+import { type VoiceState } from "../../intercom/VoiceState";
 import { startUpdateToasts } from "../../intercom/updater/UpdateToast";
 import { IPCManager } from "./IPCManager";
 import { _t } from "../../languageHandler";
@@ -185,10 +187,21 @@ export default class ElectronPlatform extends BasePlatform {
 
         // InterCom: mute, deafen, camera and leave, from a global shortcut or from `intercom --toggle-mute`
         // run by a key binding of the compositor, and from the keyboard while the window has the focus
-        this.electron.on("intercomCallAction", (ev, action) => {
-            void performCallAction(action, "desktop");
+        this.electron.on("intercomCallAction", (ev, action, source) => {
+            // The desktop app says what asked it: its command line, a global shortcut or the tray
+            void performCallAction(action, typeof source === "string" ? `desktop:${source}` : "desktop");
         });
         installCallShortcuts();
+        // InterCom: the tray shows and changes mute and deafen, so the desktop app is told how they stand
+        const tellVoiceState = (state: VoiceState): void => {
+            this.electron.send("app_onAction", {
+                action: "intercom_voice_state",
+                muted: state.muted,
+                deafened: state.deafened,
+            });
+        };
+        VoiceStateStore.instance.on(VoiceStateStoreEvent.Update, tellVoiceState);
+        tellVoiceState(VoiceStateStore.instance.state);
         // InterCom: tells when an update from the GitHub releases is ready
         startUpdateToasts();
 

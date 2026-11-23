@@ -18,6 +18,7 @@ import {
     CallStateStoreEvent,
     parseCallState,
 } from "./CallStateStore";
+import { VOICE_STATE_WIDGET_ACTION, VoiceStateStore } from "./VoiceStateStore";
 
 /** A plain emitter, standing in for the stores and objects the code under test listens to. */
 class Emitter extends TypedEventEmitter<string, Record<string, (...args: unknown[]) => void>> {}
@@ -76,14 +77,19 @@ describe("attachCallStateBridge", () => {
     function widgetApi(): ClientWidgetApi & { reply: ReturnType<typeof vi.fn> } {
         const api = new Emitter() as unknown as ClientWidgetApi & { reply: ReturnType<typeof vi.fn> };
         api.reply = vi.fn();
-        (api as unknown as { transport: object }).transport = { reply: api.reply };
+        (api as unknown as { transport: object }).transport = {
+            reply: api.reply,
+            send: vi.fn().mockResolvedValue({}),
+        };
         return api;
     }
+    const voiceStore = (): VoiceStateStore =>
+        new VoiceStateStore({ storage: { getItem: () => null, setItem: () => {} }, playCue: () => {}, log: () => {} });
 
     it("stores what the widget sends, answers it, and forgets it when detached", () => {
         const store = new CallStateStore();
         const api = widgetApi();
-        const detach = attachCallStateBridge(api, "!a:x", store);
+        const detach = attachCallStateBridge(api, "!a:x", store, voiceStore());
 
         const preventDefault = vi.fn();
         const detail = { data: { deafened: true, participants: [{ user_id: "@ada:x", speaking: true }] } };
@@ -103,7 +109,56 @@ describe("attachCallStateBridge", () => {
     it("does nothing for a widget that belongs to no room", () => {
         const store = new CallStateStore();
         const api = widgetApi();
-        attachCallStateBridge(api, undefined, store)();
+        attachCallStateBridge(api, undefined, store, voiceStore())();
         expect(api.listenerCount(`action:${CALL_STATE_WIDGET_ACTION}`)).toBe(0);
+    });
+
+    it("gives the call the user's mute and deafen when it asks, and takes over what the call then does", async () => {
+        vi.useFakeTimers();
+        try {
+            const voice = voiceStore();
+            voice.perform("mute", "panel");
+            const api = widgetApi();
+            const send = (api as unknown as { transport: { send: ReturnType<typeof vi.fn> } }).transport.send;
+            const detach = attachCallStateBridge(api, "!a:x", new CallStateStore(), voice);
+
+            // Joined: the call asks, and is answered with the state to take
+            const request = { data: {} };
+            api.emit(`action:${VOICE_STATE_WIDGET_ACTION}`, { preventDefault: vi.fn(), detail: request });
+            expect(api.reply).toHaveBeenCalledWith(request, {
+                muted: true,
+                deafened: false,
+                muted_before_deafen: false,
+            });
+
+            const report = (data: object): void => {
+                api.emit(`action:${CALL_STATE_WIDGET_ACTION}`, { preventDefault: vi.fn(), detail: { data } });
+            };
+            report({ audio_enabled: false });
+            expect(voice.state.muted).toBe(true);
+
+            // A change in the app goes to the call
+            voice.perform("unmute", "hotkey");
+            await vi.advanceTimersByTimeAsync(0);
+            expect(send).toHaveBeenLastCalledWith(VOICE_STATE_WIDGET_ACTION, {
+                muted: false,
+                deafened: false,
+                muted_before_deafen: false,
+            });
+            report({ audio_enabled: true });
+
+            // The call's own deafen button comes back as the app's state, and is not sent back to the call
+            send.mockClear();
+            await vi.advanceTimersByTimeAsync(5000);
+            report({ audio_enabled: false, deafened: true });
+            expect(voice.state).toEqual({ muted: true, deafened: true, mutedBeforeDeafen: false });
+            await vi.advanceTimersByTimeAsync(0);
+            expect(send).not.toHaveBeenCalled();
+
+            detach();
+            expect(api.listenerCount(`action:${VOICE_STATE_WIDGET_ACTION}`)).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

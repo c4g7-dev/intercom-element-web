@@ -83,7 +83,7 @@ describe("parseCallAction", () => {
 describe("a second instance's command line", () => {
     it("sends its action to the web app and says it was one", () => {
         expect(handleSecondInstanceCallAction(["intercom", "--toggle-deafen"])).toBe(true);
-        expect(send).toHaveBeenCalledWith("intercomCallAction", "toggle-deafen");
+        expect(send).toHaveBeenCalledWith("intercomCallAction", "toggle-deafen", "command-line");
         expect(logDiagnostics).toHaveBeenCalledWith("call_action", {
             action: "toggle-deafen",
             source: "command-line",
@@ -143,7 +143,7 @@ describe("global shortcuts", () => {
                 "CommandOrControl+Shift+D",
             ]);
             vi.mocked(globalShortcut.register).mock.calls[1][1]();
-            expect(send).toHaveBeenCalledWith("intercomCallAction", "toggle-deafen");
+            expect(send).toHaveBeenCalledWith("intercomCallAction", "toggle-deafen", "global-shortcut");
 
             onAction({}, { action: "something_else" });
             onAction({}, undefined);

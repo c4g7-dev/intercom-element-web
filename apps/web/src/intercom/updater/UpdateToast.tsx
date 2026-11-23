@@ -23,7 +23,9 @@ const TOAST_KEY = "intercom_update";
 /**
  * Shows "InterCom <version> is available" when the desktop app has an update ready (or knows of
  * one it cannot install itself), once per version: "Later" puts it away until the next version
- * or the next start. The update is never installed without the click.
+ * or the next start. The update is never installed without the click. Putting the toast away
+ * takes nothing from the update: the status bar over the user panel and the dot on the settings
+ * button stay until it is installed (UpdateStatus, useUpdateReady).
  * @returns what stops it
  */
 export function startUpdateToasts(

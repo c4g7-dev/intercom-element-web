@@ -13,11 +13,21 @@ import { type ViewModel, useViewModel } from "../../core/viewmodel";
 import { useI18n } from "../../core/i18n/i18nContext";
 
 /**
- * Where the updater stands. idle: nothing newer is known. ready: downloaded and checked, a
- * restart installs it. manual: there is a newer release that this install cannot put in place
- * by itself.
+ * Where the updater stands. idle: nothing newer is known. checking, downloading, verifying (the
+ * checksum), unpacking: at work. ready: downloaded and checked, a restart installs it.
+ * installing: being put in place, the app starts again. manual: there is a newer release that
+ * this install cannot put in place by itself.
  */
-export type UpdaterPhase = "idle" | "checking" | "downloading" | "ready" | "manual" | "error";
+export type UpdaterPhase =
+    | "idle"
+    | "checking"
+    | "downloading"
+    | "verifying"
+    | "unpacking"
+    | "ready"
+    | "installing"
+    | "manual"
+    | "error";
 
 /** Why the app does not look for updates. */
 export type UpdaterUnsupportedReason = "unpackaged" | "no-version" | "disabled-by-flag" | "platform" | "web";
@@ -81,8 +91,17 @@ export function UpdaterSettingsView({ vm }: Readonly<UpdaterSettingsViewProps>):
                 percent: `${Math.round((progress ?? 0) * 100)}%`,
             });
             break;
+        case "verifying":
+            status = _t("intercom|updater|verifying", { version: latestVersion ?? "" });
+            break;
+        case "unpacking":
+            status = _t("intercom|updater|unpacking", { version: latestVersion ?? "" });
+            break;
         case "ready":
             status = _t("intercom|updater|ready", { version: latestVersion ?? "" });
+            break;
+        case "installing":
+            status = _t("intercom|updater|installing", { version: latestVersion ?? "" });
             break;
         case "manual":
             status = _t("intercom|updater|manual", { version: latestVersion ?? "" });
@@ -103,6 +122,13 @@ export function UpdaterSettingsView({ vm }: Readonly<UpdaterSettingsViewProps>):
         "platform": _t("intercom|updater|unsupported|platform"),
         "web": _t("intercom|updater|unsupported|web"),
     };
+
+    const working =
+        phase === "checking" ||
+        phase === "downloading" ||
+        phase === "verifying" ||
+        phase === "unpacking" ||
+        phase === "installing";
 
     return (
         <Form.Root className={styles.root} data-testid="intercom-updater-settings" onSubmit={(e) => e.preventDefault()}>
@@ -144,12 +170,7 @@ export function UpdaterSettingsView({ vm }: Readonly<UpdaterSettingsViewProps>):
                                 {_t("intercom|updater|restart")}
                             </Button>
                         )}
-                        <Button
-                            size="md"
-                            kind="secondary"
-                            disabled={phase === "checking" || phase === "downloading"}
-                            onClick={vm.onCheckNow}
-                        >
+                        <Button size="md" kind="secondary" disabled={working} onClick={vm.onCheckNow}>
                             {_t("intercom|updater|check_now")}
                         </Button>
                         <Button size="md" kind="tertiary" onClick={vm.onOpenReleasePage}>

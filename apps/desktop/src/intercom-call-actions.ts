@@ -63,7 +63,8 @@ export function parseCallAction(argv: readonly unknown[]): CallAction | undefine
 export function sendCallAction(action: CallAction, source: string): boolean {
     const webContents = global.mainWindow?.webContents;
     const delivered = !!webContents && !webContents.isDestroyed();
-    if (delivered) webContents.send(CALL_ACTION_CHANNEL, action);
+    // The source goes along: the web app's diagnostics say where a change of mute or deafen came from
+    if (delivered) webContents.send(CALL_ACTION_CHANNEL, action, source);
     logDiagnostics("call_action", { action, source, delivered });
     return delivered;
 }

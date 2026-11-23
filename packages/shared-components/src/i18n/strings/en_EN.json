@@ -109,6 +109,25 @@
         }
     },
     "intercom": {
+        "update_status": {
+            "checking": "Checking for updates…",
+            "details": "Details",
+            "downloading": "Downloading %(version)s",
+            "failed": "The update failed",
+            "hide_details": "Hide details",
+            "installing": "Restarting to update…",
+            "label": "Update",
+            "log_empty": "Nothing yet",
+            "log_label": "Update steps",
+            "manual": "%(version)s is available",
+            "progress": "Update progress",
+            "ready": "%(version)s is ready",
+            "release_page": "Release page",
+            "restart": "Restart",
+            "retry": "Retry",
+            "unpacking": "Unpacking…",
+            "verifying": "Verifying checksum…"
+        },
         "updater": {
             "all_releases": "All releases",
             "auto_check": "Check for updates automatically",
@@ -120,11 +139,13 @@
             "download_progress": "Download progress",
             "downloading": "Downloading InterCom %(version)s… %(percent)s",
             "error": "The update check failed: %(message)s",
+            "installing": "Installing InterCom %(version)s and restarting…",
             "manual": "InterCom %(version)s is available. This install cannot replace itself: get it from the release page.",
             "not_checked": "Not checked for updates yet.",
             "ready": "InterCom %(version)s is ready. Restart to update.",
             "release_notes": "Release notes",
             "restart": "Restart to update",
+            "unpacking": "Unpacking InterCom %(version)s…",
             "unsupported": {
                 "disabled_by_flag": "Updates are turned off: InterCom was started with --no-update.",
                 "no_version": "This build is not a release, so it does not update itself.",
@@ -133,6 +154,7 @@
                 "web": "Updates are for the desktop app."
             },
             "up_to_date_checked": "InterCom is up to date. Last checked %(when)s.",
+            "verifying": "Verifying the checksum of InterCom %(version)s…",
             "version": "InterCom version",
             "version_unknown": "Not a release build"
         },
@@ -143,8 +165,6 @@
             "label": "You and your call",
             "leave": "Leave the call",
             "mute": "Mute",
-            "not_controllable": "This call is controlled from its own window",
-            "not_in_call": "Join a call to use this",
             "presence": {
                 "busy": "Busy",
                 "offline": "Offline",
@@ -154,11 +174,12 @@
             "profile": "%(name)s: your profile",
             "reconnecting": "Reconnecting…",
             "settings": "Settings",
+            "settings_update_ready": "Settings (an update is ready)",
             "share_screen": "Share screen",
             "stop_sharing": "Stop sharing",
-            "unavailable": "%(action)s: %(reason)s",
             "undeafen": "Undeafen",
             "unmute": "Unmute",
+            "unmute_deafened": "Unmute and undeafen",
             "voice_connected": "Voice connected"
         },
         "voice": {

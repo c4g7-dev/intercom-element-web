@@ -115,6 +115,16 @@ automatic check, "Check now" and the state.
   release that somebody tampered with.
 - Every step is an "updater" record in the diagnostics log (init, check, update_found,
   download_start, download_verified, staged, ready, install_linux, install_windows, error).
+- A check is one request for the five newest releases, sent with the ETag of the last answer
+  (kept in <profile>/intercom-updater-releases.json), so GitHub answers "304 Not Modified" with no
+  body when nothing changed; it gives up after 8 s. Only where those five are all Android releases
+  is a longer list asked for. Each check is an "update_check" record: ms, headersMs, status,
+  cached, bytes. A check nobody asked for that fails is logged and not shown.
+- While an update is on its way a slim bar over the user panel says where it stands (checking,
+  downloading with size and speed, verifying, unpacking, ready with a "Restart" button); a click
+  on it shows the last ten steps. When it is ready there is also a dot on the settings button and
+  "Restart to update" in the tray menu. The steps are a state machine in
+  src/intercom-updater-state.ts.
 - Downloads are kept in ~/.cache/intercom-updates (XDG_CACHE_HOME) on Linux and removed once
   the release they are of is running.
 
@@ -124,6 +134,17 @@ Call shortcuts
 In a call, with the window focused: Ctrl+Shift+M mutes, Ctrl+Shift+D deafens (nobody is heard and
 the microphone is off, with a banner over the call) and Ctrl+Shift+V toggles the camera. While a
 call is on, Ctrl+Shift+D is not the space panel's.
+
+Mute and deafen are one state for the whole app, not a call's: they can be changed at any time,
+also with no call on (the microphone and headphones buttons of the user panel, which show how they
+stand, Ctrl+Shift+M, the switches below, the tray menu), they are kept over restarts
+(localStorage, "intercom_voice_state") and every call is joined with them. Deafened is muted too;
+undeafening puts the microphone back as it was, and unmuting ends a deafening. What is done with
+the call's own buttons comes back into the same state. The cue for a change is played by the app,
+once, and only for your own changes. Every change is a voice_state record in the diagnostics log
+with its source: panel, hotkey, cli, call or tray. Ctrl+Shift+D deafens only while a call is on
+(without one it is the space panel's), and the global shortcuts on Windows are registered only
+while a call is on.
 
 From anywhere: a second `intercom` with one of --toggle-mute, --mute, --unmute, --toggle-deafen,
 --toggle-camera, --leave-call hands the action to the running instance and exits without opening a

@@ -10,6 +10,8 @@ import { logger } from "matrix-js-sdk/src/logger";
 import { CallStore } from "../stores/CallStore";
 import { WidgetMessagingStore } from "../stores/widgets/WidgetMessagingStore";
 import WidgetUtils from "../utils/WidgetUtils";
+import { isVoiceAction, type VoiceSource } from "./VoiceState";
+import { VoiceStateStore } from "./VoiceStateStore";
 
 /**
  * What a shortcut can ask of the call that is on: from the keyboard while the window has the
@@ -60,13 +62,39 @@ export function callActionForKey(
 }
 
 /**
- * Carry a call action out on every call the user is in (which is one, as a rule).
- * @returns how many calls it was passed to; 0 where there is no call, which is not an error
+ * Where a change of mute or deafen came from, as the diagnostics name it, from who asked for the
+ * call action: the keyboard, the user panel, or the desktop app with what it was asked by.
+ */
+export function voiceSourceFor(source: string): VoiceSource {
+    switch (source) {
+        case "user-panel":
+            return "panel";
+        case "desktop:tray":
+            return "tray";
+        case "keyboard":
+        case "desktop:global-shortcut":
+            return "hotkey";
+        default:
+            // The desktop app is asked on its command line unless it says otherwise
+            return source.startsWith("desktop") ? "cli" : "hotkey";
+    }
+}
+
+/**
+ * Carry a call action out. Mute and deafen are the app's own state, which holds with or without
+ * a call (see {@link VoiceStateStore}); everything else goes to every call the user is in (which
+ * is one, as a rule).
+ * @returns how many calls it reached; 0 where there is no call, which is not an error
  */
 export async function performCallAction(action: unknown, source: string): Promise<number> {
     if (!isCallAction(action)) {
         logger.warn(`Ignoring unknown call action from ${source}`);
         return 0;
+    }
+    if (isVoiceAction(action)) {
+        // The store tells the calls, plays the cue and writes the diagnostics record
+        VoiceStateStore.instance.perform(action, voiceSourceFor(source));
+        return CallStore.instance.connectedCalls.size;
     }
     let reached = 0;
     for (const call of CallStore.instance.connectedCalls) {
@@ -99,8 +127,10 @@ export async function performCallAction(action: unknown, source: string): Promis
 export function installCallShortcuts(target: Document = document): () => void {
     const onKeyDown = (ev: KeyboardEvent): void => {
         const action = callActionForKey(ev);
-        // Outside a call the keys are whatever they are otherwise (Ctrl+Shift+D: the space panel)
-        if (action === undefined || CallStore.instance.connectedCalls.size === 0) return;
+        if (action === undefined) return;
+        // Ctrl+Shift+M mutes with or without a call. Outside a call the other keys are whatever
+        // they are otherwise (Ctrl+Shift+D: the space panel)
+        if (action !== "toggle-mute" && CallStore.instance.connectedCalls.size === 0) return;
         ev.preventDefault();
         ev.stopPropagation();
         if (!ev.repeat) void performCallAction(action, "keyboard");

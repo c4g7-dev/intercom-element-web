@@ -30,6 +30,7 @@ import SettingsStore from "../../../../../settings/SettingsStore";
 import { UIFeature } from "../../../../../settings/UIFeature";
 import MatrixClientContext from "../../../../../contexts/MatrixClientContext";
 import Modal from "../../../../../Modal";
+import { fetchAccountCapabilities } from "../../../../../intercom/AccountCapabilities";
 
 let changePasswordOnError: (e: Error) => void;
 let changePasswordOnFinished: () => void;
@@ -116,12 +117,93 @@ describe("<AccountUserSettingsTab />", () => {
         expect(manageAccountLink.getAttribute("href")).toMatch(accountManagementLink);
     });
 
+    describe("before the server has said how the account is managed", () => {
+        const accountSections = (): (HTMLElement | null)[] => [
+            screen.queryByTestId("mx_AccountEmailAddresses"),
+            screen.queryByTestId("mx_AccountPhoneNumbers"),
+            screen.queryByTestId("accountSection"),
+            screen.queryByTestId("account-management-section"),
+            screen.queryByText("Deactivate Account"),
+            screen.queryByText("Mock change password"),
+            screen.queryByRole("button", { name: "Manage account" }),
+        ];
+
+        beforeEach(() => {
+            vi.spyOn(SettingsStore, "getValue").mockImplementation(
+                (settingName) => settingName === UIFeature.Deactivate,
+            );
+            mockClient.getThreePids.mockResolvedValue({
+                threepids: [
+                    { medium: ThreepidMedium.Email, address: "private@test.io", validated_at: 1, added_at: 1 },
+                    { medium: ThreepidMedium.Phone, address: "123456789", validated_at: 1, added_at: 1 },
+                ],
+            });
+        });
+
+        it("shows a placeholder and nothing of the account while either answer is awaited", async () => {
+            const capabilities = Promise.withResolvers<any>();
+            const authMetadata = Promise.withResolvers<any>();
+            mockClient.getCapabilities.mockReturnValue(capabilities.promise);
+            mockClient.getAuthMetadata.mockReturnValue(authMetadata.promise);
+
+            render(getComponent());
+            await flushPromises();
+            expect(screen.getByTestId("account-settings-loading")).toBeInTheDocument();
+            expect(accountSections().filter(Boolean)).toEqual([]);
+            expect(mockClient.getThreePids).not.toHaveBeenCalled();
+            expect(document.body.textContent).not.toContain("private@test.io");
+
+            // The capabilities alone do not say whether the account is managed elsewhere
+            capabilities.resolve({ "m.3pid_changes": { enabled: false }, "m.change_password": { enabled: false } });
+            await flushPromises();
+            expect(screen.getByTestId("account-settings-loading")).toBeInTheDocument();
+            expect(accountSections().filter(Boolean)).toEqual([]);
+
+            authMetadata.resolve({ account_management_uri: "https://id.server.org/my-account" });
+            await screen.findByRole("button", { name: "Manage account" });
+            expect(screen.queryByTestId("account-settings-loading")).not.toBeInTheDocument();
+            // Managed elsewhere: none of these was ever on the screen
+            expect(accountSections().slice(0, 6).filter(Boolean)).toEqual([]);
+            expect(mockClient.getThreePids).not.toHaveBeenCalled();
+        });
+
+        it("opens without a placeholder when the answers were fetched beforehand", async () => {
+            mockClient.getCapabilities.mockResolvedValue({
+                "m.3pid_changes": { enabled: false },
+                "m.change_password": { enabled: false },
+            });
+            mockClient.getAuthMetadata.mockResolvedValue({
+                account_management_uri: "https://id.server.org/my-account",
+            } as any);
+            await fetchAccountCapabilities(mockClient);
+
+            render(getComponent());
+            // In the very first render already
+            expect(screen.queryByTestId("account-settings-loading")).not.toBeInTheDocument();
+            expect(screen.getByRole("button", { name: "Manage account" })).toBeInTheDocument();
+            expect(accountSections().slice(0, 6).filter(Boolean)).toEqual([]);
+            await flushPromises();
+            expect(mockClient.getAuthMetadata).toHaveBeenCalledTimes(1);
+        });
+
+        it("shows the sections of an account that is managed here once that is known", async () => {
+            vi.spyOn(SettingsStore, "getValue").mockRestore();
+            render(getComponent());
+            expect(accountSections().filter(Boolean)).toEqual([]);
+            expect(await screen.findByTestId("mx_AccountEmailAddresses")).toBeInTheDocument();
+            expect(screen.getByTestId("account-management-section")).toBeInTheDocument();
+            expect(screen.getByTestId("accountSection")).toBeInTheDocument();
+        });
+    });
+
     describe("deactivate account", () => {
-        it("should not render section when account deactivation feature is disabled", () => {
+        it("should not render section when account deactivation feature is disabled", async () => {
             vi.spyOn(SettingsStore, "getValue").mockImplementation(
                 (settingName) => settingName !== UIFeature.Deactivate,
             );
             render(getComponent());
+            await screen.findByTestId("mx_AccountUserSettingsTab");
+            await flushPromises();
 
             expect(screen.queryByText("Deactivate Account")).not.toBeInTheDocument();
             expect(SettingsStore.getValue).toHaveBeenCalledWith(UIFeature.Deactivate);
@@ -141,13 +223,15 @@ describe("<AccountUserSettingsTab />", () => {
 
             expect(screen.queryByText("Deactivate Account")).not.toBeInTheDocument();
         });
-        it("should render section when account deactivation feature is enabled", () => {
+        it("should render section when account deactivation feature is enabled", async () => {
             vi.spyOn(SettingsStore, "getValue").mockImplementation(
                 (settingName) => settingName === UIFeature.Deactivate,
             );
             render(getComponent());
 
-            expect(screen.getByText("Deactivate Account", { selector: "h2" }).parentElement!).toMatchSnapshot();
+            expect(
+                (await screen.findByText("Deactivate Account", { selector: "h2" })).parentElement!,
+            ).toMatchSnapshot();
         });
         it("should display the deactivate account dialog when clicked", async () => {
             vi.spyOn(SettingsStore, "getValue").mockImplementation(
@@ -160,7 +244,7 @@ describe("<AccountUserSettingsTab />", () => {
 
             render(getComponent());
 
-            await userEvent.click(screen.getByRole("button", { name: "Deactivate Account" }));
+            await userEvent.click(await screen.findByRole("button", { name: "Deactivate Account" }));
 
             expect(createDialogFn).toHaveBeenCalled();
         });
@@ -175,7 +259,7 @@ describe("<AccountUserSettingsTab />", () => {
 
             render(getComponent());
 
-            await userEvent.click(screen.getByRole("button", { name: "Deactivate Account" }));
+            await userEvent.click(await screen.findByRole("button", { name: "Deactivate Account" }));
 
             finishedDeferred.resolve([true]);
             await flushPromises();
@@ -193,7 +277,7 @@ describe("<AccountUserSettingsTab />", () => {
 
             render(getComponent());
 
-            await userEvent.click(screen.getByRole("button", { name: "Deactivate Account" }));
+            await userEvent.click(await screen.findByRole("button", { name: "Deactivate Account" }));
 
             finishedDeferred.resolve([false]);
             await flushPromises();
@@ -230,11 +314,12 @@ describe("<AccountUserSettingsTab />", () => {
             mockClient.getIdentityServerUrl.mockReturnValue(undefined);
         });
 
-        it("should show loaders while 3pids load", () => {
+        it("should show loaders while 3pids load", async () => {
+            mockClient.getThreePids.mockReturnValue(new Promise(() => {}));
             render(getComponent());
 
             expect(
-                within(screen.getByTestId("mx_AccountEmailAddresses")).getByLabelText("Loading…"),
+                within(await screen.findByTestId("mx_AccountEmailAddresses")).getByLabelText("Loading…"),
             ).toBeInTheDocument();
             expect(within(screen.getByTestId("mx_AccountPhoneNumbers")).getByLabelText("Loading…")).toBeInTheDocument();
         });
@@ -242,7 +327,7 @@ describe("<AccountUserSettingsTab />", () => {
         it("should display 3pid email addresses and phone numbers", async () => {
             render(getComponent());
 
-            await flushPromises();
+            await screen.findByText("test@test.io");
 
             expect(screen.getByTestId("mx_AccountEmailAddresses")).toMatchSnapshot();
             expect(screen.getByTestId("mx_AccountPhoneNumbers")).toMatchSnapshot();

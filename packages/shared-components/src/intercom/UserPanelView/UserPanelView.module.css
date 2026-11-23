@@ -208,8 +208,36 @@
     text-overflow: ellipsis;
 }
 
-/* A microphone or hearing that is off, in the colour that says so */
+/* A microphone or hearing that is off: the struck-through icon in red on a red tint, so that it
+   is seen at a glance, with or without a call */
 .off,
 .off * {
     color: var(--cpd-color-icon-critical-primary);
+}
+
+.voice.off {
+    background-color: var(--cpd-color-bg-critical-subtle);
+    border-radius: 8px;
+}
+
+.voice.off:hover {
+    background-color: var(--cpd-color-bg-critical-subtle-hovered);
+}
+
+/* The settings button, with a dot on it while an update waits for a restart */
+.settings {
+    position: relative;
+    display: inline-flex;
+}
+
+.updateDot {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--cpd-color-icon-success-primary);
+    box-shadow: 0 0 0 2px var(--intercom-user-panel-bg, var(--cpd-color-bg-subtle-secondary));
+    pointer-events: none;
 }

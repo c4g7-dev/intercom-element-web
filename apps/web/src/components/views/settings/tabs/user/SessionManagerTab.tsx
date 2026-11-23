@@ -32,6 +32,7 @@ import { type FilterVariation } from "../../devices/filter";
 import { OtherSessionsSectionHeading } from "../../devices/OtherSessionsSectionHeading";
 import { SettingsSection } from "../../shared/SettingsSection";
 import { getManageDeviceUrl } from "../../../../../utils/oauth/urls.ts";
+import { useAccountCapabilities } from "../../../../../intercom/AccountCapabilities";
 import { SDKContext } from "../../../../../contexts/SDKContext";
 import Spinner from "../../../elements/Spinner";
 
@@ -153,13 +154,13 @@ const SessionManagerTab: React.FC<{
      * delegated auth provider.
      * See https://github.com/matrix-org/matrix-spec-proposals/pull/3824
      */
-    const accountManagement = useAsyncMemo(async () => {
-        const authMetadata = await matrixClient.getAuthMetadata().catch(() => {});
-        return {
-            endpoint: authMetadata?.account_management_uri,
-            actionsSupported: authMetadata?.account_management_actions_supported,
-        };
-    }, [matrixClient]);
+    // InterCom: from the answers asked for when the app starts, so that the sessions are not first
+    // drawn with controls that a delegated sign-in then takes away
+    const accountCapabilities = useAccountCapabilities(matrixClient);
+    const accountManagement = accountCapabilities && {
+        endpoint: accountCapabilities.externalAccountManagementUrl,
+        actionsSupported: accountCapabilities.accountManagementActionsSupported,
+    };
     const disableMultipleSignout = !!accountManagement?.endpoint;
     const userId = matrixClient?.getUserId();
     const currentUserMember = (userId && matrixClient?.getUser(userId)) || undefined;

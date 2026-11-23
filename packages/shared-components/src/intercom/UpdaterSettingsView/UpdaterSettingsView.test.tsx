@@ -19,7 +19,18 @@ import {
 } from "./UpdaterSettingsView";
 import { MockViewModel } from "../../core/viewmodel/MockViewModel";
 
-const { UpToDate, NeverChecked, Downloading, Ready, Manual, Failed, DevelopmentBuild } = composeStories(stories);
+const {
+    UpToDate,
+    NeverChecked,
+    Downloading,
+    Verifying,
+    Unpacking,
+    Installing,
+    Ready,
+    Manual,
+    Failed,
+    DevelopmentBuild,
+} = composeStories(stories);
 
 class TestViewModel extends MockViewModel<UpdaterSettingsViewSnapshot> implements UpdaterSettingsViewActions {
     public onAutoCheckChange = vi.fn();
@@ -47,6 +58,16 @@ describe("UpdaterSettingsView", () => {
         render(<Downloading />);
         expect(screen.getByRole("status")).toHaveTextContent("Downloading InterCom 1.12.35-intercom.6… 42%");
         expect(screen.getByRole("progressbar")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Check now" })).toBeDisabled();
+    });
+
+    it.each([
+        ["the checksum is checked", Verifying, "Verifying the checksum of InterCom 1.12.35-intercom.6…"],
+        ["the update is unpacked", Unpacking, "Unpacking InterCom 1.12.35-intercom.6…"],
+        ["the update is installed", Installing, "Installing InterCom 1.12.35-intercom.6 and restarting…"],
+    ])("says so while %s, and starts no check meanwhile", (_what, Story, text) => {
+        render(<Story />);
+        expect(screen.getByRole("status")).toHaveTextContent(text);
         expect(screen.getByRole("button", { name: "Check now" })).toBeDisabled();
     });
 

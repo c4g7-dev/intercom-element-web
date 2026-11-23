@@ -1,0 +1,56 @@
+/*
+Copyright 2026 InterCom contributors
+
+SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+Please see LICENSE files in the repository root for full details.
+*/
+
+/* What a settings tab shows until it knows what it may show: shapes, and nothing of the account */
+.mx_IntercomSettingsPlaceholder {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cpd-space-4x);
+    max-width: 520px;
+    padding-top: var(--cpd-space-2x);
+}
+
+.mx_IntercomSettingsPlaceholder_avatar,
+.mx_IntercomSettingsPlaceholder_line,
+.mx_IntercomSettingsPlaceholder_block {
+    border-radius: 8px;
+    background-color: var(--cpd-color-bg-subtle-secondary);
+    animation: mx_IntercomSettingsPlaceholder_pulse 1.4s ease-in-out infinite;
+}
+
+.mx_IntercomSettingsPlaceholder_avatar {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+}
+
+.mx_IntercomSettingsPlaceholder_line {
+    height: 20px;
+    width: 60%;
+}
+
+.mx_IntercomSettingsPlaceholder_line_short {
+    width: 35%;
+}
+
+.mx_IntercomSettingsPlaceholder_block {
+    height: 96px;
+}
+
+@keyframes mx_IntercomSettingsPlaceholder_pulse {
+    50% {
+        opacity: 0.55;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mx_IntercomSettingsPlaceholder_avatar,
+    .mx_IntercomSettingsPlaceholder_line,
+    .mx_IntercomSettingsPlaceholder_block {
+        animation: none;
+    }
+}

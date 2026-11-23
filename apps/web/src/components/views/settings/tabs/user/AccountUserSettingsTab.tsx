@@ -7,7 +7,7 @@ SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Com
 Please see LICENSE files in the repository root for full details.
 */
 
-import React, { type JSX, useCallback, useContext, useEffect } from "react";
+import React, { type JSX, useCallback, useContext } from "react";
 import { HTTPError } from "matrix-js-sdk/src/matrix";
 import { logger } from "matrix-js-sdk/src/logger";
 
@@ -25,6 +25,7 @@ import { SettingsSection } from "../../shared/SettingsSection";
 import { SettingsSubsection, SettingsSubsectionText } from "../../shared/SettingsSubsection";
 import { UserPersonalInfoSettings } from "../../UserPersonalInfoSettings";
 import { SDKContext } from "../../../../../contexts/SDKContext.ts";
+import { useAccountCapabilities } from "../../../../../intercom/AccountCapabilities";
 
 interface IProps {
     closeSettingsFn: () => void;
@@ -87,44 +88,12 @@ const ManagementSection: React.FC<ManagementSectionProps> = ({ onDeactivateClick
 };
 
 const AccountUserSettingsTab: React.FC<IProps> = ({ closeSettingsFn, startCustomStatus }) => {
-    const [externalAccountManagementUrl, setExternalAccountManagementUrl] = React.useState<string | undefined>();
-    const [canMake3pidChanges, setCanMake3pidChanges] = React.useState<boolean>(false);
-    const [canSetDisplayName, setCanSetDisplayName] = React.useState<boolean>(false);
-    const [canSetAvatar, setCanSetAvatar] = React.useState<boolean>(false);
-    const [canChangePassword, setCanChangePassword] = React.useState<boolean>(false);
-
     const sdkContext = useContext(SDKContext);
     const cli = sdkContext.client!;
-
-    useEffect(() => {
-        (async () => {
-            const capabilities = (await cli.getCapabilities()) ?? {};
-            const changePasswordCap = capabilities["m.change_password"];
-
-            // You can change your password so long as the capability isn't explicitly disabled. The implicit
-            // behaviour is you can change your password when the capability is missing or has not-false as
-            // the enabled flag value.
-            const canChangePassword = !changePasswordCap || changePasswordCap["enabled"] !== false;
-
-            const authMetadata = await cli.getAuthMetadata().catch(() => {});
-            const externalAccountManagementUrl = authMetadata?.account_management_uri;
-            // https://spec.matrix.org/v1.7/client-server-api/#m3pid_changes-capability
-            // We support as far back as v1.1 which doesn't have m.3pid_changes
-            // so the behaviour for when it is missing has to be assume true
-            const canMake3pidChanges =
-                !capabilities["m.3pid_changes"] || capabilities["m.3pid_changes"].enabled === true;
-
-            const canSetDisplayName =
-                !capabilities["m.set_displayname"] || capabilities["m.set_displayname"].enabled === true;
-            const canSetAvatar = !capabilities["m.set_avatar_url"] || capabilities["m.set_avatar_url"].enabled === true;
-
-            setCanMake3pidChanges(canMake3pidChanges);
-            setCanSetDisplayName(canSetDisplayName);
-            setCanSetAvatar(canSetAvatar);
-            setExternalAccountManagementUrl(externalAccountManagementUrl);
-            setCanChangePassword(canChangePassword);
-        })();
-    }, [cli]);
+    // InterCom: undefined until the server has said where the account is managed and what may be
+    // changed. Nothing that depends on it is drawn before: on a server with delegated sign-in
+    // the e-mail addresses, the password and "Deactivate account" used to show for a moment.
+    const capabilities = useAccountCapabilities(cli);
 
     const onPasswordChangeError = useCallback((err: Error): void => {
         logger.error("Failed to change password: " + err);
@@ -173,6 +142,27 @@ const AccountUserSettingsTab: React.FC<IProps> = ({ closeSettingsFn, startCustom
             if (success) closeSettingsFn();
         });
     }, [closeSettingsFn]);
+
+    if (!capabilities) {
+        return (
+            <SettingsTab data-testid="mx_AccountUserSettingsTab">
+                <div
+                    className="mx_IntercomSettingsPlaceholder"
+                    data-testid="account-settings-loading"
+                    role="status"
+                    aria-busy="true"
+                    aria-label={_t("common|loading")}
+                >
+                    <div className="mx_IntercomSettingsPlaceholder_avatar" />
+                    <div className="mx_IntercomSettingsPlaceholder_line" />
+                    <div className="mx_IntercomSettingsPlaceholder_line mx_IntercomSettingsPlaceholder_line_short" />
+                    <div className="mx_IntercomSettingsPlaceholder_block" />
+                </div>
+            </SettingsTab>
+        );
+    }
+    const { externalAccountManagementUrl, canMake3pidChanges, canSetDisplayName, canSetAvatar, canChangePassword } =
+        capabilities;
 
     let accountManagementSection: JSX.Element | undefined;
     const isAccountManagedExternally = Boolean(externalAccountManagementUrl);

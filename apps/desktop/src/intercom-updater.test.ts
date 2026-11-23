@@ -261,10 +261,99 @@ describe.runIf(process.platform === "linux")("the updater, from the check to the
         expect(await updater.checkForUpdate()).toMatchObject({ phase: "idle", latestVersion: undefined });
         expect(steps()).toContain("up_to_date");
 
-        electron.fetch.mockResolvedValue(new Response("rate limited", { status: 403 }));
+        electron.fetch.mockImplementation(async () => new Response("rate limited", { status: 403 }));
         updater = await load();
         updater.initUpdater(true);
-        expect(await updater.checkForUpdate()).toMatchObject({ phase: "error", error: "GitHub: HTTP 403" });
+        // A check nobody asked for is logged, with how long it took, and otherwise not shown
+        const quiet = await updater.checkForUpdate();
+        expect(quiet).toMatchObject({ phase: "idle", error: undefined });
+        expect(quiet.log.at(-1)!.text).toBe("Check failed: GitHub: HTTP 403");
+        expect(electron.records.at(-2)).toMatchObject({ type: "update_check", ok: false, status: 403, manual: false });
+        // One the user asked for says what went wrong
+        expect(await updater.checkForUpdate(true)).toMatchObject({ phase: "error", error: "GitHub: HTTP 403" });
+    });
+
+    it("asks GitHub once with the ETag when nothing changed, and writes how long the check took", async () => {
+        electron.version = NEW;
+        electron.fetch.mockImplementation(async (_url: string, init?: { headers?: Record<string, string> }) =>
+            init?.headers?.["If-None-Match"] === 'W/"etag"'
+                ? new Response(null, { status: 304 })
+                : new Response(JSON.stringify(releases), { headers: { etag: 'W/"etag"' } }),
+        );
+        const updater = await load();
+        updater.initUpdater(true);
+        const phases: string[] = [];
+        electron.send.mockImplementation((_channel: string, sent: { phase: string }) => phases.push(sent.phase));
+
+        await updater.checkForUpdate(true);
+        // "Checking…" is shown before GitHub is asked, and the check ends where it began
+        expect(phases).toEqual(["checking", "idle"]);
+        const checks = (): Array<Record<string, unknown>> => electron.records.filter((r) => r.type === "update_check");
+        expect(checks()).toEqual([
+            expect.objectContaining({ ok: true, manual: true, status: 200, cached: false, requests: 1, releases: 2 }),
+        ]);
+        expect(checks()[0].bytes).toBeGreaterThan(0);
+        expect(typeof checks()[0].ms).toBe("number");
+        const kept = JSON.parse(
+            fs.readFileSync(path.join(electron.userData, "intercom-updater-releases.json"), "utf8"),
+        );
+        expect(kept.etag).toBe('W/"etag"');
+
+        // The next check, also after a restart, is answered with "nothing changed"
+        const next = await load();
+        next.initUpdater(true);
+        expect(await next.checkForUpdate()).toMatchObject({ phase: "idle" });
+        expect(checks()[1]).toMatchObject({ ok: true, status: 304, cached: true, bytes: 0 });
+        expect(electron.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("tells the tray when an update is ready, and shows the steps on the way", async () => {
+        const updater = await load();
+        updater.initUpdater(true);
+        const seen: string[] = [];
+        const stop = updater.onUpdaterState((state) => {
+            if (seen.at(-1) !== state.phase) seen.push(state.phase);
+        });
+        await updater.checkForUpdate();
+        expect(seen).toEqual(["checking", "downloading", "verifying", "unpacking", "ready"]);
+        expect(updater.getUpdaterState()).toMatchObject({ phase: "ready", latestVersion: NEW });
+        expect(updater.getUpdaterState().log.map((line) => line.text)).toEqual([
+            "Checking for updates…",
+            `Found ${NEW}`,
+            expect.stringMatching(/^Downloading 1\.12\.35-intercom\.6/),
+            "Verifying checksum…",
+            "Unpacking…",
+            `${NEW} is ready: restart to update`,
+        ]);
+
+        // A second check does not fetch what is there
+        const calls = electron.fetch.mock.calls.length;
+        await updater.checkForUpdate(true);
+        expect(electron.fetch).toHaveBeenCalledTimes(calls);
+
+        await updater.installUpdate();
+        expect(seen.at(-1)).toBe("installing");
+        stop();
+    });
+
+    it("uses a download that is there already", async () => {
+        const dir = path.join(tmp, "cache", "intercom-updates");
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, ASSET), archive);
+        const updater = await load();
+        updater.initUpdater(true);
+        expect((await updater.checkForUpdate()).phase).toBe("ready");
+        expect(steps()).toContain("download_reused");
+        expect(electron.fetch.mock.calls.some(([url]) => String(url).endsWith(`/${ASSET}`))).toBe(false);
+
+        // One that is not whole is fetched again
+        fs.rmSync(`${installDir}.new`, { recursive: true });
+        fs.writeFileSync(path.join(dir, ASSET), archive.subarray(0, 10));
+        const again = await load();
+        again.initUpdater(true);
+        expect((await again.checkForUpdate()).phase).toBe("ready");
+        expect(electron.fetch.mock.calls.some(([url]) => String(url).endsWith(`/${ASSET}`))).toBe(true);
+        expect(read(`${installDir}.new`)).toBe("new");
     });
 
     it.each([
@@ -294,10 +383,16 @@ describe.runIf(process.platform === "linux")("the updater, from the check to the
         const updater = await load();
         updater.initUpdater(true);
         expect(electron.fetch).not.toHaveBeenCalled();
+        // A check reads what it kept of the last one before it asks, which takes a moment
+        const asked = (times: number): Promise<void> =>
+            vi.waitFor(() => expect(electron.fetch).toHaveBeenCalledTimes(times));
+        const idle = (): Promise<void> => vi.waitFor(() => expect(updater.getUpdaterState().phase).toBe("idle"));
         await vi.advanceTimersByTimeAsync(30_000);
-        expect(electron.fetch).toHaveBeenCalledTimes(1);
+        await asked(1);
+        await idle();
         await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
-        expect(electron.fetch).toHaveBeenCalledTimes(2);
+        await asked(2);
+        await idle();
 
         // Turned off: remembered for the next start, and no more checks
         expect((await ipc()({}, "setAutoCheck", false)).autoCheck).toBe(false);
@@ -313,7 +408,6 @@ describe.runIf(process.platform === "linux")("the updater, from the check to the
         expect(electron.fetch).toHaveBeenCalledTimes(2);
         // Asked for by hand it still checks
         await ipc()({}, "check");
-        await vi.advanceTimersByTimeAsync(0);
-        expect(electron.fetch).toHaveBeenCalledTimes(3);
+        await asked(3);
     });
 });

@@ -27,6 +27,11 @@ vi.mock("electron", () => ({
     app: {
         isPackaged: true,
     },
+    // InterCom: the tray's mute and deafen entries listen to the web app
+    ipcMain: {
+        on: vi.fn(),
+        handle: vi.fn(),
+    },
 }));
 
 vi.mock("./icon.js");

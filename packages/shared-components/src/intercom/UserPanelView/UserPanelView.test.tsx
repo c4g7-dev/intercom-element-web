@@ -38,18 +38,11 @@ const base: UserPanelViewSnapshot = {
 const call = { roomName: "Lounge", reconnecting: false, cameraOn: false, screenSharing: false, controllable: true };
 
 describe("UserPanelView", () => {
-    it("shows who you are, with the call's buttons off while there is no call", () => {
+    it("shows who you are, with mute and deafen there while there is no call", () => {
         render(<Default />);
         expect(screen.getByRole("button", { name: "Ada: your profile" }).textContent).toMatch(/AdaOnline$/);
-        // Off, and saying why
-        expect(screen.getByRole("button", { name: "Mute: Join a call to use this" })).toHaveAttribute(
-            "aria-disabled",
-            "true",
-        );
-        expect(screen.getByRole("button", { name: "Deafen: Join a call to use this" })).toHaveAttribute(
-            "aria-disabled",
-            "true",
-        );
+        expect(screen.getByRole("button", { name: "Mute" })).toHaveAttribute("aria-pressed", "false");
+        expect(screen.getByRole("button", { name: "Deafen" })).toHaveAttribute("aria-pressed", "false");
         expect(screen.getByRole("button", { name: "Settings" })).toBeEnabled();
         expect(screen.queryByTestId("intercom-call-strip")).toBeNull();
     });
@@ -70,7 +63,8 @@ describe("UserPanelView", () => {
 
     it("shows what is off and what is on", () => {
         render(<MutedAndSharing />);
-        expect(screen.getByRole("button", { name: "Unmute" })).toHaveAttribute("aria-pressed", "true");
+        // Deafened is muted too, and the microphone button says what pressing it does then
+        expect(screen.getByRole("button", { name: "Unmute and undeafen" })).toHaveAttribute("aria-pressed", "true");
         expect(screen.getByRole("button", { name: "Undeafen" })).toHaveAttribute("aria-pressed", "true");
         expect(screen.getByRole("button", { name: "Camera" })).toHaveAttribute("aria-pressed", "true");
         expect(screen.getByRole("button", { name: "Stop sharing" })).toHaveAttribute("aria-pressed", "true");
@@ -85,9 +79,24 @@ describe("UserPanelView", () => {
         render(<CallOfAnotherApp />);
         expect(screen.getByRole("button", { name: "Leave the call" })).toBeEnabled();
         expect(screen.queryByRole("button", { name: "Camera" })).toBeNull();
-        expect(
-            screen.getByRole("button", { name: "Mute: This call is controlled from its own window" }),
-        ).toHaveAttribute("aria-disabled", "true");
+        // Mute is the app's own and works whatever the call is
+        expect(screen.getByRole("button", { name: "Mute" })).toBeEnabled();
+    });
+
+    it("shows mute and deafen without a call, and lets them be changed", async () => {
+        const vm = new TestViewModel({ ...base, muted: true, deafened: false });
+        render(<UserPanelView vm={vm} />);
+        const unmute = screen.getByRole("button", { name: "Unmute" });
+        expect(unmute).toBeEnabled();
+        expect(unmute).toHaveAttribute("aria-pressed", "true");
+        expect(unmute).toHaveAttribute("data-state", "muted");
+        const deafen = screen.getByRole("button", { name: "Deafen" });
+        expect(deafen).toHaveAttribute("aria-pressed", "false");
+        const user = userEvent.setup();
+        await user.click(unmute);
+        await user.click(deafen);
+        expect(vm.onToggleMute).toHaveBeenCalledTimes(1);
+        expect(vm.onToggleDeafen).toHaveBeenCalledTimes(1);
     });
 
     it("passes every button on to the view model", async () => {
@@ -114,5 +123,19 @@ describe("UserPanelView", () => {
         ]) {
             expect(action).toHaveBeenCalledTimes(1);
         }
+    });
+});
+
+describe("UserPanelView, with an update of the app", () => {
+    it("puts a dot on the settings button while an update waits for a restart", async () => {
+        const vm = new TestViewModel(base);
+        const { rerender } = render(<UserPanelView vm={vm} />);
+        expect(screen.queryByTestId("intercom-update-dot")).toBeNull();
+
+        rerender(<UserPanelView vm={vm} updateReady />);
+        expect(screen.getByTestId("intercom-update-dot")).toBeInTheDocument();
+        // The button says so too, and still opens the settings
+        await userEvent.click(screen.getByRole("button", { name: "Settings (an update is ready)" }));
+        expect(vm.onOpenSettings).toHaveBeenCalledTimes(1);
     });
 });
