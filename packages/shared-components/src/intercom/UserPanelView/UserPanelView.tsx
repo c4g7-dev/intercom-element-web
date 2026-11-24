@@ -84,7 +84,7 @@ export type UserPanelViewModel = ViewModel<UserPanelViewSnapshot, UserPanelViewA
 interface UserPanelViewProps {
     /** The view model */
     vm: UserPanelViewModel;
-    /** Whether an update of the app is downloaded and waits for a restart: a dot on the settings button says so */
+    /** Whether an update of the app is downloaded and waits for a restart: only then a settings button, with a dot, is shown */
     updateReady?: boolean;
 }
 
@@ -234,25 +234,21 @@ export function UserPanelView({ vm, updateReady = false }: Readonly<UserPanelVie
                 >
                     {deafened ? <HeadphonesOffSolidIcon /> : <HeadphonesSolidIcon />}
                 </IconButton>
-                <span className={styles.settings}>
-                    <IconButton
-                        size="32px"
-                        tooltip={
-                            updateReady
-                                ? _t("intercom|user_panel|settings_update_ready")
-                                : _t("intercom|user_panel|settings")
-                        }
-                        aria-label={
-                            updateReady
-                                ? _t("intercom|user_panel|settings_update_ready")
-                                : _t("intercom|user_panel|settings")
-                        }
-                        onClick={vm.onOpenSettings}
-                    >
-                        <SettingsSolidIcon />
-                    </IconButton>
-                    {updateReady && <span className={styles.updateDot} data-testid="intercom-update-dot" />}
-                </span>
+                {/* The settings are in the rail of spaces; the button here only stands for an update
+                    that waits for a restart, with its dot */}
+                {updateReady && (
+                    <span className={styles.settings}>
+                        <IconButton
+                            size="32px"
+                            tooltip={_t("intercom|user_panel|settings_update_ready")}
+                            aria-label={_t("intercom|user_panel|settings_update_ready")}
+                            onClick={vm.onOpenSettings}
+                        >
+                            <SettingsSolidIcon />
+                        </IconButton>
+                        <span className={styles.updateDot} data-testid="intercom-update-dot" />
+                    </span>
+                )}
             </div>
         </section>
     );

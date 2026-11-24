@@ -43,7 +43,8 @@ describe("UserPanelView", () => {
         expect(screen.getByRole("button", { name: "Ada: your profile" }).textContent).toMatch(/AdaOnline$/);
         expect(screen.getByRole("button", { name: "Mute" })).toHaveAttribute("aria-pressed", "false");
         expect(screen.getByRole("button", { name: "Deafen" })).toHaveAttribute("aria-pressed", "false");
-        expect(screen.getByRole("button", { name: "Settings" })).toBeEnabled();
+        // The settings are in the rail of spaces: no button for them here without an update
+        expect(screen.queryByRole("button", { name: /^Settings/ })).toBeNull();
         expect(screen.queryByTestId("intercom-call-strip")).toBeNull();
     });
 
@@ -105,7 +106,6 @@ describe("UserPanelView", () => {
         const user = userEvent.setup();
         await user.click(screen.getByRole("button", { name: "Mute" }));
         await user.click(screen.getByRole("button", { name: "Deafen" }));
-        await user.click(screen.getByRole("button", { name: "Settings" }));
         await user.click(screen.getByRole("button", { name: "Ada: your profile" }));
         await user.click(screen.getByRole("button", { name: "Camera" }));
         await user.click(screen.getByRole("button", { name: "Share screen" }));
@@ -114,7 +114,6 @@ describe("UserPanelView", () => {
         for (const action of [
             vm.onToggleMute,
             vm.onToggleDeafen,
-            vm.onOpenSettings,
             vm.onOpenProfile,
             vm.onToggleCamera,
             vm.onToggleScreenShare,
@@ -131,6 +130,7 @@ describe("UserPanelView, with an update of the app", () => {
         const vm = new TestViewModel(base);
         const { rerender } = render(<UserPanelView vm={vm} />);
         expect(screen.queryByTestId("intercom-update-dot")).toBeNull();
+        expect(screen.queryByRole("button", { name: /^Settings/ })).toBeNull();
 
         rerender(<UserPanelView vm={vm} updateReady />);
         expect(screen.getByTestId("intercom-update-dot")).toBeInTheDocument();
