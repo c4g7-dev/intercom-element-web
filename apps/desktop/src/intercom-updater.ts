@@ -52,6 +52,7 @@ import {
     looksLikeInstall,
     parseIntercomVersion,
     relaunchCommand,
+    removeTree,
     selectUpdate,
     stagingDirFor,
     swapInstallDir,
@@ -282,7 +283,7 @@ async function fetchVerified(candidate: UpdateCandidate): Promise<string> {
 /** Linux: unpacks the archive beside the install directory, ready to be swapped in. */
 async function stage(archive: string): Promise<void> {
     const staging = stagingDirFor(installDir());
-    await fsp.rm(staging, { recursive: true, force: true });
+    await removeTree(staging);
     await fsp.mkdir(staging);
     try {
         // The archive holds one directory (intercom-<version>/), whose contents are the install
@@ -291,7 +292,7 @@ async function stage(archive: string): Promise<void> {
             throw new Error("The archive does not hold an InterCom install");
         }
     } catch (e) {
-        await fsp.rm(staging, { recursive: true, force: true });
+        await removeTree(staging);
         throw e;
     }
     log("staged", { beside: true });

@@ -13,7 +13,27 @@ Please see LICENSE files in the repository root for full details.
 
 import crypto from "node:crypto";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
+
+/**
+ * The file system without Electron's asar support. Electron's own `fs` treats every `.asar` file
+ * as a directory, so removing an install tree (which holds `resources/app.asar`) fails with
+ * ENOTEMPTY: the recursive removal tries to empty the archive like a folder. `original-fs` is
+ * Electron's unpatched module; outside Electron (tests) it does not exist and `node:fs` is the same.
+ */
+const realFs: typeof fs = (() => {
+    try {
+        return createRequire(import.meta.url)("original-fs") as typeof fs;
+    } catch {
+        return fs;
+    }
+})();
+
+/** Removes a directory tree that may contain `.asar` files, ignoring a missing one. */
+export async function removeTree(dir: string): Promise<void> {
+    await realFs.promises.rm(dir, { recursive: true, force: true });
+}
 
 /** An InterCom desktop version: the Element Web release it is based on, then the InterCom revision. */
 export interface IntercomVersion {
@@ -193,12 +213,12 @@ export async function looksLikeInstall(dir: string, executableName: string): Pro
 export async function swapInstallDir(installDir: string, stagedDir: string): Promise<{ backupDir: string }> {
     const backupDir = backupDirFor(installDir);
     await fs.promises.access(stagedDir);
-    await fs.promises.rm(backupDir, { recursive: true, force: true });
-    await fs.promises.rename(installDir, backupDir);
+    await removeTree(backupDir);
+    await realFs.promises.rename(installDir, backupDir);
     try {
-        await fs.promises.rename(stagedDir, installDir);
+        await realFs.promises.rename(stagedDir, installDir);
     } catch (e) {
-        await fs.promises.rename(backupDir, installDir);
+        await realFs.promises.rename(backupDir, installDir);
         throw e;
     }
     return { backupDir };

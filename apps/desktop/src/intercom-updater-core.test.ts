@@ -22,6 +22,7 @@ import {
     looksLikeInstall,
     parseIntercomVersion,
     relaunchCommand,
+    removeTree,
     selectUpdate,
     sha256File,
     stagingDirFor,
@@ -204,6 +205,25 @@ describe("with files", () => {
                 /does not list/,
             );
             await expect(verifyDownload(path.join(tmp, "absent"), "absent", `${hash}  absent\n`)).rejects.toThrow();
+        });
+    });
+
+    describe("removing an install tree", () => {
+        // Electron's fs treats app.asar as a directory, which made the removal of a staged or
+        // backed-up install fail with ENOTEMPTY; removeTree goes through original-fs there.
+        it("removes a tree that holds an .asar file", async () => {
+            const dir = path.join(tmp, "intercom.new");
+            fs.mkdirSync(path.join(dir, "resources", "app.asar.unpacked"), { recursive: true });
+            fs.writeFileSync(path.join(dir, "resources", "app.asar"), "archive");
+            fs.writeFileSync(path.join(dir, "intercom"), "binary");
+
+            await removeTree(dir);
+
+            expect(fs.existsSync(dir)).toBe(false);
+        });
+
+        it("ignores a directory that is not there", async () => {
+            await expect(removeTree(path.join(tmp, "missing"))).resolves.toBeUndefined();
         });
     });
 
