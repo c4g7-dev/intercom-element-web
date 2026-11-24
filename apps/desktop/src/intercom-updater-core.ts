@@ -195,8 +195,11 @@ export function backupDirFor(installDir: string): string {
  */
 export async function looksLikeInstall(dir: string, executableName: string): Promise<boolean> {
     try {
-        await fs.promises.access(path.join(dir, executableName), fs.constants.X_OK);
-        await fs.promises.access(path.join(dir, "resources", "app.asar"), fs.constants.R_OK);
+        // Through original-fs: Electron's fs sees app.asar as a directory and reports ENOENT for
+        // a readable-file check on it, which made every Linux update of 1.12.35-intercom.5 to .9
+        // stop with "The archive does not hold an InterCom install"
+        await realFs.promises.access(path.join(dir, executableName), realFs.constants.X_OK);
+        await realFs.promises.access(path.join(dir, "resources", "app.asar"), realFs.constants.R_OK);
         return true;
     } catch {
         return false;
