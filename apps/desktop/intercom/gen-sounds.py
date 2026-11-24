@@ -31,38 +31,44 @@ PEAK = 0.25  # about -12 dBFS: a cue, not an alarm
 CUES = {
     "join": ((587.33, 880.00), 0.11, 0.30),  # D5, A5
     "leave": ((880.00, 587.33), 0.11, 0.30),  # A5, D5
-    "unmute": ((659.26, 987.77), 0.07, 0.14),  # E5, B5
-    "mute": ((987.77, 659.26), 0.07, 0.14),  # B5, E5
-    "undeafen": ((392.00, 523.25), 0.09, 0.22),  # G4, C5
-    "deafen": ((523.25, 392.00), 0.09, 0.22),  # C5, G4
+    # Mute and deafen come often (hotkeys): an octave lower than they were, and softer (SOFT)
+    "unmute": ((329.63, 493.88), 0.08, 0.16),  # E4, B4
+    "mute": ((493.88, 329.63), 0.08, 0.16),  # B4, E4
+    "undeafen": ((261.63, 349.23), 0.10, 0.24),  # C4, F4
+    "deafen": ((349.23, 261.63), 0.10, 0.24),  # F4, C4
 }
 
+# Cues played quieter, with a slower attack and less of the octave: (peak, attack in s, octave)
+SOFT = {name: (0.15, 0.014, 0.06) for name in ("unmute", "mute", "undeafen", "deafen")}
+DEFAULT_TONE = (PEAK, 0.006, 0.18)
 
-def note(frequency, ring):
-    """One note: a sine with a little of its octave, a 6 ms attack and a decay to silence."""
+
+def note(frequency, ring, attack_s=0.006, octave=0.18):
+    """One note: a sine with a little of its octave, a short attack and a decay to silence."""
     count = int(RATE * ring)
-    attack = int(RATE * 0.006)
+    attack = int(RATE * attack_s)
     out = []
     for i in range(count):
         t = i / RATE
         envelope = min(1.0, i / attack) * math.exp(-t * 5.0 / ring)
         # The last 10 ms go to zero whatever the decay left, so that nothing clicks
         envelope *= min(1.0, (count - i) / (RATE * 0.01))
-        sample = math.sin(2 * math.pi * frequency * t) + 0.18 * math.sin(4 * math.pi * frequency * t)
+        sample = math.sin(2 * math.pi * frequency * t) + octave * math.sin(4 * math.pi * frequency * t)
         out.append(envelope * sample)
     return out
 
 
 def render(name):
     notes, step, ring = CUES[name]
+    peak, attack_s, octave = SOFT.get(name, DEFAULT_TONE)
     length = int(RATE * (step * (len(notes) - 1) + ring + 0.02))
     mix = [0.0] * length
     for index, frequency in enumerate(notes):
         start = int(RATE * step * index)
-        for i, sample in enumerate(note(frequency, ring)):
+        for i, sample in enumerate(note(frequency, ring, attack_s, octave)):
             mix[start + i] += sample
     top = max(abs(sample) for sample in mix)
-    return [sample / top * PEAK for sample in mix]
+    return [sample / top * peak for sample in mix]
 
 
 def write_wav(path, samples):
