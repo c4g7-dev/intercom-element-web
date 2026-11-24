@@ -53,6 +53,24 @@ Please see LICENSE files in the repository root for full details.
     border-radius: var(--ic-radius-md);
 }
 
+/*
+ * Compound's submenus ("Move to" in a room's menu, …): a menu without a title, whose content is
+ * padded like a full menu's (20 px above, 16 px below), so that one row stood in a box twice its
+ * height. Padded to their rows like a list instead. Compound's class names are hashed: the
+ * submenu is the Radix menu content that Compound gives an empty label.
+ */
+:root:root [data-radix-menu-content][role="menu"][aria-label=""] > [role="none"] {
+    --cpd-menu-padding-block-end: var(--cpd-space-1-5x);
+
+    padding-block: var(--cpd-space-1-5x);
+    min-block-size: 0;
+}
+
+/* Compound places a submenu 20 px up, for its first row to be level with the row that opened it */
+:root:root [data-radix-menu-content][role="menu"][aria-label=""][data-align="start"] {
+    margin-block-start: calc(var(--cpd-space-5x) - var(--cpd-space-1-5x));
+}
+
 /* In-page surfaces which carried a decorative shadow */
 :root:root .mx_PinnedMessageBanner,
 :root:root .mx_ReplyPreview,
