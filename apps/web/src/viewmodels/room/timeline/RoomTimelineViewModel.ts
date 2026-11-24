@@ -44,6 +44,13 @@ import {
     type ShownReadReceipt,
 } from "../../../utils/read-receipts";
 import type { IReadReceiptProps } from "../../../components/views/rooms/EventTile";
+import {
+    analyseGalleries,
+    keepUnchangedGalleries,
+    logGalleryDecisions,
+    type GalleryCandidate,
+} from "../../../intercom/gallery/grouping";
+import { galleryOfItem, type GalleryEventTimelineItem } from "../../../intercom/gallery/timelineItem";
 
 const DEBUG_TIMELINE = false;
 
@@ -226,6 +233,12 @@ export class RoomTimelineViewModel
      * less annoying than the text moving while you read it.
      */
     private continuationCache = new Map<string, boolean>();
+
+    /** InterCom: the pictures shown as one gallery, under the ID of the first of each. */
+    private galleries = new Map<string, MatrixEvent[]>();
+
+    /** The message being edited, which keeps a row of its own rather than be part of a gallery. */
+    private editingEventId: string | null = null;
 
     /** Set by {@link start} so a double-start (e.g. via StrictMode) is a no-op. */
     private started = false;
@@ -488,6 +501,16 @@ export class RoomTimelineViewModel
         this.mergeSnapshot({ readReceiptsByEvent: this.computeReadReceipts() }, reason);
     }
 
+    /**
+     * Say which message is being edited, if any. A picture being edited is taken out of its
+     * gallery, so that its own tile can show the edit box.
+     */
+    public setEditingEventId(eventId: string | null): void {
+        if (eventId === this.editingEventId) return;
+        this.editingEventId = eventId;
+        if (this.started) this.scheduleRebuild();
+    }
+
     /** Show or hide other users' read receipts — the room-level `showReadReceipts` setting. */
     public setShowReadReceipts(show: boolean): void {
         if (show === this.showReadReceipts) return;
@@ -596,8 +619,10 @@ export class RoomTimelineViewModel
 
         // Swap in the rebuilt list. Where decryption has revealed a message we were holding back,
         // it slots into place and the view keeps the reader's position by message id.
+        const galleriesBefore = galleriesOf(this.baseItems);
         const newlyShown = this.commitItems(itemsNew);
-        const changed = newlyShown > 0 || itemsNew.length !== prevLength;
+        // A picture that joins a gallery once decrypted adds no row, but changes its gallery's row
+        const changed = newlyShown > 0 || itemsNew.length !== prevLength || galleriesDiffer(galleriesBefore, itemsNew);
 
         if (!changed) {
             // No rows gained or lost — everything that decrypted turned out to be something we
@@ -1027,7 +1052,8 @@ export class RoomTimelineViewModel
      */
     private sendAutoReadReceipt(): void {
         if (this.isDisposed) return;
-        const eventId = this.lastBottomEventId;
+        // InterCom: the row of a gallery stands for all of its pictures, so seeing it reads the last
+        const eventId = this.lastBottomEventId && this.readUpToInGallery(this.lastBottomEventId);
         if (!eventId || eventId === this.lastSentReceiptEventId) return;
 
         const event = this.timelineWindow.getEvents().find((e) => e.getId() === eventId);
@@ -1051,6 +1077,20 @@ export class RoomTimelineViewModel
             this.lastSentReceiptEventId = null; // allow retry
             logger.warn(`[TimelineVM] sendAutoReadReceipt — sendReadReceipt failed`, err);
         });
+    }
+
+    /**
+     * InterCom: the last picture the server has of the gallery whose row is `eventId`, or
+     * `eventId` itself if that is not the row of a gallery.
+     */
+    private readUpToInGallery(eventId: string): string {
+        const gallery = this.galleries.get(eventId);
+        if (!gallery) return eventId;
+        for (let i = gallery.length - 1; i > 0; i--) {
+            const id = gallery[i].getId();
+            if (id && !this.opts.room.hasPendingEvent(id)) return id;
+        }
+        return eventId;
     }
 
     // ── Overlay button actions ───────────────────────────────────────
@@ -1612,16 +1652,37 @@ export class RoomTimelineViewModel
         // so the user sees an explicit "this is the start" marker.
         const suppressLeadingSeparator = this.timelineWindow.canPaginate(Direction.Backward);
 
-        for (const event of events) {
+        // Messages still being decrypted are left out, so the view never measures a small
+        // placeholder it has to swap for a full message a moment later — the repeated
+        // re-measuring was the original cause of the timeline going blank. They are added at
+        // their real size once decryption finishes (see onEventDecrypted).
+        const candidates: GalleryCandidate[] = events.map((event) => {
+            const shouldShow = this.shouldIncludeEvent(event, showHiddenEvents);
+            return {
+                event,
+                shouldShow,
+                // With "show hidden events" on, what has a row only because of that does not
+                // part two pictures of a gallery
+                hiddenByDefault: showHiddenEvents && shouldShow && !this.computeInclusion(event, false),
+            };
+        });
+        // InterCom: pictures sent together are one gallery on the row of the first of them; the
+        // others get no row of their own
+        const followers = this.findGalleries(candidates, showHiddenEvents);
+
+        for (const { event, shouldShow } of candidates) {
             const eventId = event.getId();
             if (!eventId) continue;
 
-            // Messages still being decrypted are left out, so the view never measures a small
-            // placeholder it has to swap for a full message a moment later — the repeated
-            // re-measuring was the original cause of the timeline going blank. They are added at
-            // their real size once decryption finishes (see onEventDecrypted).
-            if (!this.shouldIncludeEvent(event, showHiddenEvents)) {
+            if (!shouldShow) {
                 filteredCount++;
+                continue;
+            }
+            if (followers.has(event)) {
+                // The read marker on a picture inside a gallery goes after the gallery
+                if (this.frozenMarkerEventId && eventId === this.frozenMarkerEventId) {
+                    items.push({ key: "read-marker", kind: "read-marker" });
+                }
                 continue;
             }
 
@@ -1649,14 +1710,17 @@ export class RoomTimelineViewModel
             // separator so we still emit one when the day changes mid-list.
             lastDate = dateKey;
 
-            items.push({
+            const gallery = this.galleries.get(eventId);
+            const item: GalleryEventTimelineItem = {
                 key: eventId,
                 kind: "event",
                 event,
                 continuation: this.getCachedContinuation(eventId, prevEvent, event),
                 lastInSection: false, // computed in the post-pass below, once the next event is known
                 sendState: sendStateOf(event),
-            });
+                ...(gallery ? { gallery } : {}),
+            };
+            items.push(item);
 
             // Insert the read-marker item directly after the event it belongs to.
             // Uses the per-session frozen marker so the divider position never
@@ -1687,6 +1751,33 @@ export class RoomTimelineViewModel
         );
 
         return items;
+    }
+
+    /**
+     * InterCom: finds the galleries among the events (see `findGalleries` in intercom/gallery),
+     * keeps them in {@link galleries} and writes what was decided to the diagnostics log.
+     *
+     * @returns the pictures that are part of a gallery without being its first
+     */
+    private findGalleries(candidates: readonly GalleryCandidate[], showHiddenEvents: boolean): Set<MatrixEvent> {
+        // The picture a permalink points at, or that is being edited, keeps its own row
+        const exclude = new Set<string>();
+        const highlighted = this.snapshot.current.highlightedEventId;
+        if (highlighted) exclude.add(highlighted);
+        if (this.editingEventId) exclude.add(this.editingEventId);
+
+        const { galleries: found, decisions, decisionKeys } = analyseGalleries(candidates, exclude);
+        logGalleryDecisions(decisions, decisionKeys, {
+            panel: "new",
+            timeline: "Room",
+            hiddenShown: showHiddenEvents,
+            grouping: true,
+        });
+        this.galleries = keepUnchangedGalleries(this.galleries, found);
+
+        const followers = new Set<MatrixEvent>();
+        for (const gallery of this.galleries.values()) gallery.slice(1).forEach((event) => followers.add(event));
+        return followers;
     }
 
     /**
@@ -1798,6 +1889,24 @@ export class RoomTimelineViewModel
         debug(`[VM-merge] reason=${reason} changes=[${changes.join(", ")}]`);
         this.snapshot.merge(partial);
     }
+}
+
+/** The galleries of a list of rows, under the key of the row that shows each. */
+function galleriesOf(items: readonly TimelineItem[]): Map<string, readonly MatrixEvent[]> {
+    const galleries = new Map<string, readonly MatrixEvent[]>();
+    for (const item of items) {
+        const gallery = galleryOfItem(item);
+        if (gallery) galleries.set(item.key, gallery);
+    }
+    return galleries;
+}
+
+/** Whether the rows show other galleries than those given (unchanged ones keep their array). */
+function galleriesDiffer(before: ReadonlyMap<string, readonly MatrixEvent[]>, items: readonly TimelineItem[]): boolean {
+    const after = galleriesOf(items);
+    if (after.size !== before.size) return true;
+    for (const [key, gallery] of after) if (before.get(key) !== gallery) return true;
+    return false;
 }
 
 /**

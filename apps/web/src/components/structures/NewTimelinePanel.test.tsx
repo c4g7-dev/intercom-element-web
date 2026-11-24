@@ -83,6 +83,7 @@ vi.mock("../../viewmodels/room/timeline/RoomTimelineViewModel", () => ({
             vmSpies.constructorOpts.push(opts);
         }
         public setShowReadReceipts = vmSpies.setShowReadReceipts;
+        public setEditingEventId = (): void => {};
         public start = (): void => {};
         public dispose = (): void => {};
         public subscribe = (): (() => void) => (): void => {};

@@ -451,6 +451,23 @@ describe("pictures sent while a call is on, with what a real room has around the
             expect(two[0].items.map((item) => item.outcome)).toEqual(["first", "joined", "caption"]);
         });
 
+        it("keeps one run through many events without a tile, as a call puts between two pictures", () => {
+            const [a, b] = pictures();
+            const many = [0, 1, 2, 3].flatMap((i) => untiled(T0 + 10 + i));
+            expect(many.length).toBeGreaterThan(12);
+            const { decisions } = analyseGalleries([
+                { event: a, shouldShow: true },
+                ...many.map((event) => ({ event, shouldShow: false })),
+                { event: b, shouldShow: true },
+            ]);
+            expect(decisions).toHaveLength(1);
+            expect(decisions[0].galleries).toEqual([2]);
+            // What lay between is named up to a point and counted after it
+            const between = decisions[0].items[1].between;
+            expect(between).toHaveLength(16);
+            expect(between[15]).toBe(`+${many.length - 15} more`);
+        });
+
         it("writes nothing for a picture on its own", () => {
             const { decisions } = analyseGalleries(shown([image("@a:x", T0), text("@a:x", T0 + 10)]));
             expect(decisions).toEqual([]);

@@ -122,8 +122,13 @@ export interface GalleryDecision {
     items: GalleryDecisionItem[];
 }
 
-/** At most this many timeline entries may lie between two pictures of one run in the diagnostics. */
+/**
+ * At most this many tiles may lie between two pictures of one run in the diagnostics. Only what
+ * has a tile counts: a call going on puts many events without one between two pictures.
+ */
 const DECISION_MAX_BETWEEN = 12;
+/** At most this many entries of what lay between two pictures are written; the rest are counted. */
+const DECISION_MAX_BETWEEN_LISTED = 16;
 
 function describeBetween({ event, shouldShow, hiddenByDefault }: GalleryCandidate): string {
     const type = event.getType();
@@ -131,6 +136,12 @@ function describeBetween({ event, shouldShow, hiddenByDefault }: GalleryCandidat
     const how = !shouldShow ? "no_tile" : hiddenByDefault ? "hidden_by_default" : "tile";
     const state = event.isState() ? ",state" : "";
     return `${type}${typeof msgtype === "string" ? "/" + msgtype : ""}:${how}${state}`;
+}
+
+/** What lay between two pictures, the first of it by name and the rest counted. */
+function listBetween(between: string[], count: number): string[] {
+    if (count <= DECISION_MAX_BETWEEN_LISTED) return between;
+    return [...between.slice(0, DECISION_MAX_BETWEEN_LISTED - 1), `+${count - DECISION_MAX_BETWEEN_LISTED + 1} more`];
 }
 
 /**
@@ -152,6 +163,10 @@ export function analyseGalleries(
         | { decision: GalleryDecision; key: string; last: MatrixEvent; senders: string[]; batches: string[] }
         | undefined;
     let between: string[] = [];
+    // How many entries lay between, and how many of them have a tile of their own (with hidden
+    // events not shown)
+    let betweenCount = 0;
+    let tilesBetween = 0;
     // Why the gallery before the next picture was ended by something that is not a picture
     let ended: string | undefined;
 
@@ -174,7 +189,7 @@ export function analyseGalleries(
         const { event } = candidate;
         const closeToLast =
             near &&
-            between.length <= DECISION_MAX_BETWEEN &&
+            tilesBetween <= DECISION_MAX_BETWEEN &&
             (sameBatch(near.last, event) || Math.abs(event.getTs() - near.last.getTs()) <= GALLERY_MAX_GAP_MS);
         if (!closeToLast) {
             closeNear();
@@ -215,16 +230,23 @@ export function analyseGalleries(
             localEcho: event.status ?? undefined,
             shown: Boolean(candidate.shouldShow),
             keys: Object.keys(content).sort(),
-            between: state.decision.items.length === 0 ? [] : between,
+            between: state.decision.items.length === 0 ? [] : listBetween(between, betweenCount),
         });
         state.last = event;
         between = [];
+        betweenCount = 0;
+        tilesBetween = 0;
     };
 
     for (const candidate of candidates) {
         const { event, shouldShow, hiddenByDefault } = candidate;
         const picture = isPicture(event);
-        if (!picture) between.push(describeBetween(candidate));
+        // What lies between two pictures matters only once there is a picture before it
+        if (!picture && near) {
+            betweenCount++;
+            if (between.length < DECISION_MAX_BETWEEN_LISTED) between.push(describeBetween(candidate));
+            if (shouldShow && !hiddenByDefault) tilesBetween++;
+        }
 
         // What has no tile does not come between two pictures, and neither does what has one only
         // because hidden events are shown
@@ -272,6 +294,23 @@ export function findGalleries(
     exclude?: ReadonlySet<string>,
 ): Map<string, MatrixEvent[]> {
     return analyseGalleries(candidates, exclude).galleries;
+}
+
+/**
+ * The galleries found anew, with each one that has not changed replaced by its array from before,
+ * so that its tile is not rendered anew with every render of the timeline.
+ */
+export function keepUnchangedGalleries<T extends readonly MatrixEvent[]>(
+    previous: ReadonlyMap<string, T>,
+    found: Map<string, T>,
+): Map<string, T> {
+    for (const [id, gallery] of found) {
+        const before = previous.get(id);
+        if (before && before.length === gallery.length && before.every((ev, i) => ev === gallery[i])) {
+            found.set(id, before);
+        }
+    }
+    return found;
 }
 
 const DIAG_PREFIX = "[intercom-diag] ";

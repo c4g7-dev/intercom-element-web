@@ -28,6 +28,8 @@ import type { RoomPermalinkCreator } from "../../utils/permalinks/Permalinks";
 import type EditorStateTransfer from "../../utils/EditorStateTransfer";
 import { DateSeparatorWrapper } from "./DateSeparatorWrapper";
 import type { IReadReceiptPosition } from "../views/rooms/ReadReceiptMarker";
+import { GalleryGroupContext } from "../../intercom/gallery/GalleryContext";
+import { galleryOfItem } from "../../intercom/gallery/timelineItem";
 
 interface NewTimelinePanelProps {
     room: Room;
@@ -106,11 +108,13 @@ function renderTimelineItem(item: TimelineItem, ctx: RenderItemContext): ReactNo
             return null;
         case "event": {
             const mxEvent = item.event as MatrixEvent;
+            // InterCom: the row of the first picture of a gallery shows all of its pictures
+            const gallery = galleryOfItem(item);
 
             // For now, all events go through the legacy adapter.
             // As tiles are migrated to MVVM, this switch will
             // send migrated types to their shared views instead.
-            return (
+            const tile = (
                 <LegacyEventTileAdapter
                     key={item.key}
                     mxEvent={mxEvent}
@@ -133,6 +137,13 @@ function renderTimelineItem(item: TimelineItem, ctx: RenderItemContext): ReactNo
                     isTwelveHour={ctx.isTwelveHour}
                     alwaysShowTimestamps={ctx.alwaysShowTimestamps}
                 />
+            );
+            return gallery ? (
+                <GalleryGroupContext.Provider key={item.key} value={gallery}>
+                    {tile}
+                </GalleryGroupContext.Provider>
+            ) : (
+                tile
             );
         }
         default:
@@ -188,6 +199,12 @@ export function NewTimelinePanel({
     useEffect(() => {
         vm.setShowReadReceipts(showReadReceipts);
     }, [vm, showReadReceipts]);
+
+    // A picture being edited leaves its gallery, so that its tile can show the edit box.
+    const editingEventId = editState?.getEvent().getId() ?? null;
+    useEffect(() => {
+        vm.setEditingEventId(editingEventId);
+    }, [vm, editingEventId]);
 
     useEffect(() => {
         // Load the syntax highlighter up front. Code blocks fetch it the first time

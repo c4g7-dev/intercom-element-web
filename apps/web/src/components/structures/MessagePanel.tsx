@@ -45,7 +45,7 @@ import { MainGrouper } from "./grouper/MainGrouper";
 import { CreationGrouper } from "./grouper/CreationGrouper";
 import { _t } from "../../languageHandler";
 import { getLateEventInfo } from "./grouper/LateEventGrouper";
-import { analyseGalleries, logGalleryDecisions } from "../../intercom/gallery/grouping";
+import { analyseGalleries, keepUnchangedGalleries, logGalleryDecisions } from "../../intercom/gallery/grouping";
 import { GalleryGroupContext } from "../../intercom/gallery/GalleryContext";
 import { findLastSuccessfulWeSent } from "../../viewmodels/room/timeline/event-tile/EventTileReceiptState";
 import { getReadReceiptsByShownEvent, getReadReceiptsForEvent, type ShownReadReceipt } from "../../utils/read-receipts";
@@ -758,19 +758,15 @@ export default class MessagePanel extends React.Component<IProps, IState> {
         const { galleries: found, decisions, decisionKeys } = analyseGalleries(candidates, exclude);
         // For the diagnostics log: what was decided about every run of pictures, and why
         logGalleryDecisions(decisions, decisionKeys, {
+            panel: "legacy",
             layout: this.props.layout,
             timeline: type,
             hiddenShown: this.showHiddenEvents,
             grouping: enabled,
+            groupingOff: enabled ? undefined : this.props.disableGrouping ? "grouping_disabled" : `timeline_${type}`,
         });
         if (!enabled) return new Map();
-        for (const [id, gallery] of found) {
-            const before = this.galleries.get(id);
-            if (before && before.length === gallery.length && before.every((ev, i) => ev === gallery[i])) {
-                found.set(id, before);
-            }
-        }
-        return found;
+        return keepUnchangedGalleries(this.galleries, found);
     }
 
     public getTilesForEvent(
