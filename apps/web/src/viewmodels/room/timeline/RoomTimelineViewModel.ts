@@ -15,6 +15,7 @@ import {
     NotificationCountType,
     ReceiptType,
     RoomStateEvent,
+    type EventTimelineSet,
     type IRoomTimelineData,
     type MatrixClient,
     type MatrixEvent,
@@ -198,6 +199,9 @@ export interface RoomTimelineViewModelOpts {
  *  - **Messages being sent.** Drawn from the room's pending list until the server echoes them,
  *    with the row's `sendState` saying how far each has got. See `pendingEventsToShow` and
  *    `onLocalEchoUpdated`.
+ *  - **A gap in the sync.** A sync with a gap (after being offline, or when too much arrived at
+ *    once) replaces the room's live timeline; the window is moved to the new one. See
+ *    `onTimelineReset`.
  *
  * A note on timing: the constructor deliberately does nothing but set fields. React's StrictMode
  * builds two instances in development and discards one, so anything that subscribes or fetches
@@ -248,6 +252,28 @@ export class RoomTimelineViewModel
 
     /** Set while a {@link load} is running; see {@link scheduleRebuild}. */
     private loading = false;
+
+    /** Set when the live timeline was replaced while a {@link load} ran: load the live end again after it. */
+    private reloadLiveAfterLoad = false;
+
+    /**
+     * InterCom: the view model showing each room's timeline, so the client can ask before it drops
+     * a room's timelines on a sync with a gap (see {@link canResetTimeline}).
+     */
+    private static readonly byRoom = new Map<string, RoomTimelineViewModel>();
+
+    /**
+     * Whether the client may forget all of a room's timelines on a sync with a gap, rather than
+     * keep the one being read and let it be paginated forwards (`canResetEntireTimeline` of the
+     * client, asked through `RoomView.canResetTimeline`). It may unless the room is shown with
+     * its reader scrolled up into history, as with the old timeline. Either way
+     * {@link onTimelineReset} keeps the window on a timeline that receives what comes next.
+     */
+    public static canResetTimeline(roomId: string): boolean {
+        const vm = RoomTimelineViewModel.byRoom.get(roomId);
+        if (!vm || vm.isDisposed || !vm.started || vm.loading) return true;
+        return vm.isAtBottom;
+    }
 
     /**
      * In-flight backward pagination chain, or null when idle.
@@ -430,6 +456,7 @@ export class RoomTimelineViewModel
         // React re-rendering with the new one. That's harmless — we just bail.
         if (this.started || this.isDisposed) return;
         this.started = true;
+        RoomTimelineViewModel.byRoom.set(this.opts.room.roomId, this);
 
         // Determine how to load the timeline.
         let loadTarget: LoadTarget;
@@ -464,6 +491,14 @@ export class RoomTimelineViewModel
             this.opts.client,
             MatrixEventEvent.Decrypted,
             this.onEventDecrypted as (...args: unknown[]) => void,
+        );
+        // The live timeline replaced by a sync with a gap: without moving the window to the new
+        // one, nothing that arrives afterwards gets a row, and a message being sent loses its row
+        // the moment its echo arrives.
+        this.disposables.trackListener(
+            this.opts.room,
+            RoomEvent.TimelineReset,
+            this.onTimelineReset as (...args: unknown[]) => void,
         );
         // Messages of ours changing send state or getting their server id.
         this.disposables.trackListener(
@@ -560,6 +595,41 @@ export class RoomTimelineViewModel
             .catch((err) => {
                 logger.warn(`[TimelineVM][onRoomTimeline] forward paginate failed`, err);
             });
+    };
+
+    /**
+     * The room's live timeline has been replaced, because a sync came with a gap: after some time
+     * offline, or when more arrived at once than a sync carries. What arrives from now on, the
+     * echo of a message being sent included, goes to the new live timeline, which the window is
+     * not on: {@link onRoomTimeline} cannot extend the window to it, and a message being sent
+     * that leaves the pending list on its echo would be in neither and lose its row.
+     *
+     * So the live end is loaded again, unless the reader is up in history and the old timeline
+     * was kept (see {@link canResetTimeline}): then the window stays where it is, and can be
+     * paginated forwards to the new messages, as in the old timeline.
+     */
+    private onTimelineReset = (
+        _room: Room | undefined,
+        timelineSet: EventTimelineSet,
+        resetAllTimelines?: boolean,
+    ): void => {
+        if (this.isDisposed || timelineSet !== this.opts.room.getUnfilteredTimelineSet()) return;
+        logger.info(
+            `[TimelineVM] live timeline reset (all=${resetAllTimelines}, atBottom=${this.isAtBottom}, ` +
+                `loading=${this.loading})`,
+        );
+        if (this.loading) {
+            // The load in progress may already have taken the old timeline
+            this.reloadLiveAfterLoad = true;
+            return;
+        }
+        if (!resetAllTimelines && !this.isAtBottom && this.timelineWindow.canPaginate(Direction.Forward)) {
+            // Reading history: stay, with what is newer to be paginated to (and the jump to it)
+            this.commitItems(this.buildItems());
+            this.republish("timeline-reset(reading-history)", { atLiveEnd: false });
+            return;
+        }
+        void this.load({ kind: "live" });
     };
 
     /**
@@ -870,6 +940,10 @@ export class RoomTimelineViewModel
             this.republish(`load(${target.kind})-error`);
         } finally {
             this.loading = false;
+            if (this.reloadLiveAfterLoad && !this.isDisposed) {
+                this.reloadLiveAfterLoad = false;
+                void this.load({ kind: "live" });
+            }
         }
     }
 
@@ -1213,6 +1287,9 @@ export class RoomTimelineViewModel
      *   {@link sendAutoReadReceipt} for the rationale.
      */
     public override dispose(): void {
+        if (RoomTimelineViewModel.byRoom.get(this.opts.room.roomId) === this) {
+            RoomTimelineViewModel.byRoom.delete(this.opts.room.roomId);
+        }
         if (this.readReceiptDebounceTimer !== null) {
             clearTimeout(this.readReceiptDebounceTimer);
             this.readReceiptDebounceTimer = null;

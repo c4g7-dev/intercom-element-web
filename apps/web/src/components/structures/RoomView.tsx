@@ -77,6 +77,7 @@ import { useMatrixClientContext } from "../../contexts/MatrixClientContext";
 import ScrollPanel from "./ScrollPanel";
 import TimelinePanel from "./TimelinePanel";
 import { NewTimelinePanel } from "./NewTimelinePanel";
+import { RoomTimelineViewModel } from "../../viewmodels/room/timeline/RoomTimelineViewModel";
 import ErrorBoundary from "../views/elements/ErrorBoundary";
 import RoomPreviewBar from "../views/rooms/RoomPreviewBar";
 import RoomPreviewCard from "../views/rooms/RoomPreviewCard";
@@ -1487,7 +1488,8 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
 
     public canResetTimeline = (): boolean => {
         if (!this.messagePanel) {
-            return true;
+            // InterCom: the new timeline (labs) has no TimelinePanel; its view model answers
+            return this.state.room ? RoomTimelineViewModel.canResetTimeline(this.state.room.roomId) : true;
         }
         return this.messagePanel.canResetTimeline();
     };
