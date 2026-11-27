@@ -14,8 +14,8 @@ import { useMockedViewModel } from "../../core/viewmodel";
 
 type Props = UpdateStatusViewSnapshot & UpdateStatusViewActions;
 
-const Wrapper = ({ onToggleDetails, onRestart, onRetry, onOpenReleasePage, ...rest }: Props): JSX.Element => {
-    const vm = useMockedViewModel(rest, { onToggleDetails, onRestart, onRetry, onOpenReleasePage });
+const Wrapper = ({ onToggleDetails, onLater, onRestart, onRetry, onOpenReleasePage, ...rest }: Props): JSX.Element => {
+    const vm = useMockedViewModel(rest, { onToggleDetails, onLater, onRestart, onRetry, onOpenReleasePage });
     return (
         <div style={{ width: 320 }}>
             <UpdateStatusView vm={vm} />
@@ -23,7 +23,7 @@ const Wrapper = ({ onToggleDetails, onRestart, onRetry, onOpenReleasePage, ...re
     );
 };
 
-const VERSION = "1.12.35-intercom.7";
+const VERSION = "1.12.35-intercom.15";
 const steps = [
     { time: "14:02:11", text: "Checking for updates…" },
     { time: "14:02:12", text: `Found ${VERSION}` },
@@ -41,6 +41,7 @@ const meta = {
         log: steps,
         expanded: false,
         onToggleDetails: fn(),
+        onLater: fn(),
         onRestart: fn(),
         onRetry: fn(),
         onOpenReleasePage: fn(),
@@ -68,6 +69,7 @@ export const Ready: Story = {
     args: {
         phase: "ready",
         download: undefined,
+        summary: "Attachments wait above the composer: paste, drop or add, keep typing, and Enter sends them all.",
         log: [...steps, { time: "14:02:31", text: `${VERSION} is ready: restart to update` }],
     },
 };

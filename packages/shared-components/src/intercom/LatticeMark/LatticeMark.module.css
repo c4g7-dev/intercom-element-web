@@ -51,6 +51,11 @@
     animation: lattice-dot 1.6s ease-in-out infinite;
 }
 
+.stillDot {
+    fill: var(--lattice-accent);
+    opacity: 0.4;
+}
+
 /* connecting: one light goes round the ring */
 .ring {
     fill: var(--lattice-accent);

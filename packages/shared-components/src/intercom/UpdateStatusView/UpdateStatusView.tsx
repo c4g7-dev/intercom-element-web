@@ -9,6 +9,7 @@ import React, { type JSX, useId } from "react";
 import classNames from "classnames";
 
 import styles from "./UpdateStatusView.module.css";
+import { LatticeMark } from "../LatticeMark";
 import { type ViewModel, useViewModel } from "../../core/viewmodel";
 import { useI18n } from "../../core/i18n/i18nContext";
 import { type UpdaterPhase } from "../UpdaterSettingsView";
@@ -40,11 +41,15 @@ export interface UpdateStatusViewSnapshot {
     log: UpdateStatusLogLine[];
     /** Whether the steps are shown */
     expanded: boolean;
+    /** One line of what is new in the release that is offered, as plain text; cut off where it does not fit */
+    summary?: string;
 }
 
 export interface UpdateStatusViewActions {
     /** Shows or hides the steps */
     onToggleDetails: () => void;
+    /** Puts the card of an update that is offered away, until another release or the next start */
+    onLater: () => void;
     /** Installs the update that is ready and starts the app again */
     onRestart: () => void;
     /** Looks for the update again after a failure */
@@ -76,15 +81,16 @@ export function formatUpdateBytes(bytes: number): string {
 }
 
 /**
- * A slim bar that says where an update of the app stands while there is something to say: a
- * thin progress line and one line of text that changes in place ("Checking…", "Downloading … 42 %",
- * "Verifying checksum…", "Unpacking…", "… is ready" with a restart button). A click on the text
- * shows the last steps with their times. A failure stays, with "Retry" and "Details". Nothing is
- * rendered while the updater is idle.
+ * A card over the user panel that says where an update of the app stands while there is something
+ * to say, drawn as the panel under it is: the app's mark, one line that changes in place
+ * ("Checking…", "Downloading … 42 %", "Verifying checksum…", "Unpacking…") with a bar under it
+ * that fills with the download, and at the end "Lattice … is ready" with a line of what is new,
+ * "Later" and "Update". A click on the line shows the last steps with their times. A failure
+ * stays, with "Retry" and "Details". Nothing is rendered while the updater is idle.
  */
 export function UpdateStatusView({ vm }: Readonly<UpdateStatusViewProps>): JSX.Element | null {
     const { translate: _t } = useI18n();
-    const { phase, latestVersion, download, log, expanded } = useViewModel(vm);
+    const { phase, latestVersion, download, log, expanded, summary } = useViewModel(vm);
     const detailsId = useId();
     if (phase === "idle") return null;
 
@@ -131,76 +137,120 @@ export function UpdateStatusView({ vm }: Readonly<UpdateStatusViewProps>): JSX.E
     const fraction = known ? Math.min(1, download.done / download.total) : undefined;
     const settled = phase === "ready" || phase === "manual" || phase === "error";
 
+    const offered = phase === "ready" || phase === "manual";
+
     return (
-        <section
-            className={classNames(styles.bar, "mx_IntercomUpdateStatus")}
-            aria-label={_t("intercom|update_status|label")}
-            data-testid="intercom-update-status"
-            data-phase={phase}
-        >
-            <div
-                className={classNames(styles.track, {
-                    [styles.indeterminate]: fraction === undefined && !settled,
-                    [styles.done]: phase === "ready",
-                    [styles.failed]: phase === "error",
-                    [styles.quiet]: phase === "manual",
-                })}
-                role="progressbar"
-                aria-label={_t("intercom|update_status|progress")}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={fraction === undefined ? undefined : Math.round(fraction * 100)}
+        <div className={styles.wrap}>
+            <section
+                className={classNames(styles.card, "mx_IntercomUpdateStatus")}
+                aria-label={_t("intercom|update_status|label")}
+                data-testid="intercom-update-status"
+                data-phase={phase}
             >
-                <div
-                    className={styles.fill}
-                    style={fraction === undefined ? undefined : { width: `${(fraction * 100).toFixed(1)}%` }}
-                />
-            </div>
-            <div className={styles.row}>
-                <button
-                    type="button"
-                    className={classNames(styles.line, { [styles.error]: phase === "error" })}
-                    aria-expanded={expanded}
-                    aria-controls={detailsId}
-                    title={expanded ? _t("intercom|update_status|hide_details") : _t("intercom|update_status|details")}
-                    onClick={vm.onToggleDetails}
-                >
-                    <span role="status">{text}</span>
-                </button>
-                {phase === "ready" && (
-                    <button type="button" className={classNames(styles.action, styles.primary)} onClick={vm.onRestart}>
-                        {_t("intercom|update_status|restart")}
-                    </button>
-                )}
-                {phase === "manual" && (
-                    <button type="button" className={styles.action} onClick={vm.onOpenReleasePage}>
-                        {_t("intercom|update_status|release_page")}
-                    </button>
-                )}
-                {phase === "error" && (
-                    <>
-                        <button type="button" className={styles.action} onClick={vm.onRetry}>
-                            {_t("intercom|update_status|retry")}
+                <div className={styles.head}>
+                    <LatticeMark variant={settled ? "still" : "loading"} size="32px" className={styles.mark} />
+                    <div className={styles.text}>
+                        <button
+                            type="button"
+                            className={classNames(styles.line, {
+                                [styles.title]: offered,
+                                [styles.error]: phase === "error",
+                            })}
+                            aria-expanded={expanded}
+                            aria-controls={detailsId}
+                            title={
+                                expanded
+                                    ? _t("intercom|update_status|hide_details")
+                                    : _t("intercom|update_status|details")
+                            }
+                            onClick={vm.onToggleDetails}
+                        >
+                            <span role="status">{text}</span>
                         </button>
-                        <button type="button" className={styles.action} onClick={vm.onToggleDetails}>
-                            {expanded
-                                ? _t("intercom|update_status|hide_details")
-                                : _t("intercom|update_status|details")}
-                        </button>
-                    </>
+                        {offered && summary && (
+                            <span className={styles.summary} title={summary} data-testid="intercom-update-summary">
+                                {summary}
+                            </span>
+                        )}
+                        <div
+                            className={classNames(styles.track, {
+                                [styles.indeterminate]: fraction === undefined && !settled,
+                                [styles.settled]: settled,
+                            })}
+                            role="progressbar"
+                            aria-label={_t("intercom|update_status|progress")}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={fraction === undefined ? undefined : Math.round(fraction * 100)}
+                        >
+                            <div
+                                className={styles.fill}
+                                style={
+                                    fraction === undefined ? undefined : { width: `${(fraction * 100).toFixed(1)}%` }
+                                }
+                            />
+                        </div>
+                    </div>
+                </div>
+                {(offered || phase === "error") && (
+                    <div className={styles.actions}>
+                        {offered && (
+                            <button
+                                type="button"
+                                className={classNames(styles.action, styles.quiet)}
+                                onClick={vm.onLater}
+                            >
+                                {_t("intercom|update_status|later")}
+                            </button>
+                        )}
+                        {phase === "ready" && (
+                            <button
+                                type="button"
+                                className={classNames(styles.action, styles.primary)}
+                                onClick={vm.onRestart}
+                            >
+                                {_t("intercom|update_status|restart")}
+                            </button>
+                        )}
+                        {phase === "manual" && (
+                            <button
+                                type="button"
+                                className={classNames(styles.action, styles.primary)}
+                                onClick={vm.onOpenReleasePage}
+                            >
+                                {_t("intercom|update_status|release_page")}
+                            </button>
+                        )}
+                        {phase === "error" && (
+                            <>
+                                <button
+                                    type="button"
+                                    className={classNames(styles.action, styles.quiet)}
+                                    onClick={vm.onToggleDetails}
+                                >
+                                    {expanded
+                                        ? _t("intercom|update_status|hide_details")
+                                        : _t("intercom|update_status|details")}
+                                </button>
+                                <button type="button" className={styles.action} onClick={vm.onRetry}>
+                                    {_t("intercom|update_status|retry")}
+                                </button>
+                            </>
+                        )}
+                    </div>
                 )}
-            </div>
-            {expanded && (
-                <ol id={detailsId} className={styles.log} aria-label={_t("intercom|update_status|log_label")}>
-                    {log.length === 0 && <li className={styles.empty}>{_t("intercom|update_status|log_empty")}</li>}
-                    {log.map((line, i) => (
-                        // Lines are only ever added at the end and dropped at the start
-                        <li key={`${log.length - i}:${line.time}`}>
-                            <time>{line.time}</time> {line.text}
-                        </li>
-                    ))}
-                </ol>
-            )}
-        </section>
+                {expanded && (
+                    <ol id={detailsId} className={styles.log} aria-label={_t("intercom|update_status|log_label")}>
+                        {log.length === 0 && <li className={styles.empty}>{_t("intercom|update_status|log_empty")}</li>}
+                        {log.map((line, i) => (
+                            // Lines are only ever added at the end and dropped at the start
+                            <li key={`${log.length - i}:${line.time}`}>
+                                <time>{line.time}</time> {line.text}
+                            </li>
+                        ))}
+                    </ol>
+                )}
+            </section>
+        </div>
     );
 }

@@ -5,48 +5,120 @@
  * Please see LICENSE files in the repository root for full details.
  */
 
-.bar {
+/*
+ * A card on the surface of the user panel under it: a hairline, one radius, no shadow and no
+ * colour of its own. The only accent is the bar that fills with a download.
+ */
+.wrap {
+    container-type: inline-size;
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+.card {
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
     min-width: 0;
-    border-top: 1px solid var(--cpd-color-border-disabled);
-    background-color: var(--cpd-color-bg-canvas-default);
-    font: var(--cpd-font-body-xs-regular);
+    margin: var(--cpd-space-2x);
+    border: 1px solid var(--ic-separator-color, var(--cpd-color-border-disabled));
+    border-radius: 12px;
+    background-color: var(--roomlist-background-color, var(--cpd-color-bg-canvas-default));
+    font: var(--cpd-font-body-sm-regular);
     color: var(--cpd-color-text-secondary);
+    overflow: hidden;
 }
 
-/* The thin line at the top of the bar */
+.head {
+    display: flex;
+    align-items: center;
+    gap: var(--cpd-space-3x);
+    min-width: 0;
+    padding: var(--cpd-space-3x);
+}
+
+.mark {
+    flex: none;
+}
+
+.text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--cpd-space-0-5x);
+    min-width: 0;
+}
+
+.line {
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-align: start;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.line:hover {
+    color: var(--cpd-color-text-primary);
+}
+
+/* An update that is offered: its line is the card's title */
+.line.title {
+    font: var(--cpd-font-body-sm-semibold);
+    color: var(--cpd-color-text-primary);
+}
+
+.line.error {
+    color: var(--cpd-color-text-critical-primary);
+}
+
+.line:focus-visible,
+.action:focus-visible {
+    outline: 2px solid var(--cpd-color-border-focused);
+    outline-offset: 1px;
+    border-radius: 6px;
+}
+
+/* One line of what is new, cut off where the card ends */
+.summary {
+    min-width: 0;
+    font: var(--cpd-font-body-xs-regular);
+    color: var(--cpd-color-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The bar under the line, while something is on its way */
 .track {
     position: relative;
-    height: 2px;
+    height: 4px;
+    margin-top: var(--cpd-space-1x);
+    border-radius: 999px;
     overflow: hidden;
     background-color: var(--cpd-color-bg-subtle-primary);
+}
+
+/* Nothing is on its way any more: the bar is gone, and still says so to a screen reader */
+.track.settled {
+    display: none;
 }
 
 .fill {
     height: 100%;
     width: 0;
+    border-radius: 999px;
     background-color: var(--cpd-color-bg-accent-rest);
     transition: width 200ms linear;
 }
 
-.done .fill {
-    width: 100%;
-    background-color: var(--cpd-color-icon-success-primary);
-}
-
-.failed .fill {
-    width: 100%;
-    background-color: var(--cpd-color-icon-critical-primary);
-}
-
-.quiet .fill {
-    width: 100%;
-    background-color: var(--cpd-color-icon-info-primary);
-}
-
-/* Nothing to measure: a piece of the line travels along it */
+/* Nothing to measure: a piece of the bar travels along it */
 .indeterminate .fill {
     position: absolute;
     width: 35%;
@@ -64,68 +136,100 @@
     }
 }
 
-.row {
+.actions {
     display: flex;
+    justify-content: flex-end;
     align-items: center;
-    gap: var(--cpd-space-1x);
+    gap: var(--cpd-space-2x);
     min-width: 0;
-    padding: var(--cpd-space-1x) var(--cpd-space-2x) var(--cpd-space-1x) var(--cpd-space-3x);
+    padding: 0 var(--cpd-space-3x) var(--cpd-space-3x);
 }
 
-.line {
-    flex: 1;
+/* The buttons of the user panel: 8 px corners, neutral */
+.action {
+    flex: 0 1 auto;
     min-width: 0;
-    padding: var(--cpd-space-0-5x) 0;
-    border: none;
-    background: none;
-    color: inherit;
-    font: inherit;
-    font-variant-numeric: tabular-nums;
-    text-align: start;
+    min-height: 28px;
+    padding: 0 var(--cpd-space-3x);
+    border: 1px solid var(--ic-separator-color, var(--cpd-color-border-interactive-secondary));
+    border-radius: 8px;
+    background-color: var(--cpd-color-bg-action-tertiary-hovered, transparent);
+    color: var(--cpd-color-text-primary);
+    font: var(--cpd-font-body-sm-medium);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     cursor: pointer;
 }
 
-.line:hover {
-    color: var(--cpd-color-text-primary);
-}
-
-.line:focus-visible,
-.action:focus-visible {
-    outline: 2px solid var(--cpd-color-border-focused);
-    outline-offset: 1px;
-    border-radius: 4px;
-}
-
-.line.error {
-    color: var(--cpd-color-text-critical-primary);
-}
-
-.action {
-    flex-shrink: 0;
-    padding: var(--cpd-space-0-5x) var(--cpd-space-2x);
-    border: 1px solid var(--cpd-color-border-interactive-secondary);
-    border-radius: 999px;
-    background: none;
-    color: var(--cpd-color-text-primary);
-    font: var(--cpd-font-body-xs-semibold);
-    cursor: pointer;
-}
-
 .action:hover {
-    background-color: var(--cpd-color-bg-subtle-primary);
+    background-color: var(--cpd-color-bg-action-tertiary-selected, var(--cpd-color-bg-subtle-primary));
 }
 
+/* "Later", "Details": words to click, no box */
+.action.quiet {
+    border-color: transparent;
+    background: none;
+    color: var(--cpd-color-text-secondary);
+}
+
+.action.quiet:hover {
+    color: var(--cpd-color-text-primary);
+    background-color: var(--cpd-color-bg-action-tertiary-hovered, var(--cpd-color-bg-subtle-primary));
+}
+
+/* "Update": filled with the colour of the text, as the app's primary buttons are. Not the accent. */
 .action.primary {
     border-color: transparent;
-    background-color: var(--cpd-color-bg-accent-rest);
+    background-color: var(--cpd-color-bg-action-primary-rest);
     color: var(--cpd-color-text-on-solid-primary);
+    font: var(--cpd-font-body-sm-semibold);
 }
 
 .action.primary:hover {
-    background-color: var(--cpd-color-bg-accent-hovered);
+    background-color: var(--cpd-color-bg-action-primary-hovered);
+}
+
+/* A narrow room list: the mark and the buttons, the words under them where there is room for none beside */
+@container (max-width: 200px) {
+    .head {
+        gap: var(--cpd-space-2x);
+        padding: var(--cpd-space-2x);
+    }
+
+    .summary {
+        display: none;
+    }
+
+    .actions {
+        padding: 0 var(--cpd-space-2x) var(--cpd-space-2x);
+        justify-content: stretch;
+    }
+
+    .action {
+        flex: 1 1 0;
+        padding: 0 var(--cpd-space-1x);
+    }
+}
+
+/* The rail alone is left: the mark, and the one button that matters */
+@container (max-width: 96px) {
+    .head {
+        justify-content: center;
+    }
+
+    .text,
+    .action.quiet {
+        display: none;
+    }
+    .actions {
+        padding: 0 var(--cpd-space-1x) var(--cpd-space-1x);
+    }
+
+    .action {
+        padding: 0;
+        font: var(--cpd-font-body-xs-semibold);
+    }
 }
 
 /* The last steps: text to read and to copy */

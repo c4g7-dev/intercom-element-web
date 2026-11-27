@@ -7,7 +7,7 @@ Please see LICENSE files in the repository root for full details.
 
 import { describe, expect, it, vi } from "vitest";
 
-import { UpdateStatusViewModel } from "./UpdateStatusViewModel";
+import { notesSummary, UpdateStatusViewModel } from "./UpdateStatusViewModel";
 import { type UpdaterApi, type UpdaterState } from "../../intercom/updater/Updater";
 
 const VERSION = "1.12.35-intercom.7";
@@ -159,5 +159,60 @@ describe("UpdateStatusViewModel", () => {
         expect(unsubscribe).toHaveBeenCalledTimes(1);
         push({ ...idle, phase: "ready", latestVersion: VERSION });
         expect(vm.getSnapshot().phase).toBe("idle");
+    });
+
+    it("puts an offered update away with Later, until another release is offered", async () => {
+        const { vm, push } = setUp();
+        await settled();
+        const ready = { ...idle, phase: "ready" as const, latestVersion: VERSION };
+        push(ready);
+        expect(vm.getSnapshot().phase).toBe("ready");
+
+        vm.onLater();
+        expect(vm.getSnapshot().phase).toBe("idle");
+        // The updater saying the same again does not bring the card back
+        push(ready);
+        expect(vm.getSnapshot().phase).toBe("idle");
+        // Nothing was taken from the update: its steps are shown again, and the next release is offered
+        push({ ...ready, phase: "installing" });
+        expect(vm.getSnapshot().phase).toBe("installing");
+        push({ ...ready, latestVersion: "1.12.35-intercom.99" });
+        expect(vm.getSnapshot()).toMatchObject({ phase: "ready", latestVersion: "1.12.35-intercom.99" });
+    });
+
+    it("says in one line what is new in the release that is offered", async () => {
+        const { api, vm, push } = setUp();
+        const getNotes = vi.fn().mockResolvedValue({
+            pending: [
+                {
+                    version: VERSION,
+                    url: "",
+                    body: "| a | b |\n\n- **Attachments wait** above the [composer](https://example.org).\n- More",
+                },
+                { version: "1.12.35-intercom.6", url: "", body: "- Older" },
+            ],
+            whatsNew: [],
+        });
+        (api as UpdaterApi).getNotes = getNotes;
+        await settled();
+        push({ ...idle, phase: "downloading", latestVersion: VERSION });
+        expect(getNotes).not.toHaveBeenCalled();
+        push({ ...idle, phase: "ready", latestVersion: VERSION });
+        await settled();
+        expect(vm.getSnapshot().summary).toBe("Attachments wait above the composer.");
+        push({ ...idle, phase: "ready", latestVersion: VERSION });
+        expect(getNotes).toHaveBeenCalledTimes(1);
+        // Only an offer has the line
+        push({ ...idle, phase: "installing", latestVersion: VERSION });
+        expect(vm.getSnapshot().summary).toBeUndefined();
+    });
+
+    it("reads the first words of release notes", () => {
+        expect(notesSummary("\n\n## Heading here\n- x")).toBe("Heading here");
+        expect(notesSummary("![pic](https://example.org/a.png)\n<sub>x</sub>\n1. `code` and *more*")).toBe(
+            "code and more",
+        );
+        expect(notesSummary("")).toBeUndefined();
+        expect(notesSummary(undefined)).toBeUndefined();
     });
 });

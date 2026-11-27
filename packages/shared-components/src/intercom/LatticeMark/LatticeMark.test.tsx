@@ -40,6 +40,14 @@ describe("LatticeMark", () => {
         expect(screen.getByTestId("lattice-mark")).toHaveAttribute("width", "1em");
     });
 
+    it("stands still as the app's icon", () => {
+        const { container } = render(<LatticeMark variant="still" size="28px" />);
+        expect(container.querySelectorAll("rect")).toHaveLength(4);
+        expect(container.querySelectorAll("circle")).toHaveLength(6);
+        expect(container.querySelector("[style]")).toBeNull();
+        expect(screen.getByTestId("lattice-mark")).toHaveAttribute("data-variant", "still");
+    });
+
     it("is hidden from screen readers unless it is given a name", () => {
         const { rerender } = render(<LatticeMark variant="loading" />);
         expect(screen.getByTestId("lattice-mark")).toHaveAttribute("aria-hidden", "true");

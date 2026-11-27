@@ -48,7 +48,13 @@ export function getOrCreateMasterContainer(): HTMLDivElement {
     if (!container) {
         container = document.createElement("div");
         container.id = "mx_PersistedElement_container";
-        document.body.appendChild(container);
+        // Lattice: straight after the app, before the containers of dialogs, menus and toasts,
+        // whichever of them was made first. Each of these containers is a stacking context of its
+        // own, so their order in the document is what is drawn over what: a call must never be
+        // over a dialog or a menu of the app because it happened to be mounted after one was shown.
+        const app = document.getElementById("matrixchat");
+        if (app?.parentElement === document.body) app.after(container);
+        else document.body.appendChild(container);
     }
 
     return container;

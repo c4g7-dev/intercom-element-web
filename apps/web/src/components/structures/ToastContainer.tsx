@@ -7,6 +7,7 @@ Please see LICENSE files in the repository root for full details.
 */
 
 import React from "react";
+import ReactDOM from "react-dom";
 import classNames from "classnames";
 import { IconButton, Text } from "@vector-im/compound-web";
 import { type EmptyObject } from "matrix-js-sdk/src/matrix";
@@ -14,6 +15,34 @@ import { CloseIcon } from "@vector-im/compound-design-tokens/assets/web/icons";
 
 import ToastStore, { type IToast } from "../../stores/ToastStore";
 import { _t } from "../../languageHandler";
+import { getOrCreateMasterContainer } from "../views/elements/PersistedElement";
+
+/** Lattice: the id of the container the toasts are drawn in. */
+export const TOAST_HOST_ID = "mx_ToastContainer_host";
+
+/**
+ * Lattice: the container of the toasts, a child of the body that follows the container of the
+ * persisted elements (calls and other widgets) directly.
+ *
+ * The app (`#matrixchat`) and the persisted elements' container are stacking contexts of their
+ * own, the second after the first: whatever is drawn inside the app is under a call wherever the
+ * two meet, whatever z-index it has. A toast is wider than a narrow room list and reaches into the
+ * room, so half of it, with its buttons, was under the call. Here it comes after the persisted
+ * elements and is over them, also while one of them has the whole window for a dialog of its
+ * own. The containers of dialogs and menus are made later or raised by their own rules, and
+ * stay over the toasts as before.
+ */
+export function getOrCreateToastHost(): HTMLDivElement {
+    let host = document.getElementById(TOAST_HOST_ID) as HTMLDivElement | null;
+    const master = getOrCreateMasterContainer();
+    if (!host) {
+        host = document.createElement("div");
+        host.id = TOAST_HOST_ID;
+    }
+    // Straight after the persisted elements, wherever either of the two was put since
+    if (master.nextSibling !== host) master.after(host);
+    return host;
+}
 
 interface IState {
     toasts: IToast<any>[];
@@ -96,10 +125,14 @@ export default class ToastContainer extends React.Component<EmptyObject, IState>
                 mx_ToastContainer_stacked: isStacked,
             });
         }
-        return toast ? (
+        if (!toast) return null;
+        // Lattice: drawn in a container of its own, straight after the one of the persisted elements
+        // (see getOrCreateToastHost), so that a toast is never under a call or another widget
+        return ReactDOM.createPortal(
             <div className={containerClasses} role="alert">
                 {toast}
-            </div>
-        ) : null;
+            </div>,
+            getOrCreateToastHost(),
+        );
     }
 }

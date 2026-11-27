@@ -1384,13 +1384,7 @@
         },
         "updater": {
             "description": "Lattice updates itself from the releases of its GitHub repository. An update is downloaded and checked, and installed when you restart.",
-            "heading": "Updates",
-            "open_release_page": "Open the release page",
-            "release_notes": "Release notes",
-            "restart": "Restart to update",
-            "toast_manual": "This install cannot update itself. Get the new version from the release page.",
-            "toast_ready": "Restart to update.",
-            "toast_title": "Lattice %(version)s is available"
+            "heading": "Updates"
         },
         "whats_new": {
             "title": "What's new in Lattice %(version)s"

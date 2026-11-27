@@ -17,8 +17,9 @@ import styles from "./LatticeMark.module.css";
  * - `connecting`: the tile with a light going round a ring of dots, for a call that is being joined
  * - `speaking`: the three bars alone, moving, in the colour of the text around them, for somebody
  *   who talks right now
+ * - `still`: the app's icon as it is, nothing moving
  */
-export type LatticeMarkVariant = "loading" | "connecting" | "speaking";
+export type LatticeMarkVariant = "loading" | "connecting" | "speaking" | "still";
 
 interface LatticeMarkProps {
     /** Which of the animations to show */
@@ -96,6 +97,20 @@ export function LatticeMark({ variant, size, label, className }: Readonly<Lattic
                     />
                 ))}
                 <circle className={styles.centre} cx="256" cy="256" r="34" />
+            </svg>
+        );
+    }
+
+    if (variant === "still") {
+        return (
+            <svg {...common} viewBox="0 0 512 512">
+                <rect className={styles.tile} x="16" y="16" width="480" height="480" rx="112" />
+                {DOTS.map(([cx, cy]) => (
+                    <circle key={`${cx}-${cy}`} className={styles.stillDot} cx={cx} cy={cy} r="22" />
+                ))}
+                <rect className={styles.accent} x="134" y="206" width="44" height="100" rx="22" />
+                <rect className={styles.light} x="234" y="176" width="44" height="160" rx="22" />
+                <rect className={styles.accent} x="334" y="194" width="44" height="124" rx="22" />
             </svg>
         );
     }

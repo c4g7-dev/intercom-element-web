@@ -44,7 +44,6 @@ import { SeshatIndexManager } from "./SeshatIndexManager";
 import { installCallShortcuts, performCallAction } from "../../intercom/CallActions";
 import { VoiceStateStore, VoiceStateStoreEvent } from "../../intercom/VoiceStateStore";
 import { type VoiceState } from "../../intercom/VoiceState";
-import { startUpdateToasts } from "../../intercom/updater/UpdateToast";
 import { startWhatsNew, tellUpdaterWhenOnline } from "../../intercom/updater/WhatsNew";
 import { IPCManager } from "./IPCManager";
 import { _t } from "../../languageHandler";
@@ -203,8 +202,8 @@ export default class ElectronPlatform extends BasePlatform {
         };
         VoiceStateStore.instance.on(VoiceStateStoreEvent.Update, tellVoiceState);
         tellVoiceState(VoiceStateStore.instance.state);
-        // InterCom: tells when an update from the GitHub releases is ready
-        startUpdateToasts();
+        // Lattice: an update that is ready is told by one card over the user panel (UpdateStatus)
+        // and the button in the rail, not by a toast as well
         // InterCom: what is new, once after an update; and the network coming back, as a reason to look
         startWhatsNew();
         tellUpdaterWhenOnline();
