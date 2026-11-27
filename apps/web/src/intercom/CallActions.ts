@@ -12,6 +12,7 @@ import { WidgetMessagingStore } from "../stores/widgets/WidgetMessagingStore";
 import WidgetUtils from "../utils/WidgetUtils";
 import { isVoiceAction, type VoiceSource } from "./VoiceState";
 import { VoiceStateStore } from "./VoiceStateStore";
+import { type AloneTimeout, storeAloneTimeout } from "./AloneTimeout";
 
 /**
  * What a shortcut can ask of the call that is on: from the keyboard while the window has the
@@ -25,6 +26,10 @@ export type CallAction =
     | "toggle-deafen"
     | "toggle-camera"
     | "toggle-screenshare"
+    | "screenshare-settings"
+    | "toggle-diagnostics"
+    /** Stays in a private call the user was left alone in: its countdown starts over */
+    | "stay-in-call"
     | "leave-call";
 
 const CALL_ACTIONS = new Set<string>([
@@ -34,6 +39,9 @@ const CALL_ACTIONS = new Set<string>([
     "toggle-deafen",
     "toggle-camera",
     "toggle-screenshare",
+    "screenshare-settings",
+    "toggle-diagnostics",
+    "stay-in-call",
     "leave-call",
 ]);
 
@@ -44,7 +52,7 @@ export function isCallAction(value: unknown): value is CallAction {
 /** The widget action Element Call (InterCom build) carries the call actions out on. */
 export const CALL_ACTION_WIDGET_ACTION = "io.intercom.call_action";
 
-/** The shortcut a key press is while a call is on: Ctrl+Shift+M, D or V. */
+/** The shortcut a key press is while a call is on: Ctrl+Shift+M, D, V or S. */
 export function callActionForKey(
     ev: Pick<KeyboardEvent, "key" | "ctrlKey" | "shiftKey" | "altKey" | "metaKey">,
 ): CallAction | undefined {
@@ -56,6 +64,8 @@ export function callActionForKey(
             return "toggle-deafen";
         case "v":
             return "toggle-camera";
+        case "s":
+            return "toggle-screenshare";
         default:
             return undefined;
     }
@@ -116,6 +126,29 @@ export async function performCallAction(action: unknown, source: string): Promis
     }
     // The desktop app writes the console's diagnostics lines to its log
     logger.log(`[intercom-diag] ${JSON.stringify({ type: "call_action_host", action, source, calls: reached })}`);
+    return reached;
+}
+
+/**
+ * Keeps another time to stay alone in a private call for (Settings → InterCom), and tells the
+ * calls that are on: a countdown that runs starts over with it. A voice channel's call, which
+ * was not given a timeout to begin with, does nothing about it.
+ * @returns how many calls were told
+ */
+export async function changeAloneTimeout(timeout: AloneTimeout): Promise<number> {
+    storeAloneTimeout(timeout);
+    let reached = 0;
+    for (const call of CallStore.instance.connectedCalls) {
+        try {
+            const messaging = WidgetMessagingStore.instance.getMessagingForUid(WidgetUtils.getWidgetUid(call.widget));
+            if (!messaging?.widgetApi) continue;
+            await messaging.widgetApi.transport.send(CALL_ACTION_WIDGET_ACTION, { action: "alone-timeout", timeout });
+            reached++;
+        } catch (e) {
+            // A call widget that does not know the action (not the InterCom build) says so
+            logger.warn("Could not tell a call the new time to stay alone for", e);
+        }
+    }
     return reached;
 }
 

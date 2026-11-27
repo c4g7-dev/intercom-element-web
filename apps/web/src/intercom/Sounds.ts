@@ -6,15 +6,19 @@ Please see LICENSE files in the repository root for full details.
 */
 
 /**
- * InterCom's sound cues: joining and leaving a call, and the user's own microphone and hearing
- * going off and on. The built-in sounds are InterCom's own (apps/desktop/intercom/gen-sounds.py
+ * InterCom's sound cues: joining and leaving a call, the user's own microphone and hearing
+ * going off and on, and the two loops of a call that is not answered yet: the ringtone of one
+ * coming in and the ringback of one going out. The built-in sounds are InterCom's own (apps/desktop/intercom/gen-sounds.py
  * makes them from sines); a file of the user's in the profile's `sounds` directory is played
  * instead where there is one (desktop app only, see apps/desktop/src/intercom-sounds.ts).
  */
 
 /** The cues there are; a custom file is named after its cue. */
-export const SOUND_CUES = ["join", "leave", "mute", "unmute", "deafen", "undeafen"] as const;
+export const SOUND_CUES = ["join", "leave", "mute", "unmute", "deafen", "undeafen", "ringtone", "ringback"] as const;
 export type SoundCue = (typeof SOUND_CUES)[number];
+
+/** The cues that are played over and over until a call is answered: a file is one round. */
+export type LoopCue = "ringtone" | "ringback";
 
 /** One of the user's own sounds, as the desktop app hands it over. */
 export interface CustomSound {
@@ -76,6 +80,52 @@ function base64ToArrayBuffer(data: string): ArrayBuffer {
     return bytes.buffer;
 }
 
+/** Where a built-in sound is. */
+function builtInSoundUrl(cue: SoundCue): string {
+    return `media/intercom/${cue}.ogg`;
+}
+
+/** The user's own files for the loops, as URLs; null where there is none or it could not be played. */
+const customLoopUrls = new Map<LoopCue, string | null>();
+
+/** What plays a sound from a URL, as BackgroundAudio does. */
+interface UrlPlayer {
+    play(url: string, loop?: boolean): Promise<AudioBufferSourceNode>;
+}
+
+/**
+ * Plays the ringtone or the ringback: the user's own file where there is one that can be played,
+ * else the built-in sound. It is played by what Element plays its ring with, so whatever silences
+ * that ring silences this one, and it is stopped the same way.
+ * @param player - what plays it
+ * @param cue - which of the two
+ * @param loop - whether it goes on until it is stopped
+ */
+export async function playLoopCue(player: UrlPlayer, cue: LoopCue, loop = true): Promise<AudioBufferSourceNode> {
+    let customUrl = customLoopUrls.get(cue);
+    if (customUrl === undefined) {
+        const custom = (await getCustomSounds())[cue];
+        customUrl = null;
+        if (custom) {
+            try {
+                customUrl = URL.createObjectURL(new Blob([base64ToArrayBuffer(custom.data)], { type: custom.type }));
+            } catch {
+                // Not base64: the built-in sound then
+            }
+        }
+        customLoopUrls.set(cue, customUrl);
+    }
+    if (customUrl) {
+        try {
+            return await player.play(customUrl, loop);
+        } catch {
+            // Not a sound the browser can play: the built-in one, from now on
+            customLoopUrls.set(cue, null);
+        }
+    }
+    return player.play(builtInSoundUrl(cue), loop);
+}
+
 let context: AudioContext | undefined;
 const buffers = new Map<SoundCue, Promise<AudioBuffer | undefined>>();
 
@@ -99,7 +149,7 @@ async function loadBuffer(audio: AudioContext, cue: SoundCue): Promise<AudioBuff
         }
     }
     try {
-        const response = await fetch(`media/intercom/${cue}.ogg`);
+        const response = await fetch(builtInSoundUrl(cue));
         if (!response.ok) return undefined;
         return await audio.decodeAudioData(await response.arrayBuffer());
     } catch {
@@ -172,6 +222,7 @@ export function playSoundCue(cue: SoundCue): void {
 /** For tests: forgets what was loaded. */
 export function resetSoundCuesForTest(): void {
     customSounds = undefined;
+    customLoopUrls.clear();
     context = undefined;
     buffers.clear();
 }

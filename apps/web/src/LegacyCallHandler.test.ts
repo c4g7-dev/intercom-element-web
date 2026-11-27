@@ -423,7 +423,9 @@ describe("LegacyCallHandler without third party protocols", () => {
         audioElement.id = "remoteAudio";
         document.body.appendChild(audioElement);
 
-        fetchMock.get("end:/media/ring.mp3", { body: new Blob(["1", "2", "3", "4"], { type: "audio/mpeg" }) });
+        fetchMock.get("end:/media/intercom/ringtone.ogg", {
+            body: new Blob(["1", "2", "3", "4"], { type: "audio/ogg" }),
+        });
     });
 
     afterEach(() => {
@@ -439,9 +441,9 @@ describe("LegacyCallHandler without third party protocols", () => {
     it("should cache sounds between playbacks", async () => {
         await callHandler.play(AudioID.Ring);
         expect(mockAudioBufferSourceNode.start).toHaveBeenCalled();
-        expect(fetchMock).toHaveFetchedTimes(1, "end:/media/ring.mp3");
+        expect(fetchMock).toHaveFetchedTimes(1, "end:/media/intercom/ringtone.ogg");
         await callHandler.play(AudioID.Ring);
-        expect(fetchMock).toHaveFetchedTimes(1, "end:/media/ring.mp3");
+        expect(fetchMock).toHaveFetchedTimes(1, "end:/media/intercom/ringtone.ogg");
     });
 
     it("should allow silencing an incoming call ring", async () => {

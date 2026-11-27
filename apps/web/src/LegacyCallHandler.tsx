@@ -51,6 +51,7 @@ import { getJoinedNonFunctionalMembers } from "./utils/room/getJoinedNonFunction
 import { localNotificationsAreSilenced } from "./utils/notifications";
 import { isNotNull } from "./Typeguards";
 import { BackgroundAudio } from "./audio/BackgroundAudio";
+import { type LoopCue, playLoopCue } from "./intercom/Sounds";
 import { Jitsi } from "./widgets/Jitsi.ts";
 import { type SDKContextClass } from "./contexts/SDKContextClass.ts";
 
@@ -65,6 +66,12 @@ export enum AudioID {
     CallEnd = "callendAudio",
     Busy = "busyAudio",
 }
+
+// InterCom: the sounds that are InterCom's own instead of Element's
+const INTERCOM_LOOP_CUES: Partial<Record<AudioID, LoopCue>> = {
+    [AudioID.Ring]: "ringtone",
+    [AudioID.Ringback]: "ringback",
+};
 
 interface ThirdpartyLookupResponse {
     userid: string;
@@ -336,7 +343,11 @@ export default class LegacyCallHandler extends TypedEventEmitter<LegacyCallHandl
         };
 
         const [urlPrefix, loop] = audioInfo[audioId];
-        const source = await this.backgroundAudio.pickFormatAndPlay(urlPrefix, ["mp3", "ogg"], loop);
+        // InterCom: its own ringtone and ringback (res/media/intercom), or the user's own files
+        const intercomCue = INTERCOM_LOOP_CUES[audioId];
+        const source = intercomCue
+            ? await playLoopCue(this.backgroundAudio, intercomCue, loop)
+            : await this.backgroundAudio.pickFormatAndPlay(urlPrefix, ["mp3", "ogg"], loop);
         if (this.playingSources[audioId]) {
             logger.warn(`${logPrefix} Already playing audio ${audioId}!`);
         }

@@ -27,6 +27,16 @@ export const getPersistKey = (appId: string): string => "widget_" + appId;
  */
 export const DEFAULT_PERSISTED_Z_INDEX = 9;
 
+/**
+ * InterCom: the z-index of a persisted element that is given the whole window for a dialog of its
+ * own (see `setOverlay`): above every other persisted element, the floating PiP included. Dialogs
+ * and menus of the app are in containers of their own, above the persisted elements' one.
+ */
+export const OVERLAY_PERSISTED_Z_INDEX = 200;
+
+/** InterCom: the class of a persisted element while it has the whole window. */
+export const OVERLAY_PERSISTED_CLASS = "mx_PersistedElement_overlay";
+
 // Shamelessly ripped off Modal.js.  There's probably a better way
 // of doing reusable widgets like dialog boxes & menus where we go and
 // pass in a custom control as the actual body.
@@ -126,6 +136,7 @@ export default class PersistedElement extends React.Component<IProps> {
             pair[1].remove();
         }
         delete PersistedElement.rootMap[persistKey];
+        PersistedElement.revokeOverlay(persistKey);
         PersistedElement.children.delete(persistKey);
         PersistedElement.detached.delete(persistKey);
     }
@@ -142,6 +153,7 @@ export default class PersistedElement extends React.Component<IProps> {
         const pair = PersistedElement.rootMap[persistKey];
         if (!pair) return false;
         PersistedElement.detached.add(persistKey);
+        PersistedElement.revokeOverlay(persistKey);
         host.appendChild(pair[1]);
         PersistedElement.refresh(persistKey);
         return true;
@@ -163,6 +175,62 @@ export default class PersistedElement extends React.Component<IProps> {
 
     public static isDetached(persistKey: string): boolean {
         return PersistedElement.detached.has(persistKey);
+    }
+
+    // InterCom: persist keys whose tree covers the whole window for now (see `setOverlay`).
+    private static overlaid = new Set<string>();
+
+    /**
+     * InterCom: gives the persisted tree of the given persistKey the whole window, or takes it back.
+     * The tree is neither moved in the DOM nor rendered again: only its box changes, so a call in it
+     * goes on. A tree that is detached (in a window of its own) has no window of ours to cover.
+     *
+     * @returns whether the tree now is what was asked for.
+     */
+    public static setOverlay(persistKey: string, overlay: boolean): boolean {
+        if (overlay) {
+            if (!PersistedElement.rootMap[persistKey] || PersistedElement.isDetached(persistKey)) return false;
+            PersistedElement.overlaid.add(persistKey);
+        } else if (!PersistedElement.overlaid.delete(persistKey)) {
+            return true;
+        }
+        PersistedElement.refresh(persistKey);
+        return true;
+    }
+
+    // InterCom: told when a tree loses the whole window without having been asked to give it back
+    private static overlayRevoked = new Map<string, () => void>();
+
+    /**
+     * InterCom: registers what is told when the tree of the given persistKey stops covering the
+     * window by other means than `setOverlay`: it went to a window of its own, or away.
+     * @returns what removes the registration again
+     */
+    public static onOverlayRevoked(persistKey: string, listener: () => void): () => void {
+        PersistedElement.overlayRevoked.set(persistKey, listener);
+        return () => {
+            if (PersistedElement.overlayRevoked.get(persistKey) === listener) {
+                PersistedElement.overlayRevoked.delete(persistKey);
+            }
+        };
+    }
+
+    private static revokeOverlay(persistKey: string): void {
+        if (PersistedElement.overlaid.delete(persistKey)) PersistedElement.overlayRevoked.get(persistKey)?.();
+    }
+
+    public static isOverlay(persistKey: string): boolean {
+        return PersistedElement.overlaid.has(persistKey);
+    }
+
+    /**
+     * InterCom: where the tree of the given persistKey belongs in the window: the box of the
+     * placeholder it is drawn over, whether or not it covers the whole window right now.
+     */
+    public static placeholderRect(persistKey: string): DOMRect | undefined {
+        const instances = PersistedElement.instances.get(persistKey);
+        if (!instances?.size || PersistedElement.isDetached(persistKey)) return undefined;
+        return [...instances].at(-1)!.childContainer?.getBoundingClientRect();
     }
 
     private static refresh(persistKey: string): void {
@@ -285,11 +353,23 @@ export default class PersistedElement extends React.Component<IProps> {
         if (!child) return;
         // The Picture-in-Picture sate (defined by it being "detached") will overwrite `visible`
         // for the child (the actual persistent Element content. e.g. the element call component)
-        child.style.display = visible || PersistedElement.isDetached(this.props.persistKey) ? "block" : "none";
+        child.style.display =
+            visible ||
+            PersistedElement.isDetached(this.props.persistKey) ||
+            PersistedElement.isOverlay(this.props.persistKey)
+                ? "block"
+                : "none";
     }
 
     private updateChildPosition(child?: HTMLDivElement, parent?: HTMLDivElement): void {
-        if (!child || (!parent && !PersistedElement.isDetached(this.props.persistKey))) return;
+        if (
+            !child ||
+            (!parent &&
+                !PersistedElement.isDetached(this.props.persistKey) &&
+                !PersistedElement.isOverlay(this.props.persistKey))
+        ) {
+            return;
+        }
         PersistedElement.styleChild(child, this.props.persistKey, parent, this.props.zIndex);
     }
 
@@ -320,6 +400,23 @@ export default class PersistedElement extends React.Component<IProps> {
                 transform: "none",
                 width: "100%",
                 height: "100%",
+                display: "block",
+            });
+            return;
+        }
+        const overlay = PersistedElement.overlaid.has(persistKey);
+        child.classList.toggle(OVERLAY_PERSISTED_CLASS, overlay);
+        if (overlay) {
+            // InterCom: the whole window, for a dialog of the tree's own. Fixed, so that it is the
+            // window's size whatever the page is.
+            Object.assign(child.style, {
+                zIndex: String(OVERLAY_PERSISTED_Z_INDEX),
+                position: "fixed",
+                top: "0",
+                left: "0",
+                transform: "none",
+                width: "100vw",
+                height: "100vh",
                 display: "block",
             });
             return;

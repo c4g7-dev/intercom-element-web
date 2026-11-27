@@ -53,6 +53,7 @@ import {
 } from "../../../intercom/gallery/grouping";
 import { galleryOfItem, type GalleryEventTimelineItem } from "../../../intercom/gallery/timelineItem";
 import { countUnreadAfter, formatUnreadSince, unreadSinceReadMarker } from "../../../intercom/UnreadSince";
+import { findMergedCallTiles } from "../../../intercom/CallTileEvents";
 
 const DEBUG_TIMELINE = false;
 
@@ -1823,12 +1824,14 @@ export class RoomTimelineViewModel
         // InterCom: pictures sent together are one gallery on the row of the first of them; the
         // others get no row of their own
         const followers = this.findGalleries(candidates, showHiddenEvents);
+        // InterCom: two tiles of one call (announced twice, or announced and started) are one tile
+        const mergedCalls = showHiddenEvents ? new Set<MatrixEvent>() : findMergedCallTiles(candidates);
 
         for (const { event, shouldShow } of candidates) {
             const eventId = event.getId();
             if (!eventId) continue;
 
-            if (!shouldShow) {
+            if (!shouldShow || mergedCalls.has(event)) {
                 filteredCount++;
                 continue;
             }

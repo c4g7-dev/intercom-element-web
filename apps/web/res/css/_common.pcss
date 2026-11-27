@@ -831,3 +831,25 @@ summary {
     inset-inline-end: 100%;
     color: var(--cpd-color-text-secondary);
 }
+
+/**
+ * InterCom: a call that covers the whole window for one of its dialogs (see CallOverlay.ts). The
+ * call draws itself where it was and leaves the rest of its frame see-through: nothing between
+ * the frame and the app may paint, round or clip. `color-scheme: normal` is what the call's
+ * document has: a frame of another scheme than its document is given an opaque backdrop.
+ */
+.mx_PersistedElement_overlay,
+.mx_PersistedElement_overlay .mx_AppTileBody,
+.mx_PersistedElement_overlay iframe {
+    background: transparent !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.mx_PersistedElement_overlay .mx_AppTileBody,
+.mx_PersistedElement_overlay iframe {
+    width: 100% !important;
+    height: 100% !important;
+    color-scheme: normal;
+}

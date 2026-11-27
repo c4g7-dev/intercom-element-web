@@ -30,6 +30,8 @@ describe("pickSoundFiles", () => {
             file("unmute.ogg"),
             file("deafen.ogg"),
             file("undeafen.ogg"),
+            file("ringtone.mp3"),
+            file("ringback.ogg"),
         ]);
         expect(picked).toEqual({
             join: "join.ogg",
@@ -38,6 +40,8 @@ describe("pickSoundFiles", () => {
             unmute: "unmute.ogg",
             deafen: "deafen.ogg",
             undeafen: "undeafen.ogg",
+            ringtone: "ringtone.mp3",
+            ringback: "ringback.ogg",
         });
         expect(skipped).toEqual([]);
     });
@@ -131,6 +135,7 @@ describe("readCustomSounds", () => {
         const io = fakeFs({
             "join.ogg": Buffer.from("OggS-join"),
             "leave.wav": Buffer.from("RIFF-leave"),
+            "ringtone.ogg": Buffer.from("OggS-ringtone"),
             "secret.txt": Buffer.from("not a sound"),
             "mute.ogg": "dir",
         });
@@ -139,12 +144,17 @@ describe("readCustomSounds", () => {
         expect(sounds).toEqual({
             join: { name: "join.ogg", type: "audio/ogg", data: Buffer.from("OggS-join").toString("base64") },
             leave: { name: "leave.wav", type: "audio/wav", data: Buffer.from("RIFF-leave").toString("base64") },
+            ringtone: {
+                name: "ringtone.ogg",
+                type: "audio/ogg",
+                data: Buffer.from("OggS-ringtone").toString("base64"),
+            },
         });
-        expect(io.read).toEqual(["/sounds/join.ogg", "/sounds/leave.wav"]);
+        expect(io.read).toEqual(["/sounds/join.ogg", "/sounds/leave.wav", "/sounds/ringtone.ogg"]);
         expect(io.stated).not.toContain("/sounds/secret.txt");
         // The log has names, never what is in a file
         expect(log).toHaveBeenCalledWith("sound_pack", {
-            files: ["join.ogg", "leave.wav"],
+            files: ["join.ogg", "leave.wav", "ringtone.ogg"],
             skipped: ["mute.ogg: not_a_file"],
         });
         expect(JSON.stringify(log.mock.calls)).not.toContain("secret");

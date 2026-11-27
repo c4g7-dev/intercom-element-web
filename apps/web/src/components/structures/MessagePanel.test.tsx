@@ -42,6 +42,13 @@ import { ModuleApi } from "../../modules/Api.ts";
 import { CustomComponentsApi } from "../../modules/customComponentApi.ts";
 import { getEventDisplayInfo } from "../../utils/EventRenderingUtils";
 
+// The tiles of calls are not what is tested here: which events get one is
+vi.mock("../../intercom/CallEventTile", () => ({
+    RtcCallEventTile: () => null,
+    LegacyCallEventTile: () => null,
+    StateCallEventTile: () => null,
+}));
+
 vi.mock("../../utils/beacon", () => ({
     useBeacon: vi.fn(),
 }));
@@ -343,6 +350,29 @@ describe("MessagePanel", function () {
         // just check we have the right number of tiles for now
         const tiles = container.getElementsByClassName("mx_EventTile");
         expect(tiles.length).toEqual(10);
+    });
+
+    it("shows a call announced twice as one tile, the later one", function () {
+        const ts = new Date(2026, 5, 1, 12, 0, 0).getTime();
+        const notification = (seconds: number, user = "@user:id"): MatrixEvent =>
+            TestUtilsMatrix.mkEvent({
+                event: true,
+                type: "org.matrix.msc4075.rtc.notification",
+                room: "!room:id",
+                user,
+                ts: ts + seconds * 1000,
+                content: { slot_id: "m.call#ROOM", notification_type: "ring", sender_ts: ts + seconds * 1000 },
+            });
+        const first = notification(0);
+        const second = notification(6);
+        const nextCall = notification(600);
+        const { container } = render(
+            getComponent({ events: [first, second, nextCall] }),
+            clientAndSDKContextRenderOptions(client, sdkContext),
+        );
+
+        const tiles = [...container.getElementsByClassName("mx_EventTile")];
+        expect(tiles.map((tile) => tile.getAttribute("data-event-id"))).toEqual([second.getId(), nextCall.getId()]);
     });
 
     it("shows pictures sent together as one gallery on the tile of the first", function () {

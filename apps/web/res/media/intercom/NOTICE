@@ -1,0 +1,16 @@
+InterCom's sounds
+
+Every sound in this directory is InterCom's own. None is a recording and none is taken from
+another product: apps/desktop/intercom/gen-sounds.py works them out from sine waves, and running
+it again writes the same files. They are covered by the licence of this repository
+(AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial, see the LICENSE files in the
+repository root).
+
+join, leave               somebody (you or another) coming into a call, and going: two notes
+                          a major third apart (C, E), up and down, a third of a second
+mute, unmute              your microphone going off, and on
+deafen, undeafen          your hearing going off, and on
+ringtone                  a call coming in; one round of a loop (2.4 s)
+ringback                  a call going out, until it is answered; one round of a loop (3 s)
+
+This directory is where other builds of InterCom (the Android app) take their copies from.

@@ -47,6 +47,7 @@ import { _t } from "../../languageHandler";
 import { getLateEventInfo } from "./grouper/LateEventGrouper";
 import { analyseGalleries, keepUnchangedGalleries, logGalleryDecisions } from "../../intercom/gallery/grouping";
 import { GalleryGroupContext } from "../../intercom/gallery/GalleryContext";
+import { findMergedCallTiles } from "../../intercom/CallTileEvents";
 import { findLastSuccessfulWeSent } from "../../viewmodels/room/timeline/event-tile/EventTileReceiptState";
 import { getReadReceiptsByShownEvent, getReadReceiptsForEvent, type ShownReadReceipt } from "../../utils/read-receipts";
 import { DateSeparatorWrapper } from "./DateSeparatorWrapper";
@@ -636,6 +637,14 @@ export default class MessagePanel extends React.Component<IProps, IState> {
             for (const gallery of this.galleries.values()) gallery.slice(1).forEach((ev) => followers.add(ev));
             for (const wrapped of events) {
                 if (followers.has(wrapped.event)) wrapped.shouldShow = false;
+            }
+        }
+
+        // InterCom: two tiles of one call (announced twice, or announced and started) are one tile
+        if (!this.showHiddenEvents) {
+            const merged = findMergedCallTiles(events);
+            for (const wrapped of events) {
+                if (merged.has(wrapped.event)) wrapped.shouldShow = false;
             }
         }
 

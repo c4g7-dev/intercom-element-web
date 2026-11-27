@@ -21,6 +21,7 @@ export * from "./room/composer/MessageComposerUrlPreview/index.ts";
 export * from "./crypto/SasEmoji";
 export * from "./crypto/LegacyCryptoUnsupportedView";
 export * from "./crypto/DeleteKeyStorageView";
+export * from "./intercom/CallEventTileView";
 export * from "./intercom/IntercomAvatar";
 export * from "./intercom/ReleaseNotesView";
 export * from "./intercom/RoomListItemExtras";

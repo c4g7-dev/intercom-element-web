@@ -1,0 +1,237 @@
+/*
+ * Copyright 2026 InterCom contributors
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
+ */
+
+.popover {
+    position: fixed;
+    z-index: 5000;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    overflow: auto;
+    /* The room list's surface, a hairline, the radius of a card: a layer, not a shadow */
+    border: var(--cpd-border-width-1) solid var(--roomlist-separator-color, var(--cpd-color-gray-400));
+    border-radius: 12px;
+    background-color: var(--roomlist-background-color, var(--cpd-color-bg-canvas-default));
+    color: var(--cpd-color-text-primary);
+    font: var(--cpd-font-body-sm-regular);
+    font-variant-numeric: tabular-nums;
+    animation: appear 120ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* It takes the focus when it opens, so that the keyboard is in it; the ring is for its button */
+.popover:focus {
+    outline: none;
+}
+
+@keyframes appear {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+}
+
+.head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--cpd-space-2x);
+    padding: var(--cpd-space-3x) var(--cpd-space-3x) var(--cpd-space-2x);
+}
+
+.title {
+    font: var(--cpd-font-body-md-semibold);
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* The word wears the text colour; the bars beside it carry the colour of the level */
+.level {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: var(--cpd-space-1x);
+    font: var(--cpd-font-body-sm-medium);
+    color: var(--cpd-color-text-primary);
+}
+
+.level svg {
+    color: var(--cpd-color-icon-success-primary);
+}
+
+.level[data-level="fair"] svg {
+    color: var(--cpd-color-icon-warning-primary, #d9a400);
+}
+
+.level[data-level="poor"] svg,
+.level[data-level="reconnecting"] svg {
+    color: var(--cpd-color-icon-critical-primary);
+}
+
+.ping {
+    display: flex;
+    align-items: baseline;
+    gap: var(--cpd-space-2x);
+    padding: 0 var(--cpd-space-3x);
+}
+
+.pingLabel {
+    color: var(--cpd-color-text-secondary);
+}
+
+.pingValue {
+    font: var(--cpd-font-body-md-semibold);
+    font-variant-numeric: tabular-nums;
+}
+
+.pingAverage {
+    margin-inline-start: auto;
+    color: var(--cpd-color-text-secondary);
+    font: var(--cpd-font-body-xs-regular);
+    font-variant-numeric: tabular-nums;
+}
+
+.graph {
+    padding: var(--cpd-space-1-5x) var(--cpd-space-3x) 0;
+}
+
+.plot {
+    position: relative;
+    height: 40px;
+    /* The floor of the graph: nothing, in a hairline */
+    border-bottom: var(--cpd-border-width-1) solid var(--roomlist-separator-color, var(--cpd-color-gray-400));
+}
+
+.plot svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.line {
+    fill: none;
+    stroke: var(--cpd-color-icon-accent-primary);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.area {
+    fill: var(--cpd-color-icon-accent-primary);
+    opacity: 0.14;
+}
+
+.crosshair {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: var(--cpd-color-text-secondary);
+    pointer-events: none;
+}
+
+.axis {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 2px;
+    color: var(--cpd-color-text-secondary);
+    font: var(--cpd-font-body-xs-regular);
+    font-variant-numeric: tabular-nums;
+}
+
+.rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cpd-space-1x);
+    margin: 0;
+    padding: var(--cpd-space-2x) var(--cpd-space-3x) var(--cpd-space-3x);
+}
+
+.row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--cpd-space-3x);
+    min-width: 0;
+}
+
+.row dt {
+    flex: none;
+    color: var(--cpd-color-text-secondary);
+}
+
+.row dd {
+    display: flex;
+    gap: var(--cpd-space-2x);
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-align: end;
+}
+
+/* A long server name gives way at its start: the end of a host name says more */
+.row[data-row="server"] dd {
+    display: block;
+    direction: rtl;
+}
+
+.none {
+    margin: 0;
+    padding: 0 var(--cpd-space-3x) var(--cpd-space-3x);
+    color: var(--cpd-color-text-secondary);
+}
+
+.foot {
+    display: flex;
+    padding: var(--cpd-space-2x);
+    border-top: var(--cpd-border-width-1) solid var(--roomlist-separator-color, var(--cpd-color-gray-400));
+}
+
+.diagnostics {
+    all: unset;
+    box-sizing: border-box;
+    flex: 1;
+    min-height: 32px;
+    padding: 0 var(--cpd-space-2x);
+    border-radius: 8px;
+    background-color: var(--cpd-color-bg-action-tertiary-hovered);
+    color: var(--cpd-color-text-primary);
+    font: var(--cpd-font-body-sm-medium);
+    text-align: center;
+    cursor: pointer;
+}
+
+.diagnostics:hover {
+    background-color: var(--cpd-color-bg-action-tertiary-selected);
+}
+
+.diagnostics:focus-visible {
+    outline: 2px solid var(--cpd-color-border-focused);
+    outline-offset: 1px;
+}
+
+.srOnly {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .popover {
+        animation: none;
+    }
+}

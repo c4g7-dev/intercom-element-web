@@ -15,6 +15,12 @@ import { type CallStore, CallStoreEvent } from "../../stores/CallStore";
 import { type Call } from "../../models/Call";
 import { CallStateStore, parseCallState } from "../../intercom/CallStateStore";
 import { VoiceStateStore } from "../../intercom/VoiceStateStore";
+import { ConnectionStatsStore, ConnectionStatsStoreEvent } from "../../intercom/ConnectionStats";
+import {
+    DeviceAvailabilityEvent,
+    type DeviceUnavailability,
+    type MicrophoneAvailability,
+} from "../../intercom/DeviceAvailability";
 import { type CallAction } from "../../intercom/CallActions";
 import { type OwnProfileStore } from "../../stores/OwnProfileStore";
 import { UPDATE_EVENT } from "../../stores/AsyncStore";
@@ -42,6 +48,16 @@ class FakeCallStore extends Emitter {
     }
 }
 
+/** The app's own look at the microphone, which the tests set */
+class FakeMicrophone extends Emitter {
+    public unavailable: DeviceUnavailability | undefined;
+    public watch = vi.fn();
+    public set(unavailable: DeviceUnavailability | undefined): void {
+        this.unavailable = unavailable;
+        this.emit(DeviceAvailabilityEvent.Update);
+    }
+}
+
 class FakeProfileStore extends Emitter {
     public displayName: string | null = "Ada";
     public avatar: string | null = "http://media/ada";
@@ -52,6 +68,9 @@ describe("UserPanelViewModel", () => {
     let callStore: FakeCallStore;
     let callStateStore: CallStateStore;
     let voiceStateStore: VoiceStateStore;
+    let connectionStore: ConnectionStatsStore;
+    let now: number;
+    let microphone: FakeMicrophone;
     let profileStore: FakeProfileStore;
     let user: Emitter & { presence?: string; lastPresenceTs?: number };
     let client: MatrixClient;
@@ -62,7 +81,9 @@ describe("UserPanelViewModel", () => {
             client,
             callStore: callStore as unknown as CallStore,
             callStateStore,
+            connectionStore,
             voiceStateStore,
+            microphone: microphone as unknown as MicrophoneAvailability,
             profileStore: profileStore as unknown as OwnProfileStore,
             performAction,
         });
@@ -70,11 +91,14 @@ describe("UserPanelViewModel", () => {
     beforeEach(() => {
         callStore = new FakeCallStore();
         callStateStore = new CallStateStore();
+        now = 1_000_000;
+        connectionStore = new ConnectionStatsStore(() => now);
         voiceStateStore = new VoiceStateStore({
             storage: { getItem: () => null, setItem: () => {} },
             playCue: () => {},
             log: () => {},
         });
+        microphone = new FakeMicrophone();
         profileStore = new FakeProfileStore();
         user = Object.assign(new Emitter(), { presence: "online", lastPresenceTs: 1 });
         client = {
@@ -92,6 +116,7 @@ describe("UserPanelViewModel", () => {
             avatarUrl: "http://media/ada",
             presence: "online",
             muted: false,
+            micUnavailable: undefined,
             deafened: false,
             call: undefined,
         });
@@ -123,8 +148,11 @@ describe("UserPanelViewModel", () => {
             roomName: "Lounge",
             reconnecting: false,
             cameraOn: false,
+            cameraUnavailable: undefined,
             screenSharing: false,
+            canShareScreen: true,
             controllable: false,
+            aloneDeadline: undefined,
         });
 
         callStateStore.setState(
@@ -184,24 +212,241 @@ describe("UserPanelViewModel", () => {
         ]);
     });
 
-    it("shows the call before starting a screen share, and not for stopping one", () => {
+    it("shows when a call the user is alone in leaves by itself, and stays in it when asked", () => {
+        const vm = create();
+        callStore.connect(ROOM);
+        callStateStore.setState(ROOM, parseCallState({ audio_enabled: true }, 1_000));
+        expect(vm.getSnapshot().call?.aloneDeadline).toBeUndefined();
+
+        // Everybody else left
+        const alone = parseCallState({ audio_enabled: true, alone: { ms_left: 300_000, seq: 1 } }, 1_000);
+        callStateStore.setState(ROOM, alone);
+        expect(vm.getSnapshot().call?.aloneDeadline).toBe(301_000);
+
+        // The same countdown told again is nothing to render anew
+        const listener = vi.fn();
+        vm.subscribe(listener);
+        callStateStore.setState(
+            ROOM,
+            parseCallState({ audio_enabled: true, alone: { ms_left: 290_010, seq: 1 } }, 11_000, alone),
+        );
+        expect(listener).not.toHaveBeenCalled();
+
+        vm.onStayInCall();
+        expect(performAction).toHaveBeenLastCalledWith("stay-in-call", "user-panel");
+        callStateStore.setState(
+            ROOM,
+            parseCallState({ audio_enabled: true, alone: { ms_left: 300_000, seq: 2 } }, 11_000, alone),
+        );
+        expect(vm.getSnapshot().call?.aloneDeadline).toBe(311_000);
+
+        // Somebody came back
+        callStateStore.setState(ROOM, parseCallState({ audio_enabled: true }, 20_000));
+        expect(vm.getSnapshot().call?.aloneDeadline).toBeUndefined();
+    });
+
+    it("starts and stops a screen share where the call is, without showing the call", () => {
         const dispatch = vi.spyOn(dispatcher, "dispatch").mockImplementation(() => {});
         const vm = create();
         callStore.connect(ROOM);
         callStateStore.setState(ROOM, parseCallState({ screen_sharing: false }));
 
         vm.onToggleScreenShare();
+        expect(performAction).toHaveBeenLastCalledWith("toggle-screenshare", "user-panel");
+
+        callStateStore.setState(ROOM, parseCallState({ screen_sharing: true }));
+        vm.onToggleScreenShare();
+        expect(performAction).toHaveBeenCalledTimes(2);
+        expect(dispatch).not.toHaveBeenCalled();
+        dispatch.mockRestore();
+    });
+
+    it("shows the call, then opens the settings of the screen share in it", () => {
+        const order: string[] = [];
+        const dispatch = vi.spyOn(dispatcher, "dispatch").mockImplementation(() => {
+            order.push("show");
+        });
+        performAction.mockImplementation(async (action) => {
+            order.push(action);
+            return 1;
+        });
+        const vm = create();
+        callStore.connect(ROOM);
+
+        vm.onOpenShareSettings();
         expect(dispatch).toHaveBeenCalledWith(
             expect.objectContaining({ action: Action.ViewRoom, room_id: ROOM, view_call: true }),
         );
-        expect(performAction).toHaveBeenLastCalledWith("toggle-screenshare", "user-panel");
-
-        dispatch.mockClear();
-        callStateStore.setState(ROOM, parseCallState({ screen_sharing: true }));
-        vm.onToggleScreenShare();
-        expect(dispatch).not.toHaveBeenCalled();
-        expect(performAction).toHaveBeenCalledTimes(2);
+        expect(performAction.mock.calls).toEqual([["screenshare-settings", "user-panel"]]);
+        expect(order).toEqual(["show", "screenshare-settings"]);
         dispatch.mockRestore();
+    });
+
+    it("starts looking for a microphone, and shows what the app finds while there is no call", () => {
+        const vm = create();
+        expect(microphone.watch).toHaveBeenCalled();
+        expect(vm.getSnapshot().micUnavailable).toBeUndefined();
+
+        microphone.set("no-device");
+        expect(vm.getSnapshot()).toMatchObject({ micUnavailable: "no-device", muted: false });
+        microphone.set("no-permission");
+        expect(vm.getSnapshot().micUnavailable).toBe("no-permission");
+        // Plugged in, or allowed
+        microphone.set(undefined);
+        expect(vm.getSnapshot().micUnavailable).toBeUndefined();
+    });
+
+    it("takes the call's word for the microphone, the camera and the screen while there is a call", () => {
+        const vm = create();
+        microphone.set("no-device");
+        callStore.connect(ROOM);
+        // A call that tells nothing: the app's own look still counts
+        expect(vm.getSnapshot().micUnavailable).toBe("no-device");
+
+        // The call opened a microphone the app could not see
+        callStateStore.setState(
+            ROOM,
+            parseCallState({
+                audio_enabled: true,
+                audio_state: "on",
+                video_state: "no-device",
+                can_share_screen: false,
+            }),
+        );
+        expect(vm.getSnapshot()).toMatchObject({
+            micUnavailable: undefined,
+            call: { cameraOn: false, cameraUnavailable: "no-device", canShareScreen: false },
+        });
+
+        // And the other way round: the call is refused what the app thinks is there
+        microphone.set(undefined);
+        callStateStore.setState(
+            ROOM,
+            parseCallState({ audio_state: "no-permission", video_enabled: true, video_state: "on" }),
+        );
+        expect(vm.getSnapshot()).toMatchObject({
+            micUnavailable: "no-permission",
+            call: { cameraOn: true, cameraUnavailable: undefined, canShareScreen: true },
+        });
+
+        // The call is over: back to what the app sees
+        callStore.connect();
+        expect(vm.getSnapshot().micUnavailable).toBeUndefined();
+    });
+
+    it("has everything there in a call that tells nothing of it, as one from before", () => {
+        const vm = create();
+        callStore.connect(ROOM);
+        callStateStore.setState(ROOM, parseCallState({ audio_enabled: false, video_enabled: false }));
+        expect(vm.getSnapshot()).toMatchObject({
+            micUnavailable: undefined,
+            call: { cameraUnavailable: undefined, canShareScreen: true, controllable: true },
+        });
+    });
+
+    it("leaves the user's mute as it is while there is no microphone", () => {
+        const vm = create();
+        voiceStateStore.perform("mute", "panel");
+        microphone.set("no-device");
+        expect(vm.getSnapshot()).toMatchObject({ muted: true, micUnavailable: "no-device" });
+        expect(voiceStateStore.state.muted).toBe(true);
+        microphone.set(undefined);
+        expect(vm.getSnapshot()).toMatchObject({ muted: true, micUnavailable: undefined });
+    });
+
+    it("shows how good the connection is once the call tells, and not its figures", () => {
+        const vm = create();
+        callStore.connect(ROOM);
+        expect(vm.getSnapshot().call?.quality).toBeUndefined();
+        connectionStore.setStats(ROOM, { quality: "fair", rttMs: 140, lossPct: 1 });
+        expect(vm.getSnapshot().call).toMatchObject({ quality: "fair" });
+        expect(vm.getSnapshot().call?.connection).toBeUndefined();
+
+        // Other figures of the same quality are nothing to draw anew for
+        const before = vm.getSnapshot();
+        connectionStore.setStats(ROOM, { quality: "fair", rttMs: 150, lossPct: 2 });
+        expect(vm.getSnapshot()).toBe(before);
+
+        connectionStore.clear(ROOM);
+        expect(vm.getSnapshot().call?.quality).toBeUndefined();
+    });
+
+    it("asks for the details of the connection while they are open, and shows them with a minute of ping", () => {
+        const vm = create();
+        callStore.connect(ROOM);
+        connectionStore.setStats(ROOM, { quality: "good", rttMs: 30 });
+        const onDetailed = vi.fn();
+        connectionStore.onDetailed(onDetailed);
+
+        vm.onConnectionDetails(true);
+        vm.onConnectionDetails(true);
+        expect(onDetailed.mock.calls).toEqual([[true]]);
+        // What is known already is shown at once
+        expect(vm.getSnapshot().call?.connection).toMatchObject({ pingMs: 30, averagePingMs: 30 });
+
+        now += 1000;
+        connectionStore.setStats(ROOM, {
+            quality: "good",
+            rttMs: 40,
+            detail: {
+                lossOutPct: 0.3,
+                lossInPct: 1,
+                jitterMs: 8,
+                server: "sfu.example.org",
+                transport: "udp",
+                encrypted: true,
+                audio: { codec: "opus", bitrate: 32000 },
+                share: { width: 1920, height: 1080, fps: 30, bitrate: 2500000 },
+            },
+        });
+        const connection = vm.getSnapshot().call?.connection;
+        expect(connection).toEqual({
+            pingMs: 40,
+            averagePingMs: 35,
+            pingHistory: [...new Array<null>(58).fill(null), 30, 40],
+            lossOutPct: 0.3,
+            lossInPct: 1,
+            jitterMs: 8,
+            server: "sfu.example.org",
+            transport: "udp",
+            encrypted: true,
+            audio: { codec: "opus", bitrate: 32000 },
+            share: { width: 1920, height: 1080, fps: 30, bitrate: 2500000 },
+        });
+
+        vm.onConnectionDetails(false);
+        expect(onDetailed).toHaveBeenLastCalledWith(false);
+        expect(vm.getSnapshot().call?.connection).toBeUndefined();
+        expect(vm.getSnapshot().call?.quality).toBe("good");
+    });
+
+    it("has no details for a call that tells none, and none without a call", () => {
+        const vm = create();
+        vm.onConnectionDetails(true);
+        expect(vm.getSnapshot().call).toBeUndefined();
+        callStore.connect(ROOM);
+        expect(vm.getSnapshot().call?.connection).toBeUndefined();
+    });
+
+    it("shows the call, then toggles its diagnostics overlay", () => {
+        const dispatched = vi.spyOn(dispatcher, "dispatch").mockImplementation(() => {});
+        const vm = create();
+        callStore.connect(ROOM);
+        vm.onOpenDiagnostics();
+        expect(dispatched).toHaveBeenCalledWith(
+            expect.objectContaining({ action: Action.ViewRoom, room_id: ROOM, view_call: true }),
+        );
+        expect(performAction).toHaveBeenCalledWith("toggle-diagnostics", "user-panel");
+        dispatched.mockRestore();
+    });
+
+    it("stops asking for the details when disposed while they are open", () => {
+        const vm = create();
+        vm.onConnectionDetails(true);
+        expect(connectionStore.detailed).toBe(true);
+        vm.dispose();
+        expect(connectionStore.detailed).toBe(false);
+        expect(connectionStore.listenerCount(ConnectionStatsStoreEvent.Update)).toBe(0);
     });
 
     it("jumps to the call, and nowhere without one", () => {
@@ -229,6 +474,7 @@ describe("UserPanelViewModel", () => {
         vm.dispose();
         expect(callStore.listenerCount(CallStoreEvent.ConnectedCalls)).toBe(0);
         expect(profileStore.listenerCount(UPDATE_EVENT)).toBe(0);
+        expect(microphone.listenerCount(DeviceAvailabilityEvent.Update)).toBe(0);
         expect(user.listenerCount(UserEvent.Presence)).toBe(0);
     });
 });

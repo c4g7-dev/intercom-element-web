@@ -13,6 +13,23 @@ import { playSoundCue, type SoundCue } from "./Sounds";
  */
 export const OWN_LEAVE_GRACE_MS = 400;
 
+/**
+ * How long a leave sound that was heard stands for the next one too: the end of a call is one
+ * sound. Where the other one of a call of two hangs up and the call plays the sound of that, the
+ * user's own leave that follows within this makes none; nor does a second leave of the user's own.
+ */
+export const LEAVE_HEARD_QUIET_MS = 2000;
+
+/**
+ * Whether the user's own leave sound is played: not if a leave sound was heard less than
+ * {@link LEAVE_HEARD_QUIET_MS} before the user left, or since.
+ * @param leftAt - when the user left, in ms
+ * @param leaveHeardAt - when a leave sound was last heard, the call's or the app's, if ever
+ */
+export function ownLeaveIsHeard(leftAt: number, leaveHeardAt: number | undefined): boolean {
+    return leaveHeardAt === undefined || leftAt - leaveHeardAt >= LEAVE_HEARD_QUIET_MS;
+}
+
 interface Dependencies {
     play?: (cue: SoundCue) => void;
     now?: () => number;
@@ -27,7 +44,12 @@ interface Dependencies {
  *  - leaving one plays the leave sound;
  *  - going from one voice channel to another (a leave and a join within
  *    {@link OWN_LEAVE_GRACE_MS} of each other, in either order) plays the join sound alone;
- *  - a call that was never joined makes no sound when its view goes away.
+ *  - a call that was never joined makes no sound when its view goes away;
+ *  - a call that is left and joined again within the same time (its view was built anew, the
+ *    connection to it came back) makes no sound at all: neither was heard to begin with;
+ *  - the end of a call is one sound: none here where the call has just played the sound of
+ *    somebody else leaving ({@link leaveHeard}, see {@link LEAVE_HEARD_QUIET_MS}), and one for
+ *    two calls left together.
  */
 export class OwnCallCues {
     private static internalInstance: OwnCallCues | undefined;
@@ -42,6 +64,8 @@ export class OwnCallCues {
     private readonly joinedRooms = new Set<string>();
     private lastJoinAt: number | undefined;
     private pendingLeave: ReturnType<typeof setTimeout> | undefined;
+    private pendingLeaveRoom: string | undefined;
+    private leaveHeardAt: number | undefined;
 
     public constructor(deps: Dependencies = {}) {
         this.play = deps.play ?? playSoundCue;
@@ -52,13 +76,23 @@ export class OwnCallCues {
     public joined(roomId: string): void {
         if (this.joinedRooms.has(roomId)) return;
         this.joinedRooms.add(roomId);
-        this.lastJoinAt = this.now();
         if (this.pendingLeave !== undefined) {
-            // The leave that is waiting was the first half of a change of channel
             clearTimeout(this.pendingLeave);
             this.pendingLeave = undefined;
+            // Back in the call whose leave was still waiting: the user never left it
+            if (this.pendingLeaveRoom === roomId) return;
+            // Otherwise that leave was the first half of a change of channel
         }
+        this.lastJoinAt = this.now();
         this.play("join");
+    }
+
+    /**
+     * A leave sound was played by somebody else than this: by the call, for another member who
+     * left it. The user's own leave makes none if it comes right after, or came right before.
+     */
+    public leaveHeard(): void {
+        this.leaveHeardAt = this.now();
     }
 
     /** The user is no longer in the call of a room, or its view went away. */
@@ -69,8 +103,15 @@ export class OwnCallCues {
             if (this.joinedRooms.size > 0) return;
         }
         if (this.pendingLeave !== undefined) clearTimeout(this.pendingLeave);
+        const leftAt = this.now();
+        this.pendingLeaveRoom = roomId;
         this.pendingLeave = setTimeout(() => {
             this.pendingLeave = undefined;
+            this.pendingLeaveRoom = undefined;
+            // Asked now and not when the user left: the call may have said in between that
+            // it played the sound of the other one leaving
+            if (!ownLeaveIsHeard(leftAt, this.leaveHeardAt)) return;
+            this.leaveHeardAt = this.now();
             this.play("leave");
         }, OWN_LEAVE_GRACE_MS);
     }

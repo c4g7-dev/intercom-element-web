@@ -42,6 +42,7 @@ describe("parseCallAction", () => {
         ["--toggle-mute", "toggle-mute"],
         ["--toggle-deafen", "toggle-deafen"],
         ["--toggle-camera", "toggle-camera"],
+        ["--toggle-screenshare", "toggle-screenshare"],
         ["--mute", "mute"],
         ["--unmute", "unmute"],
         ["--leave-call", "leave-call"],

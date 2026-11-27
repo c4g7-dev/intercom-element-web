@@ -152,7 +152,8 @@ export function getArgs(protocolHandler: ProtocolHandler): Args {
                 `                         Also INTERCOM_ENABLE_QUIC=1.`,
         );
         console.log(
-            `  --toggle-mute, --mute, --unmute, --toggle-deafen, --toggle-camera, --leave-call:\n` +
+            `  --toggle-mute, --mute, --unmute, --toggle-deafen, --toggle-camera, --toggle-screenshare,\n` +
+                `  --leave-call:\n` +
                 `                         Act on the call of the InterCom that is already running, and exit. For\n` +
                 `                         global shortcuts, bind them in the compositor or desktop.`,
         );

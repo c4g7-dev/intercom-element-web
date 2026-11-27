@@ -11,6 +11,15 @@ import { type ClientWidgetApi, type IWidgetApiRequest } from "matrix-widget-api"
 import { attachVoiceStateBridge, VoiceStateStore } from "./VoiceStateStore";
 import { OwnCallCues } from "./OwnCallCues";
 import { attachSoundsBridge } from "./SoundsBridge";
+import { type DeviceState, readDeviceState, unavailability } from "./DeviceAvailability";
+import { attachConnectionStatsBridge } from "./ConnectionStats";
+import {
+    ALONE_TIMEOUT_LEFT_REASON,
+    type AloneCountdown,
+    noteAloneDisconnect,
+    readAloneCountdown,
+} from "./AloneTimeout";
+import { showAloneDisconnectToast } from "./AloneDisconnectToast";
 
 /** The widget action Element Call (InterCom build) tells the state of the call on. */
 export const CALL_STATE_WIDGET_ACTION = "io.intercom.call_state";
@@ -28,11 +37,23 @@ export interface CallParticipantState {
 export interface IntercomCallState {
     audioEnabled: boolean;
     videoEnabled: boolean;
+    /** How the microphone and the camera stand: also whether there is one to turn on at all */
+    audioState: DeviceState;
+    videoState: DeviceState;
     deafened: boolean;
     screenSharing: boolean;
+    /** Whether a screen can be shared in the call at all */
+    canShareScreen: boolean;
     reconnecting: boolean;
     /** By user ID */
     participants: Map<string, CallParticipantState>;
+    /**
+     * The countdown of a private call the user was left alone in: when the call leaves by itself.
+     * None while somebody else is there, in a voice channel, or with the setting at "never".
+     */
+    alone?: AloneCountdown;
+    /** Why the call is about to leave by itself, where it says so right before it does */
+    leftReason?: typeof ALONE_TIMEOUT_LEFT_REASON;
 }
 
 export enum CallStateStoreEvent {
@@ -45,9 +66,12 @@ type EventHandlerMap = { [CallStateStoreEvent.Update]: (roomId: string) => void 
 /**
  * Reads what the widget sent. Whatever is missing or of the wrong type is taken for off, and
  * members without a user ID are left out: the widget is the bundled one, but its messages are
- * still only data.
+ * still only data. What a widget from before did not tell yet (whether there is a microphone and
+ * a camera, whether a screen can be shared) is taken for there.
+ * @param now The time, in ms: the call tells how long is left of a countdown, not when it ends
+ * @param previous The state before this one, whose countdown is kept where it is the same one
  */
-export function parseCallState(data: unknown): IntercomCallState {
+export function parseCallState(data: unknown, now = Date.now(), previous?: IntercomCallState): IntercomCallState {
     const raw = (typeof data === "object" && data !== null ? data : {}) as Record<string, unknown>;
     const participants = new Map<string, CallParticipantState>();
     if (Array.isArray(raw.participants)) {
@@ -61,13 +85,21 @@ export function parseCallState(data: unknown): IntercomCallState {
             });
         }
     }
+    const audioEnabled = raw.audio_enabled === true;
+    const videoEnabled = raw.video_enabled === true;
+    const alone = readAloneCountdown(raw.alone, now, previous?.alone);
     return {
-        audioEnabled: raw.audio_enabled === true,
-        videoEnabled: raw.video_enabled === true,
+        audioEnabled,
+        videoEnabled,
+        audioState: readDeviceState(raw.audio_state, audioEnabled),
+        videoState: readDeviceState(raw.video_state, videoEnabled),
         deafened: raw.deafened === true,
         screenSharing: raw.screen_sharing === true,
+        canShareScreen: raw.can_share_screen !== false,
         reconnecting: raw.reconnecting === true,
         participants,
+        ...(alone && { alone }),
+        ...(raw.left_reason === ALONE_TIMEOUT_LEFT_REASON && { leftReason: ALONE_TIMEOUT_LEFT_REASON }),
     };
 }
 
@@ -112,6 +144,11 @@ export function attachCallStateBridge(
     store: CallStateStore = CallStateStore.instance,
     voiceStore: VoiceStateStore = VoiceStateStore.instance,
     ownCues: Pick<OwnCallCues, "joined" | "left"> = OwnCallCues.instance,
+    /** Says that the call ended because the user was alone in it */
+    onAloneDisconnect: (roomId: string) => void = (roomId) => {
+        noteAloneDisconnect(roomId);
+        showAloneDisconnectToast();
+    },
 ): () => void {
     if (!roomId) return () => {};
     // The call asks whose sounds are whose, and for the user's own sound files
@@ -119,14 +156,19 @@ export function attachCallStateBridge(
     // The user's mute and deafen are the app's: the call asks for them, is told their changes,
     // and what it reports of its own microphone and hearing goes back into them
     const detachVoice = attachVoiceStateBridge(widgetApi, roomId, voiceStore);
+    // And how its connection is, for the signal bars of the user panel and the details behind them
+    const detachConnection = attachConnectionStatsBridge(widgetApi, roomId);
     const onAction = (ev: CustomEvent<IWidgetApiRequest>): void => {
         ev.preventDefault(); // stop the widget API from auto-rejecting this
-        const state = parseCallState(ev.detail.data);
+        const state = parseCallState(ev.detail.data, Date.now(), store.getState(roomId));
         store.setState(roomId, state);
+        // The call leaves by itself right after saying so: the user is told why it ended
+        if (state.leftReason === ALONE_TIMEOUT_LEFT_REASON) onAloneDisconnect(roomId);
         // The call tells its state from when the user is in it: the first time is the join
         ownCues.joined(roomId);
         voiceStore.handleCallReport(roomId, {
-            muted: !state.audioEnabled,
+            // A microphone that is not there says nothing about mute: the user's stays as it is
+            muted: unavailability(state.audioState) ? voiceStore.state.muted : !state.audioEnabled,
             deafened: state.deafened,
             reconnecting: state.reconnecting,
         });
@@ -137,6 +179,7 @@ export function attachCallStateBridge(
         widgetApi.off(`action:${CALL_STATE_WIDGET_ACTION}`, onAction);
         detachVoice();
         detachSounds();
+        detachConnection();
         store.clear(roomId);
         // Left, or the call's view went away: the call cannot play the sound of that itself
         ownCues.left(roomId);

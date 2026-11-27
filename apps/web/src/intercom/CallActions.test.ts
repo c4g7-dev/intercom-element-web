@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
     CALL_ACTION_WIDGET_ACTION,
     callActionForKey,
+    changeAloneTimeout,
     installCallShortcuts,
     isCallAction,
     performCallAction,
@@ -69,7 +70,16 @@ describe("call actions", () => {
     afterEach(() => setCalls([]));
 
     it("knows the actions and nothing else", () => {
-        for (const action of ["toggle-mute", "mute", "unmute", "toggle-deafen", "toggle-camera", "leave-call"]) {
+        for (const action of [
+            "toggle-mute",
+            "mute",
+            "unmute",
+            "toggle-deafen",
+            "toggle-camera",
+            "toggle-diagnostics",
+            "stay-in-call",
+            "leave-call",
+        ]) {
             expect(isCallAction(action)).toBe(true);
         }
         for (const other of ["", "quit", "TOGGLE-MUTE", 5, null, undefined, {}])
@@ -84,6 +94,7 @@ describe("call actions", () => {
         expect(callActionForKey(key("M"))).toBe("toggle-mute");
         expect(callActionForKey(key("d"))).toBe("toggle-deafen");
         expect(callActionForKey(key("V"))).toBe("toggle-camera");
+        expect(callActionForKey(key("S"))).toBe("toggle-screenshare");
         expect(callActionForKey(key("x"))).toBeUndefined();
         expect(callActionForKey(key("d", { ctrlKey: true }))).toBeUndefined();
         expect(callActionForKey(key("d", { ctrlKey: true, altKey: true }))).toBeUndefined();
@@ -93,7 +104,13 @@ describe("call actions", () => {
 
     it("passes the camera and the screen share to the call's widget", async () => {
         setCalls([fakeCall("call1")]);
-        for (const action of ["toggle-camera", "toggle-screenshare"]) {
+        for (const action of [
+            "toggle-camera",
+            "toggle-screenshare",
+            "screenshare-settings",
+            "toggle-diagnostics",
+            "stay-in-call",
+        ]) {
             expect(await performCallAction(action, "test")).toBe(1);
             expect(calls[0].send).toHaveBeenLastCalledWith(CALL_ACTION_WIDGET_ACTION, { action });
         }
@@ -129,6 +146,23 @@ describe("call actions", () => {
         expect(await performCallAction("leave-call", "test")).toBe(1);
         expect(calls[0].disconnect).toHaveBeenCalled();
         expect(calls[0].send).not.toHaveBeenCalled();
+    });
+
+    it("keeps another time to stay alone for, and tells the calls that are on", async () => {
+        expect(await changeAloneTimeout(600)).toBe(0);
+        expect(window.localStorage.getItem("intercom_alone_timeout")).toBe("600");
+
+        setCalls([fakeCall("call1"), fakeCall("call2")]);
+        calls[0].send.mockRejectedValue(new Error("not the InterCom call"));
+        expect(await changeAloneTimeout("never")).toBe(1);
+        expect(window.localStorage.getItem("intercom_alone_timeout")).toBe("never");
+        for (const call of calls) {
+            expect(call.send).toHaveBeenLastCalledWith(CALL_ACTION_WIDGET_ACTION, {
+                action: "alone-timeout",
+                timeout: "never",
+            });
+        }
+        window.localStorage.removeItem("intercom_alone_timeout");
     });
 
     it("does nothing without a call, and nothing for what is not an action", async () => {

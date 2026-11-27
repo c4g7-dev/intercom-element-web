@@ -1354,6 +1354,18 @@
         "impossible_dialog_title": "Integrations not allowed"
     },
     "intercom": {
+        "calls": {
+            "alone_disconnected": "You were disconnected because you were alone in the call.",
+            "alone_disconnected_title": "Call ended",
+            "alone_timeout_description": "When everybody else leaves a private call, you stay in it for a while and can choose to stay longer. Voice channels are not affected: you can sit in one alone for as long as you like.",
+            "alone_timeout_label": "Leave a call I am alone in after",
+            "alone_timeout_minutes": {
+                "one": "%(count)s minute",
+                "other": "%(count)s minutes"
+            },
+            "alone_timeout_never": "Never",
+            "heading": "Calls"
+        },
         "channels": {
             "create_text_channel": "Create text channel",
             "create_text_channel_title": "Create a text channel",

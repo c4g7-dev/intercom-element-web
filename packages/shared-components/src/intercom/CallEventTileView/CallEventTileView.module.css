@@ -1,0 +1,254 @@
+/*
+ * Copyright 2026 InterCom contributors
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
+ */
+
+.tile {
+    /* The surface of the room list: one layer under the timeline the tile sits on */
+    --call-tile-bg: var(--intercom-call-tile-bg, var(--ic-roomlist-bg, var(--cpd-color-bg-subtle-secondary)));
+    --call-tile-tone: var(--cpd-color-icon-secondary);
+
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: var(--cpd-space-3x);
+    width: 100%;
+    /* A tile, not a bar across a wide window */
+    max-width: 640px;
+    min-height: 56px;
+    /* All call tiles have a 10px margin at the top and bottom */
+    margin: 10px 0;
+    padding: var(--cpd-space-2x) var(--cpd-space-3x) var(--cpd-space-2x) var(--cpd-space-2x);
+    border: 1px solid var(--ic-separator-color, var(--cpd-color-gray-400));
+    border-radius: 12px;
+    background-color: var(--call-tile-bg);
+    color: var(--cpd-color-text-primary);
+}
+
+.ongoing,
+.ringing {
+    --call-tile-tone: var(--cpd-color-icon-success-primary);
+}
+
+.missed,
+.declined {
+    --call-tile-tone: var(--cpd-color-icon-critical-primary);
+}
+
+/* The state of the call, as a tile of its colour */
+.icon {
+    position: relative;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background-color: color-mix(in srgb, var(--call-tile-tone) 14%, transparent);
+    color: var(--call-tile-tone);
+}
+
+.ended .icon {
+    background-color: var(--cpd-color-bg-action-tertiary-hovered, var(--cpd-color-gray-300));
+    color: var(--cpd-color-icon-tertiary);
+}
+
+/* A running call: the ring of whoever speaks, breathing slowly */
+.ongoing .icon::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--call-tile-tone) 60%, transparent);
+    animation: call-tile-pulse 2.4s ease-in-out infinite;
+}
+
+/* A call that rings: the phone shakes for a moment, then rests */
+.ringing .icon svg {
+    transform-origin: 50% 55%;
+    animation: call-tile-ring 1.8s ease-in-out infinite;
+}
+
+.text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--cpd-space-1x);
+}
+
+.title {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font: var(--cpd-font-body-md-medium);
+}
+
+.ended .title {
+    color: var(--cpd-color-text-secondary);
+}
+
+.details {
+    display: flex;
+    align-items: center;
+    gap: var(--cpd-space-2x);
+    min-width: 0;
+    font: var(--cpd-font-body-sm-regular);
+    color: var(--cpd-color-text-secondary);
+}
+
+.people {
+    flex: none;
+    display: flex;
+    align-items: center;
+    /* Room for the ring around the first avatar */
+    padding-inline-start: 2px;
+}
+
+.person,
+.more {
+    flex: none;
+    display: flex;
+    border-radius: 50%;
+    /* Parts each avatar from the one it lies on */
+    box-shadow: 0 0 0 2px var(--call-tile-bg);
+}
+
+.person + .person,
+.more {
+    margin-inline-start: -5px;
+}
+
+.more {
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background-color: var(--cpd-color-gray-400);
+    color: var(--cpd-color-text-primary);
+    font: var(--cpd-font-body-xs-medium);
+    font-size: 11px;
+    line-height: 20px;
+}
+
+.clock {
+    font-variant-numeric: tabular-nums;
+}
+
+.inCall {
+    flex: none;
+    font: var(--cpd-font-body-sm-medium);
+    color: var(--cpd-color-text-success-primary);
+}
+
+.buttons {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: var(--cpd-space-2x);
+}
+
+.button {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0 var(--cpd-space-4x);
+    border-radius: 8px;
+    background-color: var(--cpd-color-bg-action-tertiary-hovered, var(--cpd-color-gray-300));
+    color: var(--cpd-color-text-primary);
+    font: var(--cpd-font-body-sm-medium);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 80ms ease-out;
+}
+
+.button:hover {
+    background-color: var(--cpd-color-bg-action-tertiary-selected, var(--cpd-color-gray-400));
+}
+
+.button:focus-visible {
+    outline: 2px solid var(--cpd-color-border-focused);
+    outline-offset: 1px;
+}
+
+.button.primary {
+    background-color: var(--cpd-color-bg-accent-rest);
+    color: var(--cpd-color-text-on-solid-primary);
+}
+
+.button.primary:hover {
+    background-color: var(--cpd-color-bg-accent-hovered);
+}
+
+.button.danger {
+    background-color: color-mix(in srgb, var(--cpd-color-icon-critical-primary) 14%, transparent);
+    color: var(--cpd-color-text-critical-primary);
+}
+
+.button.danger:hover {
+    background-color: color-mix(in srgb, var(--cpd-color-icon-critical-primary) 24%, transparent);
+}
+
+.button:disabled {
+    background-color: var(--cpd-color-bg-action-tertiary-hovered, var(--cpd-color-gray-300));
+    color: var(--cpd-color-text-disabled);
+    cursor: default;
+}
+
+.time {
+    flex: none;
+    font: var(--cpd-font-body-xs-regular);
+    color: var(--cpd-color-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+@keyframes call-tile-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.25;
+    }
+}
+
+@keyframes call-tile-ring {
+    0%,
+    36%,
+    100% {
+        transform: rotate(0);
+    }
+
+    6%,
+    18%,
+    30% {
+        transform: rotate(-11deg);
+    }
+
+    12%,
+    24% {
+        transform: rotate(11deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* The ring stays, still; the phone does not move */
+    .ongoing .icon::after,
+    .ringing .icon svg {
+        animation: none;
+    }
+
+    .button {
+        transition: none;
+    }
+}

@@ -6,7 +6,7 @@ Please see LICENSE files in the repository root for full details.
 */
 
 /**
- * Call actions from outside the window: mute, deafen, camera, leave.
+ * Call actions from outside the window: mute, deafen, camera, screen share, leave.
  *
  * Wayland compositors give an application no global shortcuts of its own, so the actions are
  * command line switches. `intercom --toggle-mute` started while InterCom runs is a second
@@ -28,6 +28,7 @@ const ACTION_SWITCHES = {
     "--toggle-mute": "toggle-mute",
     "--toggle-deafen": "toggle-deafen",
     "--toggle-camera": "toggle-camera",
+    "--toggle-screenshare": "toggle-screenshare",
     "--mute": "mute",
     "--unmute": "unmute",
     "--leave-call": "leave-call",

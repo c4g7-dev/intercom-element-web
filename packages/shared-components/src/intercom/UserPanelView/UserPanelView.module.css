@@ -15,6 +15,8 @@
     /* A card on the room list: its own surface, no frame */
     --user-panel-separator: var(--cpd-color-gray-400);
     overflow: hidden;
+    /* The strip of the call is laid out by the width the room list leaves the panel */
+    container: intercom-user-panel / inline-size;
 }
 
 .call {
@@ -32,13 +34,45 @@
     min-width: 0;
 }
 
+.callInfo {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+/* The bars and the state: one button, which opens the details of the connection */
+.callConnection {
+    all: unset;
+    box-sizing: border-box;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--cpd-space-1-5x);
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.callConnection:focus-visible,
+.callRoom:focus-visible {
+    outline: 2px solid var(--cpd-color-border-focused);
+    outline-offset: 2px;
+}
+
+/* The bars say how good the connection is: green, amber, and red for poor or lost */
 .callSignal {
     display: flex;
     flex: none;
     color: var(--cpd-color-icon-success-primary);
 }
 
-.callSignal.reconnecting {
+.callSignal[data-level="fair"] {
+    color: var(--cpd-color-icon-warning-primary, #d9a400);
+}
+
+.callSignal[data-level="poor"],
+.callSignal[data-level="reconnecting"] {
     color: var(--cpd-color-icon-critical-primary);
 }
 
@@ -46,41 +80,111 @@
     display: block;
 }
 
-.callInfo {
-    all: unset;
-    box-sizing: border-box;
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    cursor: pointer;
-    border-radius: 4px;
-}
-
-.callInfo:focus-visible {
-    outline: 2px solid var(--cpd-color-border-focused);
-    outline-offset: 2px;
-}
-
 .callState {
     font: var(--cpd-font-body-sm-semibold);
     color: var(--cpd-color-text-success-primary);
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .callState.reconnecting {
     color: var(--cpd-color-text-critical-primary);
 }
 
+.callConnection:hover .callState {
+    text-decoration: underline;
+}
+
+/* The room's name: the way back to the call, under the state and in line with its words */
 .callRoom {
+    all: unset;
+    box-sizing: border-box;
+    max-width: 100%;
+    /* The bars and the gap beside them */
+    padding-inline-start: calc(18px + var(--cpd-space-1-5x));
     font: var(--cpd-font-body-xs-regular);
     color: var(--cpd-color-text-secondary);
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+    cursor: pointer;
+    border-radius: 4px;
 }
 
-.callInfo:hover .callRoom {
+.callRoom:hover {
     text-decoration: underline;
+}
+
+/* Left alone in a private call: what is left of the time, and Stay / Leave. One line, between
+   the state of the call and its buttons */
+.callAlone {
+    display: flex;
+    align-items: center;
+    gap: var(--cpd-space-1x);
+    min-width: 0;
+}
+
+.aloneText {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    gap: var(--cpd-space-1x);
+    font: var(--cpd-font-body-xs-regular);
+    color: var(--cpd-color-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.aloneWords {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.aloneMore {
+    flex: none;
+}
+
+.aloneTime {
+    flex: none;
+    font: var(--cpd-font-body-xs-semibold);
+    color: var(--cpd-color-text-primary);
+    /* The digits change every second and must not move what is beside them */
+    font-variant-numeric: tabular-nums;
+}
+
+.aloneButton {
+    all: unset;
+    box-sizing: border-box;
+    flex: none;
+    min-height: 24px;
+    padding: 0 var(--cpd-space-2x);
+    border-radius: 6px;
+    background-color: var(--cpd-color-bg-action-tertiary-hovered);
+    color: var(--cpd-color-text-primary);
+    font: var(--cpd-font-body-xs-medium);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.aloneButton:hover {
+    background-color: var(--cpd-color-bg-action-tertiary-selected);
+}
+
+.aloneButton:focus-visible {
+    outline: 2px solid var(--cpd-color-border-focused);
+    outline-offset: 1px;
+}
+
+.aloneLeave {
+    background-color: transparent;
+    color: var(--cpd-color-text-critical-primary);
+}
+
+.aloneLeave:hover {
+    background-color: var(--cpd-color-bg-critical-subtle);
 }
 
 .callButtons {
@@ -126,6 +230,39 @@
 .callButton.on {
     background-color: var(--cpd-color-bg-accent-rest);
     color: var(--cpd-color-text-on-solid-primary);
+}
+
+/* What cannot be used here (no camera, no screen to share): it says why and does nothing */
+.callButton[aria-disabled="true"],
+.callButton[aria-disabled="true"]:hover {
+    background-color: var(--cpd-color-bg-action-tertiary-hovered);
+    color: var(--cpd-color-text-disabled);
+    cursor: default;
+}
+
+/* The share button and the chevron of its settings: one control in two parts */
+.callSplit {
+    display: flex;
+    min-width: 0;
+    gap: 1px;
+}
+
+.callSplit > .callButton:first-child {
+    flex: 1;
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+}
+
+.callSplit > .callChevron {
+    flex: none;
+    padding: 0 var(--cpd-space-1x);
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+}
+
+.callSplit > .callChevron svg {
+    width: 16px;
+    height: 16px;
 }
 
 .user {
@@ -225,6 +362,15 @@
     background-color: var(--cpd-color-bg-critical-subtle-hovered);
 }
 
+/* No microphone to turn on: its own icon, greyed, with the badge that says so (not the red of
+   muted, which is the user's own doing) */
+.voice.unavailable,
+.voice.unavailable:hover {
+    color: var(--cpd-color-icon-disabled);
+    background-color: transparent;
+    cursor: default;
+}
+
 /* The settings button, with a dot on it while an update waits for a restart */
 .settings {
     position: relative;
@@ -241,4 +387,38 @@
     background-color: var(--cpd-color-icon-success-primary);
     box-shadow: 0 0 0 2px var(--intercom-user-panel-bg, var(--cpd-color-bg-subtle-secondary));
     pointer-events: none;
+}
+
+.callLabel {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* A narrow room list: the words of the call's buttons would be cut off ("Share scree"), so the
+   buttons are their icons, as high as before and as wide as each other. Their names stay in the
+   tooltip and for screen readers. 324 px is where "Camera" and "Stop sharing" still fit beside
+   their icons and the chevron. */
+@container intercom-user-panel (max-width: 323px) {
+    .callLabel {
+        display: none;
+    }
+
+    .callButton {
+        padding: 0 var(--cpd-space-1x);
+    }
+
+    /* "Alone · 4:59" says it there; the whole of it is in the title */
+    .aloneMore {
+        display: none;
+    }
+}
+
+/* The name and the presence give way with an ellipsis; the buttons beside them never do */
+.user > :not(.identity) {
+    flex: none;
+}
+
+.names {
+    flex: 1;
 }

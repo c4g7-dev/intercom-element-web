@@ -10,7 +10,8 @@ Please see LICENSE files in the repository root for full details.
  *
  * A file named after a cue in `<profile>/sounds/` (on Linux `~/.config/InterCom/sounds/`, on
  * Windows `%APPDATA%\InterCom\sounds\`) is played instead of the built-in sound: `join`, `leave`,
- * `mute`, `unmute`, `deafen` and `undeafen`, as `.ogg`, `.mp3` or `.wav`, 2 MB at most. The files
+ * `mute`, `unmute`, `deafen`, `undeafen`, and the two loops `ringtone` (a call coming in) and
+ * `ringback` (a call going out), as `.ogg`, `.mp3` or `.wav`, 2 MB at most. The files
  * are read when the web app asks for them, which it does when it starts, and handed to it as
  * they are. Nothing else is done with them: they are not copied, not uploaded and not logged; the
  * diagnostics log gets the names of the files that were taken and of those that were not.
@@ -25,7 +26,7 @@ import { logDiagnostics } from "./intercom-diagnostics.js";
 export const SOUNDS_CHANNEL = "intercomSounds";
 
 /** The cues a file can be given for. */
-export const SOUND_CUES = ["join", "leave", "mute", "unmute", "deafen", "undeafen"] as const;
+export const SOUND_CUES = ["join", "leave", "mute", "unmute", "deafen", "undeafen", "ringtone", "ringback"] as const;
 export type SoundCue = (typeof SOUND_CUES)[number];
 
 /** The kinds of file that are taken, the preferred one first, with what the web app is told they are. */

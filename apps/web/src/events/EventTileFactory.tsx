@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Com
 Please see LICENSE files in the repository root for full details.
 */
 
-import React, { type JSX, useContext, useEffect } from "react";
+import React, { type JSX, useEffect } from "react";
 import {
     type MatrixEvent,
     EventType,
@@ -23,7 +23,6 @@ import {
     MJitsiWidgetEventView,
     MKeyVerificationRequestView,
     RoomAvatarEventView,
-    RootCallTileView,
     TextualEventView,
     ViewSourceEventView,
     useCreateAutoDisposedViewModel,
@@ -34,8 +33,6 @@ import type LegacyCallEventGrouper from "../components/structures/LegacyCallEven
 import { type IEventTileType, type EventTileProps } from "../components/views/rooms/EventTile";
 import { TimelineRenderingType } from "../contexts/RoomContext";
 import MessageEvent from "../components/views/messages/MessageEvent";
-import LegacyCallEvent from "../components/views/messages/LegacyCallEvent";
-import { CallEvent } from "../components/views/messages/CallEvent";
 import { RoomPredecessorTile } from "../components/views/messages/RoomPredecessorTile";
 import RoomAvatar from "../components/views/avatars/RoomAvatar";
 import { WIDGET_LAYOUT_EVENT_TYPE } from "../stores/widgets/WidgetLayoutStore";
@@ -57,8 +54,7 @@ import { TextualEventViewModel } from "../viewmodels/room/timeline/event-tile/Te
 import { HiddenBodyViewModel } from "../viewmodels/room/timeline/event-tile/body/HiddenBodyViewModel";
 import { ViewSourceEventViewModel } from "../viewmodels/room/timeline/event-tile/body/ViewSourceEventViewModel";
 import { ElementCallEventType } from "../call-types";
-import { RootCallTileViewModel } from "../viewmodels/room/timeline/event-tile/call/RootCallTileViewModel";
-import { SDKContext } from "../contexts/SDKContext";
+import { LegacyCallEventTile, RtcCallEventTile, StateCallEventTile } from "../intercom/CallEventTile";
 
 // Subset of EventTile's IProps plus some mixins
 export interface EventTileTypeProps extends Pick<
@@ -87,10 +83,11 @@ type FactoryProps = Omit<EventTileTypeProps, "ref">;
 type Factory<X = FactoryProps> = (ref: React.RefObject<any> | undefined, props: X) => JSX.Element;
 
 export const MessageEventFactory: Factory = (ref, props) => <MessageEvent ref={ref} {...props} />;
-const LegacyCallEventFactory: Factory<FactoryProps & { callEventGrouper: LegacyCallEventGrouper }> = (ref, props) => (
-    <LegacyCallEvent ref={ref} {...props} />
+// InterCom: the tiles of calls are InterCom's own (intercom/CallEventTile), one look for every kind of call
+const LegacyCallEventFactory: Factory<FactoryProps & { callEventGrouper: LegacyCallEventGrouper }> = (_ref, props) => (
+    <LegacyCallEventTile mxEvent={props.mxEvent} callEventGrouper={props.callEventGrouper} />
 );
-const CallEventFactory: Factory = (ref, props) => <CallEvent ref={ref} {...props} />;
+const CallEventFactory: Factory = (_ref, props) => <StateCallEventTile mxEvent={props.mxEvent} />;
 export const TextualEventFactory: Factory = (ref, props) => {
     const vm = new TextualEventViewModel(props);
     return <TextualEventView vm={vm} className="mx_TextualEvent" />;
@@ -189,25 +186,8 @@ function RoomAvatarEventWrappedView({ mxEvent, ref }: IBodyProps): JSX.Element {
 }
 const RoomAvatarEventFactory: Factory = (ref, props) => <RoomAvatarEventWrappedView ref={ref} {...props} />;
 
-function CallStartedTileViewWrapped({ mxEvent, getRelationsForEvent }: IBodyProps): JSX.Element {
-    const sdkContext = useContext(SDKContext);
-    const cli = useMatrixClientContext();
-    const vm = useCreateAutoDisposedViewModel(
-        () =>
-            new RootCallTileViewModel({
-                mxEvent,
-                getRelationsForEvent,
-                cli,
-                callStore: sdkContext.callStore,
-                latestRtcNotificationEventStore: sdkContext.latestRtcNotificationEventStore,
-                legacyCallHandler: sdkContext.legacyCallHandler,
-            }),
-    );
-    return <RootCallTileView vm={vm} />;
-}
-
-export const CallStartedEventFactory: Factory = (ref, props) => {
-    return <CallStartedTileViewWrapped {...props} />;
+export const CallStartedEventFactory: Factory = (_ref, props) => {
+    return <RtcCallEventTile mxEvent={props.mxEvent} getRelationsForEvent={props.getRelationsForEvent} />;
 };
 
 // These factories are exported for reference comparison against pickFactory()

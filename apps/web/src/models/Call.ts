@@ -41,6 +41,7 @@ import ActiveWidgetStore, { ActiveWidgetStoreEvent } from "../stores/ActiveWidge
 import { getCurrentLanguage } from "../languageHandler";
 import { Anonymity, PosthogAnalytics } from "../PosthogAnalytics";
 import { isVideoRoom } from "../utils/video-rooms";
+import { ALONE_TIMEOUT_URL_PARAM, aloneTimeoutParam } from "../intercom/AloneTimeout";
 import { FontWatcher } from "../settings/watchers/FontWatcher";
 import { type JitsiCallMemberContent, JitsiCallMemberEventType } from "../call-types";
 import SdkConfig from "../SdkConfig.ts";
@@ -918,6 +919,10 @@ export class ElementCall extends Call {
         // InterCom: joining a voice channel is dropping in, not calling its members: no notification
         const room = client.getRoom(roomId);
         if (room && isVideoRoom(room)) params.append("sendNotificationType", "none");
+        // InterCom: left alone in a call that is not a voice channel, the user stays for a while
+        // (their setting) instead of the call ending the moment the other side leaves
+        const aloneTimeout = aloneTimeoutParam(room);
+        if (aloneTimeout !== undefined) params.append(ALONE_TIMEOUT_URL_PARAM, aloneTimeout);
 
         const rageshakeSubmitUrl = SdkConfig.get("bug_report_endpoint_url");
         if (rageshakeSubmitUrl && rageshakeSubmitUrl !== BugReportEndpointURLLocal) {

@@ -7,9 +7,12 @@
 
 export type {
     UserPanelCall,
+    UserPanelDeviceUnavailability,
     UserPanelPresence,
     UserPanelViewActions,
     UserPanelViewModel,
     UserPanelViewSnapshot,
 } from "./UserPanelView";
+export type { UserPanelConnection, UserPanelConnectionTransport } from "./ConnectionPopover";
+export type { UserPanelConnectionQuality } from "./SignalBars";
 export { UserPanelView } from "./UserPanelView";

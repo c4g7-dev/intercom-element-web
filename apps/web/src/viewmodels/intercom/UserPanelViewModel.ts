@@ -17,7 +17,9 @@ import { CallStore, CallStoreEvent } from "../../stores/CallStore";
 import { type Call } from "../../models/Call";
 import { CallStateStore, CallStateStoreEvent } from "../../intercom/CallStateStore";
 import { type CallAction, performCallAction } from "../../intercom/CallActions";
+import { averageRtt, ConnectionStatsStore, ConnectionStatsStoreEvent } from "../../intercom/ConnectionStats";
 import { VoiceStateStore, VoiceStateStoreEvent } from "../../intercom/VoiceStateStore";
+import { DeviceAvailabilityEvent, MicrophoneAvailability, unavailability } from "../../intercom/DeviceAvailability";
 import { OwnProfileStore } from "../../stores/OwnProfileStore";
 import { UPDATE_EVENT } from "../../stores/AsyncStore";
 import dispatcher from "../../dispatcher/dispatcher";
@@ -28,8 +30,12 @@ interface Props {
     client: MatrixClient;
     callStore?: CallStore;
     callStateStore?: CallStateStore;
+    /** How the call's connection is, for the signal bars and the details behind them */
+    connectionStore?: ConnectionStatsStore;
     /** The user's mute and deafen, which hold with or without a call */
     voiceStateStore?: VoiceStateStore;
+    /** Whether there is a microphone, as the app sees it: what counts while no call tells */
+    microphone?: MicrophoneAvailability;
     profileStore?: OwnProfileStore;
     /** Carries a call action out; the same as the shortcuts use */
     performAction?: (action: CallAction, source: string) => Promise<number>;
@@ -47,15 +53,21 @@ const PRESENCES = new Set<string>(["online", "unavailable", "offline", "busy"]);
 export class UserPanelViewModel extends BaseViewModel<UserPanelViewSnapshot, Props> implements UserPanelViewActions {
     private readonly callStore: CallStore;
     private readonly callStateStore: CallStateStore;
+    private readonly connectionStore: ConnectionStatsStore;
+    /** Whether the details of the connection are on screen: only then they are asked for and in the snapshot */
+    private connectionDetailsOpen = false;
     private readonly voiceStateStore: VoiceStateStore;
+    private readonly microphone: MicrophoneAvailability;
     private readonly profileStore: OwnProfileStore;
     private readonly user: User | null;
 
     public constructor(props: Props) {
         const callStore = props.callStore ?? CallStore.instance;
         const callStateStore = props.callStateStore ?? CallStateStore.instance;
+        const connectionStore = props.connectionStore ?? ConnectionStatsStore.instance;
         const profileStore = props.profileStore ?? OwnProfileStore.instance;
         const voiceStateStore = props.voiceStateStore ?? VoiceStateStore.instance;
+        const microphone = props.microphone ?? MicrophoneAvailability.instance;
         const user = props.client.getUser(props.client.getSafeUserId());
         super(
             props,
@@ -66,17 +78,29 @@ export class UserPanelViewModel extends BaseViewModel<UserPanelViewSnapshot, Pro
                 callStateStore,
                 profileStore,
                 voiceStateStore,
+                microphone,
+                connectionStore,
+                false,
             ),
         );
         this.callStore = callStore;
         this.callStateStore = callStateStore;
+        this.connectionStore = connectionStore;
         this.voiceStateStore = voiceStateStore;
+        this.microphone = microphone;
         this.profileStore = profileStore;
         this.user = user;
 
         this.disposables.trackListener(callStore, CallStoreEvent.ConnectedCalls, this.update);
         this.disposables.trackListener(callStateStore, CallStateStoreEvent.Update, this.update);
+        this.disposables.trackListener(connectionStore, ConnectionStatsStoreEvent.Update, this.update);
+        // The calls tell the details only while somebody looks: not after the panel is gone
+        this.disposables.track(() => {
+            if (this.connectionDetailsOpen) connectionStore.setDetailed(false);
+        });
         this.disposables.trackListener(voiceStateStore, VoiceStateStoreEvent.Update, this.update);
+        this.disposables.trackListener(microphone, DeviceAvailabilityEvent.Update, this.update);
+        microphone.watch();
         this.disposables.trackListener(profileStore, UPDATE_EVENT, this.update);
         if (user) this.disposables.trackListener(user, UserEvent.Presence, this.update);
     }
@@ -93,10 +117,15 @@ export class UserPanelViewModel extends BaseViewModel<UserPanelViewSnapshot, Pro
         callStateStore: CallStateStore,
         profileStore: OwnProfileStore,
         voiceStateStore: VoiceStateStore,
+        microphone: MicrophoneAvailability,
+        connectionStore: ConnectionStatsStore,
+        connectionDetailsOpen: boolean,
     ): UserPanelViewSnapshot {
         const userId = client.getSafeUserId();
         const call = UserPanelViewModel.currentCall(callStore);
         const state = call ? callStateStore.getState(call.roomId) : undefined;
+        const connection = call ? connectionStore.getStats(call.roomId) : undefined;
+        const pingHistory = call && connectionDetailsOpen ? connectionStore.getRttSeries(call.roomId) : [];
         const presence = user?.presence && PRESENCES.has(user.presence) ? user.presence : undefined;
         return {
             userId,
@@ -106,13 +135,29 @@ export class UserPanelViewModel extends BaseViewModel<UserPanelViewSnapshot, Pro
             presence: presence === "offline" && !user?.lastPresenceTs ? undefined : (presence as UserPanelPresence),
             // The app's own state, which the calls follow: there with or without a call
             muted: voiceStateStore.state.muted,
+            // The call opens the microphone and knows best; without one the app looks itself
+            micUnavailable: state ? unavailability(state.audioState) : microphone.unavailable,
             deafened: voiceStateStore.state.deafened,
             call: call && {
                 roomName: client.getRoom(call.roomId)?.name ?? call.roomId,
                 reconnecting: state?.reconnecting ?? false,
                 cameraOn: state?.videoEnabled ?? false,
+                cameraUnavailable: state && unavailability(state.videoState),
                 screenSharing: state?.screenSharing ?? false,
+                canShareScreen: state?.canShareScreen ?? true,
                 controllable: state !== undefined,
+                aloneDeadline: state?.alone?.deadline,
+                quality: connection?.quality,
+                // The figures change every second: they are in the snapshot only while they are shown
+                connection:
+                    connection && connectionDetailsOpen
+                        ? {
+                              pingMs: connection.rttMs,
+                              averagePingMs: averageRtt(pingHistory),
+                              pingHistory,
+                              ...connection.detail,
+                          }
+                        : undefined,
             },
         };
     }
@@ -125,6 +170,9 @@ export class UserPanelViewModel extends BaseViewModel<UserPanelViewSnapshot, Pro
             this.callStateStore,
             this.profileStore,
             this.voiceStateStore,
+            this.microphone,
+            this.connectionStore,
+            this.connectionDetailsOpen,
         );
         // The call tells its state whenever somebody starts or stops speaking, which is none of the panel's
         if (JSON.stringify(next) !== JSON.stringify(this.snapshot.current)) this.snapshot.set(next);
@@ -141,12 +189,21 @@ export class UserPanelViewModel extends BaseViewModel<UserPanelViewSnapshot, Pro
     public onToggleCamera = (): void => this.perform("toggle-camera");
 
     public onToggleScreenShare = (): void => {
-        // What to share is chosen in the call, so the call is shown first
-        if (!this.snapshot.current.call?.screenSharing) this.onJumpToCall();
+        // The call starts the share at once with the settings of the last one. The first time it
+        // asks for them, in a dialog over the whole window, wherever the call is
         this.perform("toggle-screenshare");
     };
 
+    public onOpenShareSettings = (): void => {
+        // The dialog belongs to the call's view: a call that is only a small picture in the
+        // corner shows none, so the call is shown first
+        this.onJumpToCall();
+        this.perform("screenshare-settings");
+    };
+
     public onLeaveCall = (): void => this.perform("leave-call");
+
+    public onStayInCall = (): void => this.perform("stay-in-call");
 
     public onJumpToCall = (): void => {
         const call = UserPanelViewModel.currentCall(this.callStore);
@@ -157,6 +214,20 @@ export class UserPanelViewModel extends BaseViewModel<UserPanelViewSnapshot, Pro
             view_call: true,
             metricsTrigger: undefined,
         });
+    };
+
+    public onConnectionDetails = (open: boolean): void => {
+        if (this.connectionDetailsOpen === open) return;
+        this.connectionDetailsOpen = open;
+        this.connectionStore.setDetailed(open);
+        this.update();
+    };
+
+    public onOpenDiagnostics = (): void => {
+        // The overlay is drawn over the call: a call that is only a small picture in the corner
+        // has no room for it, so the call is shown first
+        this.onJumpToCall();
+        this.perform("toggle-diagnostics");
     };
 
     public onOpenSettings = (): void => {

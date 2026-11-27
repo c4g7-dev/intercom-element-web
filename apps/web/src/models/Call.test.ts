@@ -820,6 +820,26 @@ describe("ElementCall", () => {
             );
         });
 
+        it("gives the time to stay alone for to a call, but not in a voice channel (InterCom)", async () => {
+            const aloneTimeout = (call: Call | null): string | null => {
+                if (!(call instanceof ElementCall)) throw new Error("Failed to create call");
+                return new URLSearchParams(new URL(call.widget.url).hash.slice(1)).get("intercomAloneTimeout");
+            };
+            ElementCall.create(room);
+            expect(aloneTimeout(Call.get(room))).toBe("300");
+            Call.get(room)?.destroy();
+
+            window.localStorage.setItem("intercom_alone_timeout", "never");
+            ElementCall.create(room);
+            expect(aloneTimeout(Call.get(room))).toBe("never");
+            Call.get(room)?.destroy();
+
+            vi.spyOn(room, "isElementVideoRoom").mockReturnValue(true);
+            ElementCall.create(room);
+            expect(aloneTimeout(Call.get(room))).toBeNull();
+            window.localStorage.removeItem("intercom_alone_timeout");
+        });
+
         it("requests correct intent when joining a non-DM call", async () => {
             roomSession.memberships = [{} as CallMembership]; // Remote party is already there
             ElementCall.create(room);

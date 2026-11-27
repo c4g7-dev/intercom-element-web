@@ -107,4 +107,59 @@ describe("PersistedElement", () => {
         // And forgets the detached state once destroyed
         PersistedElement.reattach("widget_unknown");
     });
+
+    describe("InterCom: the whole window for a dialog of the tree", () => {
+        it("covers the window without moving the tree, and goes back to its placeholder", async () => {
+            mount();
+            await act(async () => {});
+            const node = child();
+            const parent = node.parentElement;
+
+            expect(PersistedElement.setOverlay(persistKey, true)).toBe(true);
+            expect(PersistedElement.isOverlay(persistKey)).toBe(true);
+            // The same element in the same place of the DOM: nothing in it is loaded again
+            expect(child()).toBe(node);
+            expect(node.parentElement).toBe(parent);
+            expect(node.style.position).toBe("fixed");
+            expect(node.style.width).toBe("100vw");
+            expect(node.style.height).toBe("100vh");
+            expect(node.classList.contains("mx_PersistedElement_overlay")).toBe(true);
+            expect(PersistedElement.placeholderRect(persistKey)).toBeDefined();
+
+            expect(PersistedElement.setOverlay(persistKey, false)).toBe(true);
+            expect(node.style.position).toBe("absolute");
+            expect(node.classList.contains("mx_PersistedElement_overlay")).toBe(false);
+        });
+
+        it("stays over the window while its placeholder is away, and is hidden once it gives the window back", async () => {
+            const { unmount } = mount();
+            await act(async () => {});
+            PersistedElement.setOverlay(persistKey, true);
+            unmount();
+            expect(child().style.display).toBe("block");
+            expect(PersistedElement.placeholderRect(persistKey)).toBeUndefined();
+            PersistedElement.setOverlay(persistKey, false);
+            expect(child().style.display).toBe("none");
+        });
+
+        it("is refused for a tree that is not there or in a window of its own, and revoked when it leaves", async () => {
+            expect(PersistedElement.setOverlay("widget_unknown", true)).toBe(false);
+            mount();
+            await act(async () => {});
+            let revoked = 0;
+            const forget = PersistedElement.onOverlayRevoked(persistKey, () => revoked++);
+            PersistedElement.setOverlay(persistKey, true);
+
+            const host = document.createElement("div");
+            document.body.appendChild(host);
+            act(() => void PersistedElement.detach(persistKey, host));
+            expect(revoked).toBe(1);
+            expect(PersistedElement.isOverlay(persistKey)).toBe(false);
+            expect(PersistedElement.setOverlay(persistKey, true)).toBe(false);
+
+            act(() => void PersistedElement.reattach(persistKey));
+            forget();
+            host.remove();
+        });
+    });
 });
