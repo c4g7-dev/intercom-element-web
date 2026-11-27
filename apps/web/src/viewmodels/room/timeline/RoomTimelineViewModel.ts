@@ -52,6 +52,7 @@ import {
     type GalleryCandidate,
 } from "../../../intercom/gallery/grouping";
 import { galleryOfItem, type GalleryEventTimelineItem } from "../../../intercom/gallery/timelineItem";
+import { countUnreadAfter, formatUnreadSince, unreadSinceReadMarker } from "../../../intercom/UnreadSince";
 
 const DEBUG_TIMELINE = false;
 
@@ -420,6 +421,9 @@ export class RoomTimelineViewModel
             canJumpToReadMarker: false,
             numUnreadMessages: 0,
             hasHighlights: false,
+            unreadSinceCount: null,
+            unreadSinceTime: null,
+            unreadBelowCount: 0,
             readReceiptsByEvent: new Map(),
             lastSuccessfulEventId: null,
         });
@@ -589,7 +593,7 @@ export class RoomTimelineViewModel
                     atLiveEnd,
                     numUnreadMessages: this.isAtBottom ? 0 : this.unreadMessageCount,
                     hasHighlights: this.opts.room.getUnreadNotificationCount(NotificationCountType.Highlight) > 0,
-                    canJumpToReadMarker: this.computeCanJumpToReadMarker(items),
+                    ...this.readMarkerFields(items),
                 });
             })
             .catch((err) => {
@@ -684,7 +688,7 @@ export class RoomTimelineViewModel
         const itemsNew = this.buildItems();
         const prevLength = this.baseItems.length;
 
-        const newCanJumpToReadMarker = this.computeCanJumpToReadMarker(itemsNew);
+        const readMarkerFields = this.readMarkerFields(itemsNew);
         const newHasHighlights = this.opts.room.getUnreadNotificationCount(NotificationCountType.Highlight) > 0;
 
         // Swap in the rebuilt list. Where decryption has revealed a message we were holding back,
@@ -698,16 +702,13 @@ export class RoomTimelineViewModel
             // No rows gained or lost — everything that decrypted turned out to be something we
             // do not show anyway, like a reaction or an edit. Just refresh the derived flags;
             // mergeSnapshot skips the update entirely if none of them actually moved.
-            this.mergeSnapshot(
-                { canJumpToReadMarker: newCanJumpToReadMarker, hasHighlights: newHasHighlights },
-                "decrypt-flush(no-op)",
-            );
+            this.mergeSnapshot({ ...readMarkerFields, hasHighlights: newHasHighlights }, "decrypt-flush(no-op)");
             return;
         }
 
         // Items grew (typical: historical encrypted events newly decrypted).
         this.republish(`decrypt-flush(+${newlyShown})`, {
-            canJumpToReadMarker: newCanJumpToReadMarker,
+            ...readMarkerFields,
             hasHighlights: newHasHighlights,
         });
     }
@@ -794,7 +795,7 @@ export class RoomTimelineViewModel
             this.commitItems(this.buildItems());
             this.republish("local-echo", {
                 atLiveEnd: !this.timelineWindow.canPaginate(Direction.Forward),
-                canJumpToReadMarker: this.computeCanJumpToReadMarker(this.baseItems),
+                ...this.readMarkerFields(this.baseItems),
             });
             // A message taking its server id keeps its row, so the view reports no new range, yet
             // the bottom row may now take a receipt. Re-read it from the range last reported.
@@ -923,7 +924,7 @@ export class RoomTimelineViewModel
                 atLiveEnd: !this.timelineWindow.canPaginate(Direction.Forward),
                 pendingAnchor,
                 highlightedEventId: target.kind === "permalink" ? target.eventId : null,
-                canJumpToReadMarker: this.computeCanJumpToReadMarker(items),
+                ...this.readMarkerFields(items),
             });
 
             // If all events in the initial window were filtered (items empty) but more
@@ -1078,6 +1079,8 @@ export class RoomTimelineViewModel
         this.visibleEndArrayIndex = Math.max(0, endIndex);
 
         this.lastBottomEventId = this.bottomConfirmedEventId(items) ?? this.lastBottomEventId;
+        // InterCom: the unread messages below the view, for the bar at the bottom
+        this.mergeSnapshot({ unreadBelowCount: this.computeUnreadBelow() }, "range-changed(unread-below)");
 
         // Recompute canJumpToReadMarker when the visible range moves.
         if (this.visibleStartArrayIndex !== prevStartArrayIndex || this.visibleEndArrayIndex !== prevEndArrayIndex) {
@@ -1212,7 +1215,16 @@ export class RoomTimelineViewModel
         this.readMarkerEventId = null;
         this.frozenMarkerEventId = null;
         const newItems = this.buildItems(); // removes the read-marker item
-        this.mergeSnapshot({ items: newItems, canJumpToReadMarker: false }, "mark-all-as-read");
+        this.mergeSnapshot(
+            {
+                items: newItems,
+                canJumpToReadMarker: false,
+                unreadSinceCount: null,
+                unreadSinceTime: null,
+                unreadBelowCount: 0,
+            },
+            "mark-all-as-read",
+        );
     };
 
     public onJumpToLive = (scrollNow: ImmediateScroll): void => {
@@ -1234,6 +1246,26 @@ export class RoomTimelineViewModel
                 this.mergeSnapshot({ numUnreadMessages: 0, hasHighlights: false }, "jump-to-live-empty");
             }
         }
+    };
+
+    /**
+     * InterCom: scroll through {@link pendingAnchor}, for a jump asked for from outside the view
+     * (the keyboard), where the view's own scroll handle is not at hand. The view scrolls to the
+     * anchor as soon as it renders, and reports back with {@link onAnchorReached}.
+     */
+    private readonly scrollThroughAnchor: ImmediateScroll = (anchor) => {
+        this.mergeSnapshot({ pendingAnchor: anchor }, "keyboard-jump");
+    };
+
+    /** InterCom: Escape, "Dismiss read marker and jump to bottom": everything read, then the newest messages. */
+    public dismissReadMarkerAndJumpToPresent = (): void => {
+        this.onMarkAllAsRead();
+        this.onJumpToLive(this.scrollThroughAnchor);
+    };
+
+    /** InterCom: Shift+Page Up, "Jump to oldest unread message". */
+    public jumpToReadMarker = (): void => {
+        this.onJumpToReadMarker(this.scrollThroughAnchor);
     };
 
     /**
@@ -1272,6 +1304,51 @@ export class RoomTimelineViewModel
         if (rmIdx < this.visibleStartArrayIndex) return "above";
         if (rmIdx > this.visibleEndArrayIndex) return "below";
         return false;
+    }
+
+    /**
+     * InterCom: what the bar at the top needs of the read marker: where it is (see
+     * {@link computeCanJumpToReadMarker}), and how many messages after it are unread since when
+     * ("12 new messages since 14:32"), counted after the marker frozen for this visit.
+     */
+    private readMarkerFields(
+        items: TimelineItem[],
+    ): Pick<
+        RoomTimelineViewSnapshot,
+        "canJumpToReadMarker" | "unreadSinceCount" | "unreadSinceTime" | "unreadBelowCount"
+    > {
+        const unread = unreadSinceReadMarker(
+            this.opts.client,
+            this.opts.room,
+            this.timelineWindow.getEvents(),
+            this.frozenMarkerEventId,
+        );
+        return {
+            canJumpToReadMarker: this.computeCanJumpToReadMarker(items),
+            unreadSinceCount: unread?.count ?? null,
+            unreadSinceTime: formatUnreadSince(
+                unread?.since ?? null,
+                SettingsStore.getValue("showTwelveHourTimestamps"),
+            ),
+            unreadBelowCount: this.computeUnreadBelow(),
+        };
+    }
+
+    /**
+     * InterCom: how many unread messages are below the viewport: after the read marker frozen for
+     * this visit and after the last message in view. Without a marker, nothing is unread here (what
+     * arrives meanwhile is counted in `numUnreadMessages`).
+     */
+    private computeUnreadBelow(): number {
+        if (!this.frozenMarkerEventId) return 0;
+        const events = this.timelineWindow.getEvents();
+        const markerIndex = events.findIndex((e) => e.getId() === this.frozenMarkerEventId);
+        // A marker that is not loaded is newer than what is, while the window stops short of the
+        // live end (as in computeCanJumpToReadMarker): what is below the view is read
+        if (markerIndex < 0 && this.timelineWindow.canPaginate(Direction.Forward)) return 0;
+        const lastInView = this.lastBottomEventId ? this.readUpToInGallery(this.lastBottomEventId) : null;
+        const lastInViewIndex = lastInView ? events.findIndex((e) => e.getId() === lastInView) : -1;
+        return countUnreadAfter(this.opts.client, events, Math.max(markerIndex, lastInViewIndex));
     }
 
     /**
@@ -1512,7 +1589,7 @@ export class RoomTimelineViewModel
         );
         this.republish(`paginate(${dirLabel})-trim`, {
             atLiveEnd: !this.timelineWindow.canPaginate(Direction.Forward),
-            canJumpToReadMarker: this.computeCanJumpToReadMarker(this.baseItems),
+            ...this.readMarkerFields(this.baseItems),
         });
 
         // Yield a frame so React commits the trim and the virtualizer applies its scroll
@@ -1602,11 +1679,11 @@ export class RoomTimelineViewModel
                         // Backward pagination can trim the newest messages away once the window is
                         // full, so re-check whether we are still at the live end.
                         atLiveEnd: !this.timelineWindow.canPaginate(Direction.Forward),
-                        canJumpToReadMarker: this.computeCanJumpToReadMarker(rebuilt),
+                        ...this.readMarkerFields(rebuilt),
                     });
                 } else {
                     this.republish("paginate(forward)-batch", {
-                        canJumpToReadMarker: this.computeCanJumpToReadMarker(rebuilt),
+                        ...this.readMarkerFields(rebuilt),
                     });
                 }
 

@@ -23,6 +23,7 @@ export * from "./crypto/LegacyCryptoUnsupportedView";
 export * from "./crypto/DeleteKeyStorageView";
 export * from "./intercom/IntercomAvatar";
 export * from "./intercom/RoomListItemExtras";
+export * from "./intercom/TimelineJumpBars";
 export * from "./intercom/UpdateStatusView";
 export * from "./intercom/UpdaterSettingsView";
 export * from "./intercom/UserPanelView";

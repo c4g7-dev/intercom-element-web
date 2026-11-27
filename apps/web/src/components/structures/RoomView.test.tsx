@@ -60,6 +60,7 @@ import {
 import { MatrixClientPeg } from "../../MatrixClientPeg";
 import { Action } from "../../dispatcher/actions";
 import defaultDispatcher from "../../dispatcher/dispatcher";
+import { INTERCOM_TIMELINE_JUMP } from "../../intercom/TimelineJump";
 import { type ViewRoomPayload } from "../../dispatcher/payloads/ViewRoomPayload";
 import { RoomView } from "./RoomView";
 import SettingsStore from "../../settings/SettingsStore";
@@ -989,6 +990,41 @@ describe("RoomView", () => {
             expect(cli.peekInRoom).toHaveBeenCalledWith(room.roomId);
             expect(instance.state.room).toBe(room);
             expect(instance.state.peekAndSummaryLoading).toBe(false);
+        });
+    });
+
+    // InterCom: the new timeline keeps its scrolling to itself, so RoomView passes the room's shortcuts on
+    describe("shortcuts with the new timeline", () => {
+        beforeEach(() => {
+            const getValue = SettingsStore.getValue.bind(SettingsStore);
+            vi.spyOn(SettingsStore, "getValue").mockImplementation(((setting: string, ...rest: unknown[]) =>
+                setting === "feature_new_timeline"
+                    ? true
+                    : (getValue as (...args: unknown[]) => unknown)(
+                          setting,
+                          ...rest,
+                      )) as typeof SettingsStore.getValue);
+            vi.spyOn(room, "getMyMembership").mockReturnValue(KnownMembership.Join);
+        });
+
+        it("passes Escape and Shift+Page Up on to the new timeline", async () => {
+            const dispatch = vi.spyOn(defaultDispatcher, "dispatch");
+            const { container } = await mountRoomView();
+            const roomView = container.querySelector(".mx_RoomView")!;
+
+            fireEvent.keyDown(roomView, { key: "Escape" });
+            expect(dispatch).toHaveBeenCalledWith({
+                action: INTERCOM_TIMELINE_JUMP,
+                roomId: room.roomId,
+                to: "present",
+            });
+
+            fireEvent.keyDown(roomView, { key: "PageUp", shiftKey: true });
+            expect(dispatch).toHaveBeenCalledWith({
+                action: INTERCOM_TIMELINE_JUMP,
+                roomId: room.roomId,
+                to: "read_marker",
+            });
         });
     });
 

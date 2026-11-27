@@ -1,0 +1,114 @@
+/*
+ * Copyright 2026 InterCom contributors
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
+ */
+
+/* Docked to the top of the timeline, across its column; clicks beside the bar reach the messages */
+.dock {
+    position: absolute;
+    top: 0;
+    inset-inline: var(--cpd-space-4x);
+    z-index: 1000;
+    display: flex;
+    pointer-events: none;
+}
+
+.visuallyHidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* Unread is what the accent stands for: a slim bar of it, hanging from the top edge */
+.bar {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: stretch;
+    min-height: 30px;
+    border-radius: 0 0 8px 8px;
+    background-color: var(--cpd-color-bg-accent-rest);
+    color: var(--cpd-color-text-on-solid-primary);
+    font: var(--cpd-font-body-sm-semibold);
+    overflow: hidden;
+    pointer-events: auto;
+    animation: drop 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.jump,
+.markRead {
+    display: flex;
+    align-items: center;
+    gap: var(--cpd-space-1-5x);
+    margin: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    transition: background-color 0.12s linear;
+}
+
+.jump {
+    flex: 1;
+    min-width: 0;
+    padding: 0 var(--cpd-space-3x);
+    text-align: start;
+}
+
+.text {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.markRead {
+    flex: none;
+    padding: 0 var(--cpd-space-3x);
+    /* A hairline in the bar's own text colour, faint */
+    border-inline-start: var(--cpd-border-width-1) solid
+        color-mix(in srgb, var(--cpd-color-text-on-solid-primary) 28%, transparent);
+    white-space: nowrap;
+}
+
+.jump:hover,
+.markRead:hover {
+    background-color: var(--cpd-color-bg-accent-hovered);
+}
+
+.jump:active,
+.markRead:active {
+    background-color: var(--cpd-color-bg-accent-pressed);
+}
+
+/* Inside the bar's clipped corners, so drawn inwards */
+.jump:focus-visible,
+.markRead:focus-visible {
+    outline: 2px solid var(--cpd-color-text-on-solid-primary);
+    outline-offset: -4px;
+    border-radius: 6px;
+}
+
+@keyframes drop {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bar {
+        animation: none;
+    }
+
+    .jump,
+    .markRead {
+        transition: none;
+    }
+}

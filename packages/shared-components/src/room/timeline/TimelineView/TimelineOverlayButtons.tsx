@@ -6,12 +6,9 @@
  */
 
 import React, { useCallback, type JSX } from "react";
-import classNames from "classnames";
-import { Tooltip } from "@vector-im/compound-web";
-import { ChevronUpIcon, ChevronDownIcon, CloseIcon } from "@vector-im/compound-design-tokens/assets/web/icons";
 
-import { useI18n } from "../../../core/i18n/i18nContext";
 import type { ImmediateScroll, TimelineViewActions, TimelineViewSnapshot } from "./types";
+import { JumpToPresentBar, UnreadSinceBar, jumpToPresentMode } from "../../../intercom/TimelineJumpBars";
 import styles from "./TimelineOverlayButtons.module.css";
 
 interface TimelineOverlayButtonsProps {
@@ -20,98 +17,57 @@ interface TimelineOverlayButtonsProps {
     /** Imperative scroll-to-anchor handle from the parent View; the VM invokes it
      * when the target is already loaded, else falls back to a pendingAnchor load. */
     scrollNow: ImmediateScroll;
+    /**
+     * InterCom: whether the reader is far above the end of the loaded list (see
+     * `isFarFromPresent`), which the View measures; decides between the bar and the arrow.
+     */
+    farFromBottom?: boolean;
 }
 
 /**
- * Absolutely-positioned overlay on top of the timeline list:
- * - **Unread bar** — shown when `canJumpToReadMarker` is `"above"`/`"below"`; a
- *   scroll-to-marker + mark-as-read pair at the top-right.
- * - **Jump-to-bottom** (bottom-right) — shown when not at the live bottom, with an
- *   optional unread badge and highlight colouring.
+ * Absolutely-positioned overlay on top of the timeline list. InterCom shows the way back to the
+ * newest messages and to the unread ones as Discord does:
+ * - **Unread bar** along the top, while the read marker is out of view (`canJumpToReadMarker`):
+ *   "12 new messages since 14:32", which scrolls to the marker, and "Mark as read".
+ * - **Jump to present** at the bottom, while not at the live bottom: a bar "You're viewing older
+ *   messages" with "Jump to present" when far back or off the live end, a small arrow when only a
+ *   little way up (see `jumpToPresentMode`).
  */
-export function TimelineOverlayButtons({ snapshot, vm, scrollNow }: TimelineOverlayButtonsProps): JSX.Element {
-    const { translate: _t } = useI18n();
-
+export function TimelineOverlayButtons({
+    snapshot,
+    vm,
+    scrollNow,
+    farFromBottom = false,
+}: TimelineOverlayButtonsProps): JSX.Element {
     const readMarkerDirection = snapshot.canJumpToReadMarker;
-    const showJumpToBottom = !snapshot.atLiveEnd || !snapshot.isAtBottom;
+    // Nothing unread after the marker (only our own messages, or events without a tile): no bar
+    const showUnread = readMarkerDirection !== false && snapshot.unreadSinceCount !== 0;
+    const mode = jumpToPresentMode(snapshot.atLiveEnd, snapshot.isAtBottom, farFromBottom);
 
     const onJumpToReadMarkerClick = useCallback(() => vm.onJumpToReadMarker(scrollNow), [vm, scrollNow]);
     const onJumpToLiveClick = useCallback(() => vm.onJumpToLive(scrollNow), [vm, scrollNow]);
+    const onMarkAllAsReadClick = useCallback(() => vm.onMarkAllAsRead(), [vm]);
 
     return (
         // Non-interactive layer (pointer-events:none) so clicks fall through to the list;
-        // only the buttons re-enable them. Must NOT be aria-hidden — these are AT-reachable.
+        // only the bars re-enable them. Must NOT be aria-hidden — these are AT-reachable.
         <div className={styles.overlay}>
-            {/* Top unread bar — marker is above the viewport */}
-            {readMarkerDirection === "above" && (
-                <div className={styles.topUnreadBar}>
-                    <Tooltip description={_t("room|jump_read_marker")} placement="left">
-                        <button
-                            className={styles.topUnreadBarScrollUp}
-                            aria-label={_t("room|jump_read_marker")}
-                            onClick={onJumpToReadMarkerClick}
-                            type="button"
-                        >
-                            <ChevronUpIcon />
-                        </button>
-                    </Tooltip>
-                    <Tooltip description={_t("notifications|mark_all_read")} placement="left">
-                        <button
-                            className={styles.topUnreadBarMarkAsRead}
-                            aria-label={_t("notifications|mark_all_read")}
-                            onClick={() => vm.onMarkAllAsRead()}
-                            type="button"
-                        >
-                            <CloseIcon />
-                        </button>
-                    </Tooltip>
-                </div>
-            )}
-
-            {/* Unread bar — marker is below the viewport; sits at top-right like the above bar */}
-            {readMarkerDirection === "below" && (
-                <div className={styles.belowUnreadBar}>
-                    <Tooltip description={_t("room|jump_read_marker")} placement="left">
-                        <button
-                            className={styles.belowUnreadBarScrollDown}
-                            aria-label={_t("room|jump_read_marker")}
-                            onClick={onJumpToReadMarkerClick}
-                            type="button"
-                        >
-                            <ChevronDownIcon />
-                        </button>
-                    </Tooltip>
-                    <Tooltip description={_t("notifications|mark_all_read")} placement="left">
-                        <button
-                            className={styles.belowUnreadBarMarkAsRead}
-                            aria-label={_t("notifications|mark_all_read")}
-                            onClick={() => vm.onMarkAllAsRead()}
-                            type="button"
-                        >
-                            <CloseIcon />
-                        </button>
-                    </Tooltip>
-                </div>
-            )}
-
-            {/* Jump-to-bottom button — matches legacy JumpToBottomButton */}
-            {showJumpToBottom && (
-                <div className={classNames(styles.jumpToBottom, { [styles.highlight]: snapshot.hasHighlights })}>
-                    <Tooltip description={_t("room|jump_to_bottom_button")} placement="left">
-                        <button
-                            className={styles.jumpToBottomScrollDown}
-                            aria-label={_t("room|jump_to_bottom_button")}
-                            onClick={onJumpToLiveClick}
-                            type="button"
-                        >
-                            <ChevronDownIcon />
-                        </button>
-                    </Tooltip>
-                    {snapshot.numUnreadMessages > 0 && (
-                        <div className={styles.jumpToBottomBadge}>{snapshot.numUnreadMessages}</div>
-                    )}
-                </div>
-            )}
+            <UnreadSinceBar
+                visible={showUnread}
+                count={snapshot.unreadSinceCount ?? null}
+                since={snapshot.unreadSinceTime ?? null}
+                direction={readMarkerDirection === "below" ? "below" : "above"}
+                onJump={onJumpToReadMarkerClick}
+                onMarkAsRead={onMarkAllAsReadClick}
+            />
+            <JumpToPresentBar
+                mode={mode}
+                // What arrived while away, or the unread below the view, which it is part of when
+                // there is a read marker
+                newMessages={Math.max(snapshot.numUnreadMessages, snapshot.unreadBelowCount ?? 0)}
+                highlight={snapshot.hasHighlights}
+                onJump={onJumpToLiveClick}
+            />
         </div>
     );
 }

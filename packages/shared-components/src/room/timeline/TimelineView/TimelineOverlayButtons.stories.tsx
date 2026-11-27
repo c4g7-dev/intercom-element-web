@@ -15,7 +15,8 @@ import type { ImmediateScroll, TimelineViewActions, TimelineViewSnapshot } from 
 // The overlay takes an already-split snapshot + actions (not a ViewModel), so the
 // story flattens them into props — this lets interaction tests override a single
 // action (e.g. onJumpToLive) without rebuilding the whole object.
-type OverlayStoryProps = TimelineViewSnapshot & TimelineViewActions & { scrollNow: ImmediateScroll };
+type OverlayStoryProps = TimelineViewSnapshot &
+    TimelineViewActions & { scrollNow: ImmediateScroll; farFromBottom?: boolean };
 
 const TimelineOverlayButtonsWrapper = ({
     onStartReached,
@@ -27,6 +28,7 @@ const TimelineOverlayButtonsWrapper = ({
     onMarkAllAsRead,
     onJumpToLive,
     scrollNow,
+    farFromBottom,
     ...snapshot
 }: OverlayStoryProps): JSX.Element => {
     const vm: TimelineViewActions = {
@@ -39,7 +41,7 @@ const TimelineOverlayButtonsWrapper = ({
         onMarkAllAsRead,
         onJumpToLive,
     };
-    return <TimelineOverlayButtons snapshot={snapshot} vm={vm} scrollNow={scrollNow} />;
+    return <TimelineOverlayButtons snapshot={snapshot} vm={vm} scrollNow={scrollNow} farFromBottom={farFromBottom} />;
 };
 
 const meta = {
@@ -80,25 +82,31 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Scrolled up off the live end: the jump-to-bottom button, no unread. */
+/** Off the live end: the bar "You're viewing older messages" with "Jump to present". */
 export const JumpToBottom: Story = {};
 
-/** Jump-to-bottom carrying an unread-message badge. */
+/** The bar counting the messages that arrived while away. */
 export const JumpToBottomWithUnread: Story = {
     args: { numUnreadMessages: 5 },
 };
 
-/** Jump-to-bottom with the highlight (mention/keyword) colouring. */
+/** Scrolled up a little at the live end: the small arrow, here with a mention among the new messages. */
 export const JumpToBottomWithHighlight: Story = {
-    args: { numUnreadMessages: 3, hasHighlights: true },
+    args: { atLiveEnd: true, numUnreadMessages: 3, hasHighlights: true },
 };
 
-/** Read marker sits above the viewport: scroll-up + mark-as-read bar (top-right). */
+/** Read marker above the viewport: the unread bar along the top. */
 export const UnreadMarkerAbove: Story = {
-    args: { atLiveEnd: true, isAtBottom: true, canJumpToReadMarker: "above" },
+    args: {
+        atLiveEnd: true,
+        isAtBottom: true,
+        canJumpToReadMarker: "above",
+        unreadSinceCount: 12,
+        unreadSinceTime: "14:32",
+    },
 };
 
-/** Read marker sits below the viewport: scroll-down + mark-as-read bar. */
+/** Read marker below the viewport: the unread bar points down. */
 export const UnreadMarkerBelow: Story = {
-    args: { atLiveEnd: true, isAtBottom: true, canJumpToReadMarker: "below" },
+    args: { atLiveEnd: true, isAtBottom: true, canJumpToReadMarker: "below", unreadSinceCount: 2 },
 };

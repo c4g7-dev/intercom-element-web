@@ -44,22 +44,22 @@ function makeActions(): TimelineViewActions {
 const button = (name: string): HTMLElement => screen.getByRole("button", { name });
 const queryButton = (name: string): HTMLElement | null => screen.queryByRole("button", { name });
 
-const JUMP_TO_BOTTOM = "Scroll to most recent messages";
-const JUMP_READ_MARKER = "Scroll to first unread message.";
-const MARK_ALL_READ = "Mark all as read";
+const JUMP_TO_PRESENT = "Jump to present";
+const MARK_AS_READ = "Mark as read";
+const dock = (): HTMLElement => screen.getByTestId("jump-to-present");
 
 describe("<TimelineOverlayButtons />", () => {
     it("renders no buttons at the live bottom with no read marker", () => {
         const actions = makeActions();
         render(<TimelineOverlayButtons snapshot={baseSnapshot} vm={actions} scrollNow={vi.fn()} />);
 
-        expect(queryButton(JUMP_TO_BOTTOM)).toBeNull();
-        expect(queryButton(JUMP_READ_MARKER)).toBeNull();
-        expect(queryButton(MARK_ALL_READ)).toBeNull();
+        expect(screen.queryByRole("button")).toBeNull();
+        expect(dock()).toHaveAttribute("data-mode", "hidden");
     });
 
-    describe("jump-to-bottom button", () => {
-        it("shows when not at the live end", () => {
+    // InterCom: Discord's way back to the present, see intercom/TimelineJumpBars
+    describe("jump to present", () => {
+        it("is the bar when the live end is not loaded", () => {
             render(
                 <TimelineOverlayButtons
                     snapshot={{ ...baseSnapshot, atLiveEnd: false }}
@@ -67,10 +67,12 @@ describe("<TimelineOverlayButtons />", () => {
                     scrollNow={vi.fn()}
                 />,
             );
-            expect(button(JUMP_TO_BOTTOM)).toBeInTheDocument();
+            expect(dock()).toHaveAttribute("data-mode", "far");
+            expect(screen.getByTestId("jump-to-present-status")).toHaveTextContent("You're viewing older messages");
+            expect(button(JUMP_TO_PRESENT)).toBeInTheDocument();
         });
 
-        it("shows when at the live end but scrolled up off the bottom", () => {
+        it("is the small arrow at the live end, scrolled up a little", () => {
             render(
                 <TimelineOverlayButtons
                     snapshot={{ ...baseSnapshot, atLiveEnd: true, isAtBottom: false }}
@@ -78,7 +80,21 @@ describe("<TimelineOverlayButtons />", () => {
                     scrollNow={vi.fn()}
                 />,
             );
-            expect(button(JUMP_TO_BOTTOM)).toBeInTheDocument();
+            expect(dock()).toHaveAttribute("data-mode", "near");
+            expect(screen.queryByTestId("jump-to-present-status")).toBeNull();
+            expect(button(JUMP_TO_PRESENT)).toBeInTheDocument();
+        });
+
+        it("is the bar at the live end when scrolled far up", () => {
+            render(
+                <TimelineOverlayButtons
+                    snapshot={{ ...baseSnapshot, atLiveEnd: true, isAtBottom: false }}
+                    vm={makeActions()}
+                    scrollNow={vi.fn()}
+                    farFromBottom
+                />,
+            );
+            expect(dock()).toHaveAttribute("data-mode", "far");
         });
 
         it("calls onJumpToLive with the imperative scroll handle when clicked", async () => {
@@ -90,71 +106,103 @@ describe("<TimelineOverlayButtons />", () => {
                     snapshot={{ ...baseSnapshot, isAtBottom: false }}
                     vm={actions}
                     scrollNow={scrollNow}
+                    farFromBottom
                 />,
             );
 
-            await user.click(button(JUMP_TO_BOTTOM));
+            await user.click(button(JUMP_TO_PRESENT));
 
             expect(actions.onJumpToLive).toHaveBeenCalledWith(scrollNow);
         });
 
-        it("renders the unread badge count", () => {
+        it("counts the messages that arrived while away", () => {
             render(
                 <TimelineOverlayButtons
                     snapshot={{ ...baseSnapshot, isAtBottom: false, numUnreadMessages: 7 }}
                     vm={makeActions()}
                     scrollNow={vi.fn()}
+                    farFromBottom
                 />,
             );
-            expect(screen.getByText("7")).toBeInTheDocument();
+            expect(screen.getByTestId("jump-to-present-status")).toHaveTextContent("7 new messages");
         });
 
-        it("omits the badge when there are no unread messages", () => {
+        it("counts the unread messages below the view when there are more of them", () => {
             render(
                 <TimelineOverlayButtons
-                    snapshot={{ ...baseSnapshot, isAtBottom: false, numUnreadMessages: 0 }}
+                    snapshot={{ ...baseSnapshot, isAtBottom: false, numUnreadMessages: 2, unreadBelowCount: 30 }}
                     vm={makeActions()}
                     scrollNow={vi.fn()}
+                    farFromBottom
                 />,
             );
-            expect(screen.queryByText("0")).toBeNull();
+            expect(screen.getByTestId("jump-to-present-status")).toHaveTextContent("30 new messages");
         });
 
-        it("applies the highlight style when there are highlight messages", () => {
-            const { container } = render(
+        it("puts the count on the arrow a little way up, marked when one mentions the reader", () => {
+            render(
                 <TimelineOverlayButtons
                     snapshot={{ ...baseSnapshot, isAtBottom: false, numUnreadMessages: 1, hasHighlights: true }}
                     vm={makeActions()}
                     scrollNow={vi.fn()}
                 />,
             );
-            expect(container.querySelector('[class*="highlight"]')).not.toBeNull();
+            const pill = button("Jump to present, 1 new message");
+            expect(pill).toHaveTextContent("1");
+            expect(pill).toHaveAttribute("data-highlight");
         });
     });
 
     describe("unread bar", () => {
-        it("shows scroll-up and mark-as-read when the marker is above the viewport", () => {
+        it("says how many are unread since when, while the marker is above the viewport", () => {
             render(
                 <TimelineOverlayButtons
-                    snapshot={{ ...baseSnapshot, canJumpToReadMarker: "above" }}
+                    snapshot={{
+                        ...baseSnapshot,
+                        canJumpToReadMarker: "above",
+                        unreadSinceCount: 12,
+                        unreadSinceTime: "14:32",
+                    }}
                     vm={makeActions()}
                     scrollNow={vi.fn()}
                 />,
             );
-            expect(button(JUMP_READ_MARKER)).toBeInTheDocument();
-            expect(button(MARK_ALL_READ)).toBeInTheDocument();
+            expect(button("12 new messages since 14:32")).toBeInTheDocument();
+            expect(button(MARK_AS_READ)).toBeInTheDocument();
         });
 
         it("shows the bar when the marker is below the viewport", () => {
             render(
                 <TimelineOverlayButtons
-                    snapshot={{ ...baseSnapshot, canJumpToReadMarker: "below" }}
+                    snapshot={{ ...baseSnapshot, canJumpToReadMarker: "below", unreadSinceCount: 2 }}
                     vm={makeActions()}
                     scrollNow={vi.fn()}
                 />,
             );
-            expect(button(JUMP_READ_MARKER)).toBeInTheDocument();
-            expect(button(MARK_ALL_READ)).toBeInTheDocument();
+            expect(button("2 new messages")).toBeInTheDocument();
+            expect(button(MARK_AS_READ)).toBeInTheDocument();
+        });
+
+        it("is not shown when nothing after the marker is unread", () => {
+            render(
+                <TimelineOverlayButtons
+                    snapshot={{ ...baseSnapshot, canJumpToReadMarker: "above", unreadSinceCount: 0 }}
+                    vm={makeActions()}
+                    scrollNow={vi.fn()}
+                />,
+            );
+            expect(queryButton(MARK_AS_READ)).toBeNull();
+        });
+
+        it("is shown when the count is not known", () => {
+            render(
+                <TimelineOverlayButtons
+                    snapshot={{ ...baseSnapshot, canJumpToReadMarker: "above", unreadSinceCount: null }}
+                    vm={makeActions()}
+                    scrollNow={vi.fn()}
+                />,
+            );
+            expect(button("New messages")).toBeInTheDocument();
         });
 
         it("calls onJumpToReadMarker with the scroll handle and onMarkAllAsRead on click", async () => {
@@ -163,16 +211,16 @@ describe("<TimelineOverlayButtons />", () => {
             const scrollNow = vi.fn();
             render(
                 <TimelineOverlayButtons
-                    snapshot={{ ...baseSnapshot, canJumpToReadMarker: "above" }}
+                    snapshot={{ ...baseSnapshot, canJumpToReadMarker: "above", unreadSinceCount: 3 }}
                     vm={actions}
                     scrollNow={scrollNow}
                 />,
             );
 
-            await user.click(button(JUMP_READ_MARKER));
+            await user.click(button("3 new messages"));
             expect(actions.onJumpToReadMarker).toHaveBeenCalledWith(scrollNow);
 
-            await user.click(button(MARK_ALL_READ));
+            await user.click(button(MARK_AS_READ));
             expect(actions.onMarkAllAsRead).toHaveBeenCalledTimes(1);
         });
     });

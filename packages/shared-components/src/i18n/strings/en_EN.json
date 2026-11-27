@@ -108,6 +108,25 @@
         }
     },
     "intercom": {
+        "timeline": {
+            "jump_to_present": "Jump to present",
+            "jump_to_present_new": {
+                "one": "Jump to present, %(count)s new message",
+                "other": "Jump to present, %(count)s new messages"
+            },
+            "mark_as_read": "Mark as read",
+            "new_messages": {
+                "one": "%(count)s new message",
+                "other": "%(count)s new messages"
+            },
+            "new_messages_since": {
+                "one": "%(count)s new message since %(time)s",
+                "other": "%(count)s new messages since %(time)s"
+            },
+            "new_messages_unknown": "New messages",
+            "new_since": "New messages since %(time)s",
+            "viewing_older": "You're viewing older messages"
+        },
         "update_status": {
             "checking": "Checking for updates…",
             "details": "Details",
@@ -174,7 +193,6 @@
             },
             "profile": "%(name)s: your profile",
             "reconnecting": "Reconnecting…",
-            "settings": "Settings",
             "settings_update_ready": "Settings (an update is ready)",
             "share_screen": "Share screen",
             "stop_sharing": "Stop sharing",
@@ -219,7 +237,6 @@
     "notifications": {
         "all_messages": "All messages",
         "default_settings": "Match default settings",
-        "mark_all_read": "Mark all as read",
         "mentions_keywords": "Mentions and keywords",
         "message_didnt_send": "Message didn't send. Select for info.",
         "mute_room": "Mute room"
@@ -246,7 +263,6 @@
             "world_readable": "Anyone can see history"
         },
         "jump_read_marker": "Scroll to first unread message.",
-        "jump_to_bottom_button": "Scroll to most recent messages",
         "jump_to_date": "Scroll to date",
         "jump_to_date_beginning": "The beginning of the room",
         "jump_to_date_prompt": "Pick a date to scroll to",

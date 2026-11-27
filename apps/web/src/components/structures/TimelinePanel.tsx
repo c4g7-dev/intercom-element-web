@@ -33,7 +33,12 @@ import {
 } from "matrix-js-sdk/src/matrix";
 import { debounce } from "lodash";
 import { logger } from "matrix-js-sdk/src/logger";
-import type { EventTileRenderingMode } from "@element-hq/web-shared-components";
+import {
+    type EventTileRenderingMode,
+    isFarFromPresent,
+    jumpToPresentMode,
+    type JumpToPresentMode,
+} from "@element-hq/web-shared-components";
 
 import SettingsStore from "../../settings/SettingsStore";
 import { type Layout } from "../../settings/enums/Layout";
@@ -59,6 +64,7 @@ import { type ViewRoomPayload } from "../../dispatcher/payloads/ViewRoomPayload"
 import { getKeyBindingsManager } from "../../KeyBindingsManager";
 import { KeyBindingAction } from "../../accessibility/KeyboardShortcuts";
 import { haveRendererForEvent } from "../../events/EventTileFactory";
+import { countUnreadAfter, type UnreadSince, unreadSinceReadMarker } from "../../intercom/UnreadSince";
 
 // These pagination sizes are higher than they may possibly need be
 // once https://github.com/matrix-org/matrix-spec-proposals/pull/3874 lands
@@ -1361,6 +1367,50 @@ class TimelinePanel extends React.Component<IProps, IState> {
         }
 
         return null;
+    };
+
+    /**
+     * InterCom: what to offer to get back to the newest messages: nothing, the small arrow or the
+     * bar "You're viewing older messages" (see `jumpToPresentMode`).
+     */
+    public getJumpToPresentMode = (): JumpToPresentMode => {
+        const messagePanel = this.messagePanel.current;
+        if (!messagePanel || !this.timelineWindow) return "hidden";
+        const liveEndLoaded = !this.timelineWindow.canPaginate(EventTimeline.FORWARDS);
+        const scroll = messagePanel.getDistanceFromBottom();
+        const far = scroll ? isFarFromPresent(scroll.distance, scroll.viewportHeight) : false;
+        return jumpToPresentMode(liveEndLoaded, messagePanel.isAtBottom() ?? true, far);
+    };
+
+    /**
+     * InterCom: the unread messages after the read marker, for the bar at the top: how many, and
+     * since when. Null without a read marker.
+     */
+    public getUnreadSinceReadMarker = (): UnreadSince | null => {
+        const room = this.props.timelineSet.room;
+        if (!room) return null;
+        return unreadSinceReadMarker(
+            MatrixClientPeg.safeGet(),
+            room,
+            this.state.events,
+            this.state.readMarkerEventId,
+            TimelinePanel.roomReadMarkerTsMap[room.roomId],
+        );
+    };
+
+    /**
+     * InterCom: how many unread messages are below the viewport: after the read marker and after
+     * the last message in view, for the bar at the bottom ("N new messages").
+     */
+    public getUnreadBelowView = (): number => {
+        const marker = this.state.readMarkerEventId;
+        if (!marker) return 0;
+        const events = this.state.liveEvents;
+        const markerIndex = events.findIndex((event) => event.getId() === marker);
+        // A marker that is not loaded counts only when it is known to be older than what is
+        if (markerIndex < 0 && this.getReadMarkerPosition() !== -1) return 0;
+        const lastInView = this.getLastDisplayedEventIndex({ allowPartial: true }) ?? -1;
+        return countUnreadAfter(MatrixClientPeg.safeGet(), events, Math.max(markerIndex, lastInView));
     };
 
     public canJumpToReadMarker = (): boolean => {

@@ -6,38 +6,31 @@ Please see LICENSE files in the repository root for full details.
 */
 
 import React from "react";
-import classNames from "classnames";
-import { ChevronDownIcon } from "@vector-im/compound-design-tokens/assets/web/icons";
-
-import { _t } from "../../../languageHandler";
-import AccessibleButton, { type ButtonEvent } from "../elements/AccessibleButton";
+import { JumpToPresentBar, type JumpToPresentMode } from "@element-hq/web-shared-components";
 
 interface IProps {
     numUnreadMessages?: number;
     highlight: boolean;
-    onScrollToBottomClick: (e: ButtonEvent) => void;
+    onScrollToBottomClick: () => void;
+    /**
+     * InterCom: the bar "You're viewing older messages" when far back, the small arrow when a
+     * little way up (see `jumpToPresentMode`). Without it, the arrow.
+     */
+    mode?: JumpToPresentMode;
 }
 
+/**
+ * InterCom: the way back to the newest messages of the classic timeline, the same as the new
+ * timeline's (the shared {@link JumpToPresentBar}) in place of Element's round button.
+ */
 const JumpToBottomButton: React.FC<IProps> = (props) => {
-    const className = classNames({
-        mx_JumpToBottomButton: true,
-        mx_JumpToBottomButton_highlight: props.highlight,
-    });
-    let badge;
-    if (props.numUnreadMessages) {
-        badge = <div className="mx_JumpToBottomButton_badge">{props.numUnreadMessages}</div>;
-    }
     return (
-        <div className={className}>
-            <AccessibleButton
-                className="mx_JumpToBottomButton_scrollDown"
-                title={_t("room|jump_to_bottom_button")}
-                onClick={props.onScrollToBottomClick}
-            >
-                <ChevronDownIcon />
-            </AccessibleButton>
-            {badge}
-        </div>
+        <JumpToPresentBar
+            mode={props.mode ?? "near"}
+            newMessages={props.numUnreadMessages ?? 0}
+            highlight={props.highlight}
+            onJump={props.onScrollToBottomClick}
+        />
     );
 };
 

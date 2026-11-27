@@ -14,6 +14,7 @@ import { useViewModel } from "../../../core/viewmodel/useViewModel";
 import type { AnchorAlign, ImmediateScroll, TimelineItem, TimelineViewProps } from "./types";
 import { BACKWARD_LOADING_KEY, FORWARD_LOADING_KEY } from "./types";
 import { TimelineOverlayButtons } from "./TimelineOverlayButtons";
+import { isFarFromPresent } from "../../../intercom/TimelineJumpBars";
 import styles from "./TimelineView.module.css";
 
 /**
@@ -149,6 +150,11 @@ export function TimelineView({ vm, renderItem }: TimelineViewProps): JSX.Element
     // hold the last values we sent and repeats are skipped.
     const lastVisibleRangeRef = useRef<{ start: number; end: number } | null>(null);
     const lastAtBottomRef = useRef<boolean | null>(null);
+    // InterCom: whether the reader is far above the end of the list, which decides between the bar
+    // "You're viewing older messages" and the small arrow. Kept as state, set only when it changes,
+    // so that scrolling re-renders the overlay only when it crosses the threshold.
+    const [farFromBottom, setFarFromBottom] = useState(false);
+    const lastFarFromBottomRef = useRef(false);
     // For the "reached the top/bottom" reports we remember a short description of the
     // situation we last reported, in the form "<number of rows>:<row index>", and clear it
     // whenever we move away from that end. This stops us reporting over and over while
@@ -192,6 +198,11 @@ export function TimelineView({ vm, renderItem }: TimelineViewProps): JSX.Element
             if (atBottom !== lastAtBottomRef.current) {
                 lastAtBottomRef.current = atBottom;
                 vm.onAtBottomStateChange(atBottom);
+            }
+            const far = isFarFromPresent(totalSize - (scrollOffset + viewportHeight), viewportHeight);
+            if (far !== lastFarFromBottomRef.current) {
+                lastFarFromBottomRef.current = far;
+                setFarFromBottom(far);
             }
 
             // Have we reached either end of the loaded messages? True once the very first or
@@ -406,7 +417,14 @@ export function TimelineView({ vm, renderItem }: TimelineViewProps): JSX.Element
                     <InlineSpinner size={32} />
                 </div>
             )}
-            {revealed && <TimelineOverlayButtons snapshot={snapshot} vm={vm} scrollNow={scrollNow} />}
+            {revealed && (
+                <TimelineOverlayButtons
+                    snapshot={snapshot}
+                    vm={vm}
+                    scrollNow={scrollNow}
+                    farFromBottom={farFromBottom}
+                />
+            )}
         </div>
     );
 }

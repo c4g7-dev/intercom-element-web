@@ -1,0 +1,184 @@
+/*
+ * Copyright 2026 InterCom contributors
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
+ */
+
+/*
+ * Docked to the bottom of the timeline, on the composer, across the timeline's column with the
+ * composer's side margins. The bar sits right on the composer, so no message shows between the
+ * two. Clicks fall through to the messages, except on the bar and the arrow themselves.
+ */
+.dock {
+    position: absolute;
+    inset-inline: var(--cpd-space-4x);
+    bottom: 0;
+    z-index: 1000;
+    display: flex;
+    justify-content: flex-end;
+    pointer-events: none;
+}
+
+.visuallyHidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* ── Far back: the bar ───────────────────────────────────────────── */
+
+.bar {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--cpd-space-3x);
+    box-sizing: border-box;
+    min-height: 38px;
+    padding: var(--cpd-space-1x) var(--cpd-space-1x) var(--cpd-space-1x) var(--cpd-space-4x);
+    /* One surface with the composer under it: its colour, a hairline, the radius of a card */
+    border: var(--cpd-border-width-1) solid var(--roomlist-separator-color, var(--cpd-color-gray-400));
+    border-radius: 10px;
+    background-color: var(--cpd-color-gray-300);
+    color: var(--cpd-color-text-secondary);
+    pointer-events: auto;
+    animation: rise 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.status {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--cpd-space-2x);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font: var(--cpd-font-body-sm-medium);
+}
+
+.bar[data-new] .status {
+    color: var(--cpd-color-text-primary);
+    font: var(--cpd-font-body-sm-semibold);
+}
+
+/* New messages: the accent's dot, as on an unread room */
+.dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--cpd-color-bg-accent-rest);
+}
+
+.jump {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--cpd-space-1-5x);
+    box-sizing: border-box;
+    height: 28px;
+    padding: 0 10px 0 var(--cpd-space-3x);
+    border: none;
+    border-radius: 6px;
+    background-color: var(--cpd-color-bg-accent-rest);
+    color: var(--cpd-color-text-on-solid-primary);
+    font: var(--cpd-font-body-sm-semibold);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.12s linear;
+}
+
+.jump:hover {
+    background-color: var(--cpd-color-bg-accent-hovered);
+}
+
+.jump:active {
+    background-color: var(--cpd-color-bg-accent-pressed);
+}
+
+/* ── A little way up: the arrow ──────────────────────────────────── */
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--cpd-space-1x);
+    box-sizing: border-box;
+    height: 28px;
+    min-width: 28px;
+    /* Floats a little above the composer, at the edge */
+    margin-bottom: var(--cpd-space-2x);
+    padding: 0 var(--cpd-space-1-5x);
+    border: var(--cpd-border-width-1) solid var(--roomlist-separator-color, var(--cpd-color-gray-400));
+    border-radius: 14px;
+    background-color: var(--cpd-color-gray-300);
+    color: var(--cpd-color-icon-secondary);
+    cursor: pointer;
+    pointer-events: auto;
+    animation: fade 120ms linear;
+    transition:
+        background-color 0.12s linear,
+        color 0.12s linear;
+}
+
+.pill:hover {
+    background-color: var(--cpd-color-gray-400);
+    color: var(--cpd-color-icon-primary);
+}
+
+.pill[data-new] {
+    padding-inline-start: var(--cpd-space-2x);
+    color: var(--cpd-color-text-action-accent);
+    border-color: var(--cpd-color-border-accent-subtle, var(--cpd-color-bg-accent-rest));
+}
+
+.count {
+    font: var(--cpd-font-body-xs-semibold);
+}
+
+/* A mention among the new messages: the arrow in the accent's solid colour */
+.pill[data-highlight][data-new] {
+    border-color: var(--cpd-color-bg-accent-rest);
+    background-color: var(--cpd-color-bg-accent-rest);
+    color: var(--cpd-color-text-on-solid-primary);
+}
+
+.pill[data-highlight][data-new]:hover {
+    background-color: var(--cpd-color-bg-accent-hovered);
+}
+
+.jump:focus-visible,
+.pill:focus-visible {
+    outline: 2px solid var(--cpd-color-border-focused);
+    outline-offset: 2px;
+}
+
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+}
+
+@keyframes fade {
+    from {
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bar,
+    .pill {
+        animation: none;
+    }
+
+    .jump,
+    .pill {
+        transition: none;
+    }
+}

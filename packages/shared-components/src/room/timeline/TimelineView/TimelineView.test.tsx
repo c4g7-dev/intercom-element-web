@@ -152,21 +152,38 @@ describe("<TimelineView />", () => {
         expect(await screen.findByTestId("row-evt-5")).toBeInTheDocument();
     });
 
-    it("shows the jump-to-bottom control once revealed when scrolled off the bottom", async () => {
+    it("shows the jump-to-present control once revealed when scrolled off the bottom", async () => {
         const { vm, actions } = makeFakeVm({ items: eventItems(30), isAtBottom: false });
         renderTimeline(vm);
 
-        const jumpToBottom = await screen.findByRole(
-            "button",
-            { name: "Scroll to most recent messages" },
-            { timeout: 5000 },
-        );
+        const jumpToBottom = await screen.findByRole("button", { name: "Jump to present" }, { timeout: 5000 });
 
         const user = userEvent.setup();
         await user.click(jumpToBottom);
         expect(actions.onJumpToLive).toHaveBeenCalledTimes(1);
         // The View hands the VM its imperative scroll handle.
         expect(actions.onJumpToLive.mock.calls[0][0]).toBeTypeOf("function");
+    });
+
+    // InterCom: the bar far back, the small arrow a little way up
+    it("shows the bar far back and the small arrow a little way up", async () => {
+        const { vm, actions } = makeFakeVm({ items: eventItems(30), isAtBottom: false });
+        renderTimeline(vm);
+        const scroller = screen.getByTestId("timeline-scroller");
+        await waitFor(() => expect(actions.onAnchorReached).toHaveBeenCalled(), { timeout: 5000 });
+        // Let the first load's placement settle, or it would undo the scrolls below
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const dock = screen.getByTestId("jump-to-present");
+
+        // 30 rows of 40px in a 300px viewport: the top is 900px above the end, three screens
+        scroller.scrollTop = 0;
+        await waitFor(() => expect(dock).toHaveAttribute("data-mode", "far"));
+        expect(screen.getByTestId("jump-to-present-status")).toHaveTextContent("You're viewing older messages");
+
+        // 100px above the end: a third of a screen
+        scroller.scrollTop = scroller.scrollHeight - scroller.clientHeight - 100;
+        await waitFor(() => expect(dock).toHaveAttribute("data-mode", "near"));
+        expect(screen.queryByTestId("jump-to-present-status")).toBeNull();
     });
 
     describe("when the viewport changes height", () => {

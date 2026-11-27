@@ -8,7 +8,7 @@ Please see LICENSE files in the repository root for full details.
 // @vitest-environment happy-dom
 
 import React from "react";
-import { render, screen } from "test-utils-rtl";
+import { act, render, screen } from "test-utils-rtl";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { type MatrixClient, type MatrixEvent, PendingEventOrdering, Room } from "matrix-js-sdk/src/matrix";
 import type { TimelineItem } from "@element-hq/web-shared-components";
@@ -19,6 +19,8 @@ import { Layout } from "../../settings/enums/Layout";
 import EditorStateTransfer from "../../utils/EditorStateTransfer";
 import MatrixClientContext from "../../contexts/MatrixClientContext";
 import { SDKContext } from "../../contexts/SDKContext";
+import defaultDispatcher from "../../dispatcher/dispatcher";
+import { INTERCOM_TIMELINE_JUMP, type TimelineJumpPayload } from "../../intercom/TimelineJump";
 
 const ROOM_ID = "!room:example.org";
 const USER_ID = "@alice:example.org";
@@ -74,7 +76,12 @@ const { vmState } = vi.hoisted(() => ({
 }));
 
 const { vmSpies } = vi.hoisted(() => ({
-    vmSpies: { setShowReadReceipts: vi.fn(), constructorOpts: [] as Record<string, unknown>[] },
+    vmSpies: {
+        setShowReadReceipts: vi.fn(),
+        dismissReadMarkerAndJumpToPresent: vi.fn(),
+        jumpToReadMarker: vi.fn(),
+        constructorOpts: [] as Record<string, unknown>[],
+    },
 }));
 
 vi.mock("../../viewmodels/room/timeline/RoomTimelineViewModel", () => ({
@@ -83,6 +90,8 @@ vi.mock("../../viewmodels/room/timeline/RoomTimelineViewModel", () => ({
             vmSpies.constructorOpts.push(opts);
         }
         public setShowReadReceipts = vmSpies.setShowReadReceipts;
+        public dismissReadMarkerAndJumpToPresent = vmSpies.dismissReadMarkerAndJumpToPresent;
+        public jumpToReadMarker = vmSpies.jumpToReadMarker;
         public setEditingEventId = (): void => {};
         public start = (): void => {};
         public dispose = (): void => {};
@@ -144,6 +153,46 @@ describe("<NewTimelinePanel />", () => {
         vi.spyOn(client, "getRoom").mockReturnValue(room);
         event = mkMessage({ room: ROOM_ID, user: USER_ID, msg: "hello", event: true });
         room.getUnfilteredTimelineSet().addLiveEvent(event, { addToState: false });
+    });
+
+    // InterCom: RoomView passes Escape and Shift+Page Up on, there being no TimelinePanel to call
+    describe("the room's shortcuts", () => {
+        const jump = (roomId: string, to: TimelineJumpPayload["to"]): void =>
+            act(() =>
+                defaultDispatcher.dispatch<TimelineJumpPayload>({ action: INTERCOM_TIMELINE_JUMP, roomId, to }, true),
+            );
+
+        beforeEach(() => {
+            vmSpies.dismissReadMarkerAndJumpToPresent.mockReset();
+            vmSpies.jumpToReadMarker.mockReset();
+        });
+
+        it("marks everything read and jumps to the present on Escape", () => {
+            renderPanel();
+            jump(ROOM_ID, "present");
+            expect(vmSpies.dismissReadMarkerAndJumpToPresent).toHaveBeenCalledTimes(1);
+            expect(vmSpies.jumpToReadMarker).not.toHaveBeenCalled();
+        });
+
+        it("jumps to the read marker on Shift+Page Up", () => {
+            renderPanel();
+            jump(ROOM_ID, "read_marker");
+            expect(vmSpies.jumpToReadMarker).toHaveBeenCalledTimes(1);
+        });
+
+        it("leaves the jumps of other rooms, and jumps nowhere while hidden", () => {
+            const { rerender } = renderPanel();
+            jump("!other:example.org", "present");
+            rerender(
+                <MatrixClientContext.Provider value={client}>
+                    <SDKContext.Provider value={new TestSDKContext()}>
+                        <NewTimelinePanel room={room} hidden />
+                    </SDKContext.Provider>
+                </MatrixClientContext.Provider>,
+            );
+            jump(ROOM_ID, "present");
+            expect(vmSpies.dismissReadMarkerAndJumpToPresent).not.toHaveBeenCalled();
+        });
     });
 
     it("draws the event the row carries", () => {

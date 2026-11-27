@@ -48,6 +48,7 @@ import { CryptoEvent } from "matrix-js-sdk/src/crypto-api";
 import { type RoomViewProps } from "@element-hq/element-web-module-api";
 import {
     EncryptionEventView,
+    type JumpToPresentMode,
     RoomStatusBarView,
     useCreateAutoDisposedViewModel,
 } from "@element-hq/web-shared-components";
@@ -91,6 +92,8 @@ import { CHAT_EFFECTS } from "../../effects";
 import { CallView } from "../views/voip/CallView";
 import { CallSplitPanel } from "../../intercom/CallSplitPanel";
 import { CallSplitStore, CallSplitStoreEvent } from "../../intercom/CallSplitStore";
+import { formatUnreadSince } from "../../intercom/UnreadSince";
+import { INTERCOM_TIMELINE_JUMP, type TimelineJumpPayload } from "../../intercom/TimelineJump";
 import { UPDATE_EVENT } from "../../stores/AsyncStore";
 import { showToast as showNotificationsToast } from "../../toasts/DesktopNotificationsToast";
 import { WidgetLayoutStore } from "../../stores/widgets/WidgetLayoutStore";
@@ -250,7 +253,18 @@ export interface IRoomState {
     // the end of the live timeline. It has the effect of hiding the
     // 'scroll to bottom' knob, among a couple of other things.
     atEndOfLiveTimeline?: boolean;
+    /**
+     * InterCom: the way back to the newest messages of the classic timeline: nothing, the small
+     * arrow a little way up, the bar "You're viewing older messages" far back.
+     */
+    jumpToPresentMode?: JumpToPresentMode;
     showTopUnreadMessagesBar: boolean;
+    /** InterCom: how many messages after the read marker are unread, for the bar at the top; null when not known */
+    unreadSinceCount?: number | null;
+    /** InterCom: when the first of them was sent, formatted for the bar */
+    unreadSinceTime?: string | null;
+    /** InterCom: how many unread messages are below the view, for the bar at the bottom */
+    unreadBelowCount?: number;
     statusBarVisible: boolean;
     // We load this later by asking the js-sdk to suggest a version for us.
     // This object is the result of Room#getRecommendedVersion()
@@ -1089,6 +1103,7 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
         if (this.messagePanel && this.state.atEndOfLiveTimeline === undefined) {
             this.setState({
                 atEndOfLiveTimeline: this.messagePanel.isAtEndOfLiveTimeline(),
+                jumpToPresentMode: this.messagePanel.getJumpToPresentMode(),
             });
         }
     }
@@ -1099,6 +1114,7 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
         //
         // (We could use isMounted, but facebook have deprecated that.)
         this.unmounted = true;
+        this.updateUnreadBelow.cancel();
 
         CallSplitStore.instance.off(CallSplitStoreEvent.Mode, this.onCallViewModeChange);
         this.context.legacyCallHandler.removeListener(LegacyCallHandlerEvent.CallState, this.onCallState);
@@ -1187,11 +1203,19 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
         const action = getKeyBindingsManager().getRoomAction(ev);
         switch (action) {
             case KeyBindingAction.DismissReadMarker:
+                if (!this.messagePanel && this.jumpInNewTimeline("present")) {
+                    handled = true;
+                    break;
+                }
                 void this.messagePanel?.forgetReadMarker();
                 this.jumpToLiveTimeline();
                 handled = true;
                 break;
             case KeyBindingAction.JumpToOldestUnread:
+                if (!this.messagePanel && this.jumpInNewTimeline("read_marker")) {
+                    handled = true;
+                    break;
+                }
                 this.jumpToReadMarker();
                 handled = true;
                 break;
@@ -1448,6 +1472,8 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
                 this.setState((state) => {
                     return { numUnreadMessages: state.numUnreadMessages + 1 };
                 });
+                // InterCom: and among the unread below the view, once the timeline has taken it in
+                window.setTimeout(this.updateUnreadBelow, 300);
             }
         }
     };
@@ -1778,18 +1804,50 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
     };
 
     private onMessageListScroll = (): void => {
+        const jumpToPresentMode = this.messagePanel?.getJumpToPresentMode() ?? "hidden";
         if (this.messagePanel?.isAtEndOfLiveTimeline()) {
             this.setState({
                 numUnreadMessages: 0,
                 atEndOfLiveTimeline: true,
+                jumpToPresentMode,
             });
         } else {
             this.setState({
                 atEndOfLiveTimeline: false,
+                jumpToPresentMode,
             });
         }
         this.updateTopUnreadMessagesBar();
+        this.updateUnreadBelow();
     };
+
+    /**
+     * InterCom: how many unread messages are below the view, for the bar at the bottom ("N new
+     * messages"). Finding the last message in view measures the tiles, so not on every scroll event.
+     */
+    private updateUnreadBelow = throttle(
+        (): void => {
+            if (this.unmounted) return;
+            const unreadBelowCount = this.messagePanel?.getUnreadBelowView() ?? 0;
+            if (unreadBelowCount !== this.state.unreadBelowCount) this.setState({ unreadBelowCount });
+        },
+        250,
+        { leading: true, trailing: true },
+    );
+
+    /**
+     * InterCom: passes a jump asked for from the keyboard on to the labs "New timeline", which
+     * keeps its scrolling to itself. Returns whether that timeline is the one shown.
+     */
+    private jumpInNewTimeline(to: TimelineJumpPayload["to"]): boolean {
+        if (!this.state.roomId || !SettingsStore.getValue("feature_new_timeline")) return false;
+        defaultDispatcher.dispatch<TimelineJumpPayload>({
+            action: INTERCOM_TIMELINE_JUMP,
+            roomId: this.state.roomId,
+            to,
+        });
+        return true;
+    }
 
     private resetJumpToEvent = (eventId?: string): void => {
         if (
@@ -2035,9 +2093,19 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
             return;
         }
 
-        const showBar = this.messagePanel.canJumpToReadMarker();
-        if (this.state.showTopUnreadMessagesBar != showBar) {
-            this.setState({ showTopUnreadMessagesBar: showBar });
+        let showBar = this.messagePanel.canJumpToReadMarker();
+        // InterCom: the bar says how many are unread since when ("12 new messages since 14:32")
+        const unread = showBar ? this.messagePanel.getUnreadSinceReadMarker() : null;
+        // Nothing unread after the marker (only our own messages, or events without a tile): no bar
+        if (unread?.count === 0) showBar = false;
+        const unreadSinceCount = unread?.count ?? null;
+        const unreadSinceTime = formatUnreadSince(unread?.since ?? null, this.state.showTwelveHourTimestamps);
+        if (
+            this.state.showTopUnreadMessagesBar != showBar ||
+            this.state.unreadSinceCount !== unreadSinceCount ||
+            this.state.unreadSinceTime !== unreadSinceTime
+        ) {
+            this.setState({ showTopUnreadMessagesBar: showBar, unreadSinceCount, unreadSinceTime });
         }
     };
 
@@ -2646,20 +2714,32 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
             );
         }
 
+        // InterCom: the bars of the classic timeline stay mounted, for their live regions to be
+        // there before they have something to say; the new timeline draws its own
         let topUnreadMessagesBar: JSX.Element | undefined;
-        // Do not show TopUnreadMessagesBar if we have search results showing, it makes no sense
-        if (this.state.showTopUnreadMessagesBar && !this.state.search) {
-            topUnreadMessagesBar = (
-                <TopUnreadMessagesBar onScrollUpClick={this.jumpToReadMarker} onCloseClick={this.forgetReadMarker} />
-            );
-        }
         let jumpToBottom;
-        // Do not show JumpToBottomButton if we have search results showing, it makes no sense
-        if (this.state.atEndOfLiveTimeline === false && !this.state.search) {
+        if (messagePanel && !SettingsStore.getValue("feature_new_timeline")) {
+            topUnreadMessagesBar = (
+                <TopUnreadMessagesBar
+                    // Do not show TopUnreadMessagesBar if we have search results showing, it makes no sense
+                    visible={this.state.showTopUnreadMessagesBar && !this.state.search}
+                    count={this.state.unreadSinceCount}
+                    since={this.state.unreadSinceTime}
+                    onScrollUpClick={this.jumpToReadMarker}
+                    onCloseClick={this.forgetReadMarker}
+                />
+            );
             jumpToBottom = (
                 <JumpToBottomButton
+                    // Do not show JumpToBottomButton if we have search results showing, it makes no sense
+                    mode={
+                        this.state.atEndOfLiveTimeline === false && !this.state.search
+                            ? (this.state.jumpToPresentMode ?? "near")
+                            : "hidden"
+                    }
                     highlight={this.state.room.getUnreadNotificationCount(NotificationCountType.Highlight) > 0}
-                    numUnreadMessages={this.state.numUnreadMessages}
+                    // What arrived while scrolled up, or the unread below the view
+                    numUnreadMessages={Math.max(this.state.numUnreadMessages, this.state.unreadBelowCount ?? 0)}
                     onScrollToBottomClick={this.jumpToLiveTimeline}
                 />
             );

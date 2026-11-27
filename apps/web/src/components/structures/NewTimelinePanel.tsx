@@ -30,6 +30,10 @@ import { DateSeparatorWrapper } from "./DateSeparatorWrapper";
 import type { IReadReceiptPosition } from "../views/rooms/ReadReceiptMarker";
 import { GalleryGroupContext } from "../../intercom/gallery/GalleryContext";
 import { galleryOfItem } from "../../intercom/gallery/timelineItem";
+import { useDispatcher } from "../../hooks/useDispatcher";
+import defaultDispatcher from "../../dispatcher/dispatcher";
+import { INTERCOM_TIMELINE_JUMP, type TimelineJumpPayload } from "../../intercom/TimelineJump";
+import { Action } from "../../dispatcher/actions";
 
 interface NewTimelinePanelProps {
     room: Room;
@@ -205,6 +209,19 @@ export function NewTimelinePanel({
     useEffect(() => {
         vm.setEditingEventId(editingEventId);
     }, [vm, editingEventId]);
+
+    // InterCom: the room's shortcuts (Escape, Shift+Page Up), which RoomView handles and passes on
+    useDispatcher(defaultDispatcher, (payload) => {
+        if (payload.action !== INTERCOM_TIMELINE_JUMP) return;
+        const { roomId, to } = payload as TimelineJumpPayload;
+        if (roomId !== room.roomId || hidden) return;
+        if (to === "present") {
+            vm.dismissReadMarkerAndJumpToPresent();
+            defaultDispatcher.fire(Action.FocusSendMessageComposer);
+        } else {
+            vm.jumpToReadMarker();
+        }
+    });
 
     useEffect(() => {
         // Load the syntax highlighter up front. Code blocks fetch it the first time

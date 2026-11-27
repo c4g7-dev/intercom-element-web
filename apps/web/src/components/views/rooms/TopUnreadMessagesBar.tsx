@@ -7,35 +7,36 @@ Please see LICENSE files in the repository root for full details.
 */
 
 import React from "react";
-import { ChevronUpIcon, CloseIcon } from "@vector-im/compound-design-tokens/assets/web/icons";
+import { UnreadSinceBar } from "@element-hq/web-shared-components";
 
-import { _t } from "../../../languageHandler";
-import AccessibleButton, { type ButtonEvent } from "../elements/AccessibleButton";
+import { type ButtonEvent } from "../elements/AccessibleButton";
 
 interface IProps {
-    onScrollUpClick: (e: ButtonEvent) => void;
+    onScrollUpClick: () => void;
     onCloseClick: (e: ButtonEvent) => void;
+    /** InterCom: whether the bar is shown; it stays mounted for its live region */
+    visible?: boolean;
+    /** InterCom: how many messages after the read marker are unread; null when not known */
+    count?: number | null;
+    /** InterCom: when the first of them was sent, formatted; null when not known */
+    since?: string | null;
 }
 
+/**
+ * InterCom: the unread messages above, as the new timeline shows them (the shared
+ * {@link UnreadSinceBar}): "12 new messages since 14:32" and "Mark as read" along the top of the
+ * timeline, in place of Element's round button and its small ✕.
+ */
 export default class TopUnreadMessagesBar extends React.PureComponent<IProps> {
     public render(): React.ReactNode {
         return (
-            <div className="mx_TopUnreadMessagesBar">
-                <AccessibleButton
-                    className="mx_TopUnreadMessagesBar_scrollUp"
-                    title={_t("room|jump_read_marker")}
-                    onClick={this.props.onScrollUpClick}
-                >
-                    <ChevronUpIcon />
-                </AccessibleButton>
-                <AccessibleButton
-                    className="mx_TopUnreadMessagesBar_markAsRead"
-                    title={_t("notifications|mark_all_read")}
-                    onClick={this.props.onCloseClick}
-                >
-                    <CloseIcon />
-                </AccessibleButton>
-            </div>
+            <UnreadSinceBar
+                visible={this.props.visible ?? true}
+                count={this.props.count ?? null}
+                since={this.props.since ?? null}
+                onJump={this.props.onScrollUpClick}
+                onMarkAsRead={this.props.onCloseClick}
+            />
         );
     }
 }

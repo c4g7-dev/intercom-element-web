@@ -48,6 +48,7 @@ import { mkThread } from "test-utils/threads";
 import { createMessageEventContent } from "test-utils/events";
 
 import TimelinePanel from "./TimelinePanel";
+import MessagePanel from "./MessagePanel";
 import { MatrixClientPeg } from "../../MatrixClientPeg";
 import SettingsStore from "../../settings/SettingsStore";
 import ScrollPanel from "./ScrollPanel";
@@ -421,6 +422,107 @@ describe("TimelinePanel", () => {
             const readMarkerTimer = timelinePanel!.readMarkerActivityTimer;
 
             checkCall(readReceiptTimer, readMarkerTimer);
+        });
+    });
+
+    // InterCom: Discord's way back, the bar far back and the small arrow a little way up
+    describe("the way back to the present and the unread bar", () => {
+        const renderPanel = async (events: MatrixEvent[]): Promise<TimelinePanel> => {
+            const client = MatrixClientPeg.safeGet();
+            const room = mkRoom(client, "roomId");
+            let panel: TimelinePanel | null = null;
+            render(
+                <TimelinePanel
+                    {...getProps(room, events)}
+                    manageReadMarkers={true}
+                    ref={(ref) => {
+                        panel = ref;
+                    }}
+                />,
+            );
+            await waitFor(() => expect(panel).toBeTruthy());
+            return panel!;
+        };
+        const scrolled = (distance: number, viewportHeight = 600): void => {
+            vi.spyOn(MessagePanel.prototype, "getDistanceFromBottom").mockReturnValue({ distance, viewportHeight });
+            vi.spyOn(MessagePanel.prototype, "isAtBottom").mockReturnValue(distance === 0);
+        };
+        const liveEndLoaded = (panel: TimelinePanel, loaded: boolean): void => {
+            // The panel's own window, private
+            const { timelineWindow } = panel as unknown as { timelineWindow: TimelineWindow };
+            vi.spyOn(timelineWindow, "canPaginate").mockImplementation(
+                (direction) => direction === EventTimeline.FORWARDS && !loaded,
+            );
+        };
+
+        afterEach(() => {
+            vi.restoreAllMocks();
+        });
+
+        it("offers nothing at the newest message", async () => {
+            const panel = await renderPanel(mockEvents(MatrixClientPeg.safeGet().getRoom("roomId")!, 3));
+            scrolled(0);
+            liveEndLoaded(panel, true);
+            expect(panel.getJumpToPresentMode()).toBe("hidden");
+        });
+
+        it("offers the small arrow a little way up", async () => {
+            const panel = await renderPanel(mockEvents(mkRoom(MatrixClientPeg.safeGet(), "roomId"), 3));
+            scrolled(120);
+            liveEndLoaded(panel, true);
+            expect(panel.getJumpToPresentMode()).toBe("near");
+            // Exactly one and a half screens is still a little way
+            scrolled(900);
+            expect(panel.getJumpToPresentMode()).toBe("near");
+        });
+
+        it("offers the bar more than one and a half screens up", async () => {
+            const panel = await renderPanel(mockEvents(mkRoom(MatrixClientPeg.safeGet(), "roomId"), 3));
+            scrolled(901);
+            liveEndLoaded(panel, true);
+            expect(panel.getJumpToPresentMode()).toBe("far");
+        });
+
+        it("offers the bar whenever the newest messages are not loaded", async () => {
+            const panel = await renderPanel(mockEvents(mkRoom(MatrixClientPeg.safeGet(), "roomId"), 3));
+            scrolled(0);
+            liveEndLoaded(panel, false);
+            expect(panel.getJumpToPresentMode()).toBe("far");
+        });
+
+        it("counts the unread messages after the read marker, and when the first came", async () => {
+            const events = mockEvents(mkRoom(MatrixClientPeg.safeGet(), "roomId"), 4);
+            const panel = await renderPanel(events);
+            act(() => panel.setState({ readMarkerEventId: events[0].getId()! }));
+
+            expect(panel.getUnreadSinceReadMarker()).toEqual({ count: 3, since: events[1].getTs() });
+        });
+
+        it("counts the unread messages below the view, after the read marker", async () => {
+            const events = mockEvents(mkRoom(MatrixClientPeg.safeGet(), "roomId"), 6);
+            const panel = await renderPanel(events);
+            act(() => panel.setState({ readMarkerEventId: events[1].getId()! }));
+            const lastInView = vi.spyOn(
+                panel as unknown as { getLastDisplayedEventIndex: () => number | null },
+                "getLastDisplayedEventIndex",
+            );
+
+            // Scrolled up above the marker: all four after it
+            lastInView.mockReturnValue(0);
+            expect(panel.getUnreadBelowView()).toBe(4);
+            // Reading on
+            lastInView.mockReturnValue(3);
+            expect(panel.getUnreadBelowView()).toBe(2);
+            lastInView.mockReturnValue(5);
+            expect(panel.getUnreadBelowView()).toBe(0);
+        });
+
+        it("knows nothing without a read marker", async () => {
+            const panel = await renderPanel(mockEvents(mkRoom(MatrixClientPeg.safeGet(), "roomId"), 2));
+            act(() => panel.setState({ readMarkerEventId: null }));
+
+            expect(panel.getUnreadSinceReadMarker()).toBeNull();
+            expect(panel.getUnreadBelowView()).toBe(0);
         });
     });
 

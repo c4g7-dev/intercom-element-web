@@ -381,6 +381,20 @@ export default class MessagePanel extends React.Component<IProps, IState> {
         return this.scrollPanel.current?.getScrollState() ?? null;
     }
 
+    /**
+     * InterCom: how far the bottom of the viewport is above the end of the list, and how high the
+     * viewport is, in pixels; null if we are not mounted. Decides between the bar "You're viewing
+     * older messages" and the small arrow.
+     */
+    public getDistanceFromBottom(): { distance: number; viewportHeight: number } | null {
+        const scrollNode = this.scrollPanel.current?.divScroll;
+        if (!scrollNode) return null;
+        return {
+            distance: Math.max(0, scrollNode.scrollHeight - scrollNode.scrollTop - scrollNode.clientHeight),
+            viewportHeight: scrollNode.clientHeight,
+        };
+    }
+
     // returns one of:
     //
     //  null: there is no read marker

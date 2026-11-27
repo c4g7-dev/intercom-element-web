@@ -153,6 +153,21 @@ export interface TimelineViewSnapshot {
      * "Jump to bottom" button.
      */
     hasHighlights: boolean;
+
+    /**
+     * InterCom: how many messages after the read marker are unread, for the bar at the top
+     * ("12 new messages since 14:32"); null when that is not known. With 0 the bar is not shown.
+     */
+    unreadSinceCount?: number | null;
+
+    /** InterCom: when the first of those messages was sent, formatted for the reader; null when not known. */
+    unreadSinceTime?: string | null;
+
+    /**
+     * InterCom: how many unread messages are below the viewport (after the read marker and after
+     * the last message in view). With {@link numUnreadMessages}, the count of the bar at the bottom.
+     */
+    unreadBelowCount?: number;
 }
 
 export interface TimelineViewActions {

@@ -14,6 +14,7 @@ import {
     EventType,
     MatrixEvent,
     MatrixEventEvent,
+    NotificationCountType,
     PendingEventOrdering,
     ReceiptType,
     RelationType,
@@ -28,6 +29,7 @@ import { type TimelineItem } from "@element-hq/web-shared-components";
 import { createTestClient, mkMembership, mkMessage } from "test-utils";
 
 import SettingsStore from "../../../settings/SettingsStore";
+import { formatDate } from "../../../DateUtils";
 import { RoomTimelineViewModel } from "./RoomTimelineViewModel";
 
 vi.mock("../../../settings/SettingsStore");
@@ -1211,6 +1213,148 @@ describe("RoomTimelineViewModel", () => {
             const vm = await createStartedViewModel();
 
             expect(vm.getSnapshot().lastSuccessfulEventId).toBeNull();
+        });
+    });
+
+    // InterCom: the bars of Discord's way back, see intercom/TimelineJumpBars in shared-components
+    describe("the unread bar and the jump to present", () => {
+        const markerAt = (eventId: string): void => {
+            room.addAccountData([
+                new MatrixEvent({ type: EventType.FullyRead, room_id: ROOM_ID, content: { event_id: eventId } }),
+            ]);
+        };
+        const ts = new Date("2026-11-27T14:32:00").getTime();
+
+        beforeEach(() => {
+            vi.mocked(client.getSafeUserId).mockReturnValue(USER_ID);
+        });
+
+        it("counts the unread messages after the read marker, and says when the first came", async () => {
+            seedTimeline([
+                makeMessage("$read", { user: OTHER_USER_ID, ts }),
+                makeMessage("$first", { user: OTHER_USER_ID, ts: ts + 60_000 }),
+                makeMessage("$mine", { user: USER_ID, ts: ts + 120_000 }),
+                makeMessage("$second", { user: OTHER_USER_ID, ts: ts + 180_000 }),
+            ]);
+            markerAt("$read");
+            const vm = await createStartedViewModel();
+
+            // Our own message is not unread
+            expect(vm.getSnapshot().unreadSinceCount).toBe(2);
+            expect(vm.getSnapshot().unreadSinceTime).toBe(formatDate(new Date(ts + 60_000), false));
+        });
+
+        it("counts nothing when only our own messages follow the marker, which hides the bar", async () => {
+            seedTimeline([makeMessage("$read", { user: OTHER_USER_ID }), makeMessage("$mine", { user: USER_ID })]);
+            markerAt("$read");
+            const vm = await createStartedViewModel();
+
+            expect(vm.getSnapshot().unreadSinceCount).toBe(0);
+        });
+
+        it("takes the server's count when the marker is not loaded", async () => {
+            seedTimeline([makeMessage("$a", { user: OTHER_USER_ID }), makeMessage("$b", { user: OTHER_USER_ID })]);
+            room.setUnreadNotificationCount(NotificationCountType.Total, 42);
+            markerAt("$gone");
+            const vm = await createStartedViewModel();
+
+            expect(vm.getSnapshot().unreadSinceCount).toBe(42);
+            expect(vm.getSnapshot().unreadSinceTime).toBeNull();
+        });
+
+        it("counts a message that arrives meanwhile", async () => {
+            seedTimeline([makeMessage("$read", { user: OTHER_USER_ID }), makeMessage("$b", { user: OTHER_USER_ID })]);
+            markerAt("$read");
+            const vm = await createStartedViewModel();
+            expect(vm.getSnapshot().unreadSinceCount).toBe(1);
+
+            await room.addLiveEvents([makeMessage("$c", { user: OTHER_USER_ID })], { addToState: false });
+
+            await vi.waitFor(() => expect(vm.getSnapshot().unreadSinceCount).toBe(2));
+        });
+
+        it("counts the unread messages below the view, for the bar at the bottom", async () => {
+            seedTimeline([
+                makeMessage("$old", { user: OTHER_USER_ID }),
+                makeMessage("$read", { user: OTHER_USER_ID }),
+                makeMessage("$b", { user: OTHER_USER_ID }),
+                makeMessage("$mine", { user: USER_ID }),
+                makeMessage("$c", { user: OTHER_USER_ID }),
+                makeMessage("$d", { user: OTHER_USER_ID }),
+            ]);
+            markerAt("$read");
+            const vm = await createStartedViewModel();
+            vm.onAnchorReached();
+            const items = vm.getSnapshot().items;
+
+            // Scrolled up above the marker: every unread message is below the view
+            vm.onVisibleRangeChanged(0, indexOfKey(items, "$old"));
+            expect(vm.getSnapshot().unreadBelowCount).toBe(3);
+
+            // Reading on: those in view are no longer below it, our own never counted
+            vm.onVisibleRangeChanged(0, indexOfKey(items, "$c"));
+            expect(vm.getSnapshot().unreadBelowCount).toBe(1);
+
+            vm.onVisibleRangeChanged(0, items.length - 1);
+            expect(vm.getSnapshot().unreadBelowCount).toBe(0);
+        });
+
+        it("forgets the count once everything is marked as read", async () => {
+            seedTimeline([makeMessage("$read", { user: OTHER_USER_ID }), makeMessage("$b", { user: OTHER_USER_ID })]);
+            markerAt("$read");
+            const vm = await createStartedViewModel();
+
+            vm.onMarkAllAsRead();
+
+            expect(vm.getSnapshot().canJumpToReadMarker).toBe(false);
+            expect(vm.getSnapshot().unreadSinceCount).toBeNull();
+        });
+
+        it("counts the messages from others that arrive while the reader is away from the bottom", async () => {
+            seedTimeline([makeMessage("$a", { user: OTHER_USER_ID })]);
+            const vm = await createStartedViewModel();
+            vm.onAnchorReached();
+            vm.onAtBottomStateChange(false);
+
+            await room.addLiveEvents([makeMessage("$b", { user: OTHER_USER_ID })], { addToState: false });
+            await room.addLiveEvents([makeMessage("$c", { user: USER_ID })], { addToState: false });
+
+            await vi.waitFor(() => expect(eventKeys(vm.getSnapshot().items)).toEqual(["$a", "$b", "$c"]));
+            expect(vm.getSnapshot().numUnreadMessages).toBe(1);
+
+            // Back at the newest message, nothing is new any more
+            vm.onAtBottomStateChange(true);
+            expect(vm.getSnapshot().numUnreadMessages).toBe(0);
+        });
+
+        it("Escape marks everything read and jumps to the newest message through the anchor", async () => {
+            seedTimeline([makeMessage("$read", { user: OTHER_USER_ID }), makeMessage("$b", { user: OTHER_USER_ID })]);
+            markerAt("$read");
+            const vm = await createStartedViewModel();
+            vm.onAnchorReached();
+            vm.onAtBottomStateChange(false);
+
+            vm.dismissReadMarkerAndJumpToPresent();
+
+            expect(vm.getSnapshot().canJumpToReadMarker).toBe(false);
+            expect(vm.getSnapshot().numUnreadMessages).toBe(0);
+            // The view scrolls to the anchor and reports back
+            expect(vm.getSnapshot().pendingAnchor).toEqual({ targetKey: "$b", align: "end" });
+        });
+
+        it("Shift+Page Up jumps to the read marker through the anchor", async () => {
+            seedTimeline([
+                makeMessage("$read", { user: OTHER_USER_ID }),
+                makeMessage("$b", { user: OTHER_USER_ID }),
+                makeMessage("$c", { user: OTHER_USER_ID }),
+            ]);
+            markerAt("$read");
+            const vm = await createStartedViewModel();
+            vm.onAnchorReached();
+
+            vm.jumpToReadMarker();
+
+            expect(vm.getSnapshot().pendingAnchor).toEqual(expect.objectContaining({ targetKey: "read-marker" }));
         });
     });
 });

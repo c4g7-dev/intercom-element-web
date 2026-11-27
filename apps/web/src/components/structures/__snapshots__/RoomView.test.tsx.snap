@@ -1318,6 +1318,27 @@ exports[`RoomView > should hide the composer when hideComposer=true 1`] = `
           data-testid="timeline"
         >
           <div
+            class="_dock mx_IntercomUnreadSince"
+            data-testid="unread-since"
+          >
+            <span
+              aria-atomic="true"
+              aria-live="polite"
+              class="_visuallyHidden"
+            />
+          </div>
+          <div
+            class="_dock mx_IntercomJumpToPresent"
+            data-mode="hidden"
+            data-testid="jump-to-present"
+          >
+            <span
+              aria-atomic="true"
+              aria-live="polite"
+              class="_visuallyHidden"
+            />
+          </div>
+          <div
             class="_scrollbar mx_AutoHideScrollbar mx_ScrollPanel mx_RoomView_messagePanel"
             tabindex="-1"
           >
@@ -1387,6 +1408,27 @@ exports[`RoomView > should hide the header when hideHeader=true 1`] = `
           class="mx_RoomView_timeline mx_RoomView_timeline_rr_enabled"
           data-testid="timeline"
         >
+          <div
+            class="_dock mx_IntercomUnreadSince"
+            data-testid="unread-since"
+          >
+            <span
+              aria-atomic="true"
+              aria-live="polite"
+              class="_visuallyHidden"
+            />
+          </div>
+          <div
+            class="_dock mx_IntercomJumpToPresent"
+            data-mode="hidden"
+            data-testid="jump-to-present"
+          >
+            <span
+              aria-atomic="true"
+              aria-live="polite"
+              class="_visuallyHidden"
+            />
+          </div>
           <div
             class="_scrollbar mx_AutoHideScrollbar mx_ScrollPanel mx_RoomView_messagePanel"
             tabindex="-1"
@@ -1873,6 +1915,27 @@ exports[`RoomView > should hide the pinned message banner when hidePinnedMessage
           data-testid="timeline"
         >
           <div
+            class="_dock mx_IntercomUnreadSince"
+            data-testid="unread-since"
+          >
+            <span
+              aria-atomic="true"
+              aria-live="polite"
+              class="_visuallyHidden"
+            />
+          </div>
+          <div
+            class="_dock mx_IntercomJumpToPresent"
+            data-mode="hidden"
+            data-testid="jump-to-present"
+          >
+            <span
+              aria-atomic="true"
+              aria-live="polite"
+              class="_visuallyHidden"
+            />
+          </div>
+          <div
             class="_scrollbar mx_AutoHideScrollbar mx_ScrollPanel mx_RoomView_messagePanel"
             tabindex="-1"
           >
@@ -2357,6 +2420,27 @@ exports[`RoomView > should hide the right panel when hideRightPanel=true 1`] = `
           class="mx_RoomView_timeline mx_RoomView_timeline_rr_enabled"
           data-testid="timeline"
         >
+          <div
+            class="_dock mx_IntercomUnreadSince"
+            data-testid="unread-since"
+          >
+            <span
+              aria-atomic="true"
+              aria-live="polite"
+              class="_visuallyHidden"
+            />
+          </div>
+          <div
+            class="_dock mx_IntercomJumpToPresent"
+            data-mode="hidden"
+            data-testid="jump-to-present"
+          >
+            <span
+              aria-atomic="true"
+              aria-live="polite"
+              class="_visuallyHidden"
+            />
+          </div>
           <div
             class="_scrollbar mx_AutoHideScrollbar mx_ScrollPanel mx_RoomView_messagePanel"
             tabindex="-1"
@@ -3081,6 +3165,27 @@ exports[`RoomView > should not display the timeline when the room encryption is 
           class="mx_RoomView_timeline mx_RoomView_timeline_rr_enabled"
           data-testid="timeline"
         >
+          <div
+            class="_dock mx_IntercomUnreadSince"
+            data-testid="unread-since"
+          >
+            <span
+              aria-atomic="true"
+              aria-live="polite"
+              class="_visuallyHidden"
+            />
+          </div>
+          <div
+            class="_dock mx_IntercomJumpToPresent"
+            data-mode="hidden"
+            data-testid="jump-to-present"
+          >
+            <span
+              aria-atomic="true"
+              aria-live="polite"
+              class="_visuallyHidden"
+            />
+          </div>
           <div
             class="_scrollbar mx_AutoHideScrollbar mx_ScrollPanel mx_RoomView_messagePanel"
             tabindex="-1"
