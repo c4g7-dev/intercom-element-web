@@ -79,4 +79,34 @@ describe("VoiceParticipantsView", () => {
         await userEvent.click(screen.getByText("Ada"));
         expect(onJoin).toHaveBeenCalledTimes(1);
     });
+
+    it("draws the avatars with the app's own avatar when given one", () => {
+        class TestViewModel
+            extends MockViewModel<VoiceParticipantsViewSnapshot>
+            implements VoiceParticipantsViewActions
+        {
+            public onJoin = vi.fn();
+        }
+        const vm = new TestViewModel({
+            roomName: "Lounge",
+            participants: [
+                {
+                    id: "@a:x",
+                    name: "Ada",
+                    avatarUrl: "https://x/a.png",
+                    speaking: false,
+                    muted: false,
+                    deafened: false,
+                    live: false,
+                },
+                { id: "@b:x", name: "Ben", speaking: false, muted: false, deafened: false, live: false },
+            ],
+        });
+        const renderAvatar = vi.fn(({ id }) => <span data-testid={`avatar-${id}`} />);
+        render(<VoiceParticipantsView vm={vm} renderAvatar={renderAvatar} />);
+
+        expect(screen.getByTestId("avatar-@a:x")).toBeInTheDocument();
+        expect(renderAvatar).toHaveBeenCalledWith({ id: "@a:x", name: "Ada", url: "https://x/a.png", size: "24px" });
+        expect(renderAvatar).toHaveBeenCalledWith({ id: "@b:x", name: "Ben", url: undefined, size: "24px" });
+    });
 });

@@ -6,7 +6,6 @@
  */
 
 import React, { type JSX } from "react";
-import { Avatar } from "@vector-im/compound-web";
 import MicOffSolidIcon from "@vector-im/compound-design-tokens/assets/web/icons/mic-off-solid";
 import HeadphonesOffSolidIcon from "@vector-im/compound-design-tokens/assets/web/icons/headphones-off-solid";
 import classNames from "classnames";
@@ -14,6 +13,7 @@ import classNames from "classnames";
 import styles from "./VoiceParticipantsView.module.css";
 import { type ViewModel, useViewModel } from "../../core/viewmodel";
 import { useI18n } from "../../core/i18n/i18nContext";
+import { type RenderIntercomAvatar, renderIntercomAvatar } from "../IntercomAvatar/IntercomAvatar";
 
 /** Somebody who is in the call of a voice room. */
 export interface VoiceParticipant {
@@ -56,6 +56,8 @@ export type VoiceParticipantsViewModel = ViewModel<VoiceParticipantsViewSnapshot
 interface VoiceParticipantsViewProps {
     /** The view model */
     vm: VoiceParticipantsViewModel;
+    /** Draws a participant's avatar: the app's own, which loads the picture as its other avatars do */
+    renderAvatar?: RenderIntercomAvatar;
 }
 
 /**
@@ -63,7 +65,7 @@ interface VoiceParticipantsViewProps {
  * ring while they talk, name, and what is off (microphone, hearing) or on (a shared screen).
  * Renders nothing while nobody is in the call.
  */
-export function VoiceParticipantsView({ vm }: Readonly<VoiceParticipantsViewProps>): JSX.Element | null {
+export function VoiceParticipantsView({ vm, renderAvatar }: Readonly<VoiceParticipantsViewProps>): JSX.Element | null {
     const { translate: _t } = useI18n();
     const { roomName, participants } = useViewModel(vm);
     if (participants.length === 0) return null;
@@ -100,12 +102,15 @@ export function VoiceParticipantsView({ vm }: Readonly<VoiceParticipantsViewProp
                             className={classNames(styles.avatar, { [styles.speaking]: participant.speaking })}
                             data-speaking={participant.speaking}
                         >
-                            <Avatar
-                                id={participant.id}
-                                name={participant.name}
-                                src={participant.avatarUrl}
-                                size="24px"
-                            />
+                            {renderIntercomAvatar(
+                                {
+                                    id: participant.id,
+                                    name: participant.name,
+                                    url: participant.avatarUrl,
+                                    size: "24px",
+                                },
+                                renderAvatar,
+                            )}
                         </span>
                         <span className={styles.name} title={participant.name}>
                             {participant.name}

@@ -38,6 +38,20 @@ const base: UserPanelViewSnapshot = {
 const call = { roomName: "Lounge", reconnecting: false, cameraOn: false, screenSharing: false, controllable: true };
 
 describe("UserPanelView", () => {
+    it("draws the avatar with the app's own avatar when given one", () => {
+        const vm = new TestViewModel({ ...base, avatarUrl: "https://example.org/ada.png" });
+        const renderAvatar = vi.fn(({ name }) => <span data-testid="app-avatar">{name}</span>);
+        render(<UserPanelView vm={vm} renderAvatar={renderAvatar} />);
+
+        expect(screen.getByTestId("app-avatar")).toBeInTheDocument();
+        expect(renderAvatar).toHaveBeenCalledWith({
+            id: "@ada:example.org",
+            name: "Ada",
+            url: "https://example.org/ada.png",
+            size: "32px",
+        });
+    });
+
     it("shows who you are, with mute and deafen there while there is no call", () => {
         render(<Default />);
         expect(screen.getByRole("button", { name: "Ada: your profile" }).textContent).toMatch(/AdaOnline$/);

@@ -6,7 +6,7 @@
  */
 
 import React, { type JSX } from "react";
-import { Avatar, IconButton } from "@vector-im/compound-web";
+import { IconButton } from "@vector-im/compound-web";
 import MicOnSolidIcon from "@vector-im/compound-design-tokens/assets/web/icons/mic-on-solid";
 import MicOffSolidIcon from "@vector-im/compound-design-tokens/assets/web/icons/mic-off-solid";
 import HeadphonesSolidIcon from "@vector-im/compound-design-tokens/assets/web/icons/headphones-solid";
@@ -21,6 +21,7 @@ import classNames from "classnames";
 import styles from "./UserPanelView.module.css";
 import { type ViewModel, useViewModel } from "../../core/viewmodel";
 import { useI18n } from "../../core/i18n/i18nContext";
+import { type RenderIntercomAvatar, renderIntercomAvatar } from "../IntercomAvatar/IntercomAvatar";
 
 /** Whether the user is around, as the homeserver has it. */
 export type UserPanelPresence = "online" | "unavailable" | "offline" | "busy";
@@ -86,6 +87,8 @@ interface UserPanelViewProps {
     vm: UserPanelViewModel;
     /** Whether an update of the app is downloaded and waits for a restart: only then a settings button, with a dot, is shown */
     updateReady?: boolean;
+    /** Draws the user's avatar: the app's own, which loads the picture as its other avatars do */
+    renderAvatar?: RenderIntercomAvatar;
 }
 
 /** Three bars: all of them lit while connected, one while the connection is being re-established. */
@@ -113,7 +116,7 @@ function SignalBars({ lit }: { lit: number }): JSX.Element {
  * buttons beside it, and, while you are in a call, a strip above it that says so, leads to the
  * call and holds its camera, screen share and leave buttons.
  */
-export function UserPanelView({ vm, updateReady = false }: Readonly<UserPanelViewProps>): JSX.Element {
+export function UserPanelView({ vm, updateReady = false, renderAvatar }: Readonly<UserPanelViewProps>): JSX.Element {
     const { translate: _t } = useI18n();
     const { userId, displayName, avatarUrl, presence, muted, deafened, call } = useViewModel(vm);
 
@@ -206,7 +209,10 @@ export function UserPanelView({ vm, updateReady = false }: Readonly<UserPanelVie
                     aria-label={_t("intercom|user_panel|profile", { name: displayName })}
                 >
                     <span className={styles.avatar}>
-                        <Avatar id={userId} name={displayName} src={avatarUrl} size="32px" />
+                        {renderIntercomAvatar(
+                            { id: userId, name: displayName, url: avatarUrl, size: "32px" },
+                            renderAvatar,
+                        )}
                         {presence && <span className={styles.presence} data-presence={presence} />}
                     </span>
                     <span className={styles.names}>

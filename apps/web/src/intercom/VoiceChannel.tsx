@@ -12,6 +12,7 @@ import VolumeOnSolidIcon from "@vector-im/compound-design-tokens/assets/web/icon
 
 import { VoiceChannelViewModel } from "../viewmodels/intercom/VoiceChannelViewModel";
 import { isVideoRoom } from "../utils/video-rooms";
+import { renderIntercomAvatar } from "./Avatar";
 
 /** Whether a room is a voice channel: a room that is its call (a video room or a call room). */
 export function isVoiceChannel(room: Room): boolean {
@@ -23,7 +24,7 @@ export function VoiceChannelParticipants({ room }: { room: Room }): JSX.Element 
     const vm = useCreateAutoDisposedViewModel(
         () => new VoiceChannelViewModel({ room, userId: room.client.getSafeUserId() }),
     );
-    return <VoiceParticipantsView vm={vm} />;
+    return <VoiceParticipantsView vm={vm} renderAvatar={renderIntercomAvatar} />;
 }
 
 /** What stands for a voice channel in the room list where other rooms have their avatar. */

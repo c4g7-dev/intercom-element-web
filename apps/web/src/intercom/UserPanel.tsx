@@ -12,6 +12,7 @@ import { useMatrixClientContext } from "../contexts/MatrixClientContext";
 import { UserPanelViewModel } from "../viewmodels/intercom/UserPanelViewModel";
 import { useUpdateReady } from "./updater/useUpdateReady";
 import { fetchAccountCapabilities } from "./AccountCapabilities";
+import { renderIntercomAvatar } from "./Avatar";
 
 /** The user panel at the bottom of the room list: who you are and the controls of your call. */
 export function UserPanel(): JSX.Element {
@@ -23,5 +24,5 @@ export function UserPanel(): JSX.Element {
     useEffect(() => {
         void fetchAccountCapabilities(client).catch(() => undefined);
     }, [client]);
-    return <UserPanelView vm={vm} updateReady={updateReady} />;
+    return <UserPanelView vm={vm} updateReady={updateReady} renderAvatar={renderIntercomAvatar} />;
 }
