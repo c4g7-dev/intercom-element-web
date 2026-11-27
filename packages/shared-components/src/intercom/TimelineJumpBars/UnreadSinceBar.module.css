@@ -5,14 +5,22 @@
  * Please see LICENSE files in the repository root for full details.
  */
 
-/* Docked to the top of the timeline, across its column; clicks beside the bar reach the messages */
+/*
+ * Docked to the top of the timeline, across its column; clicks beside the bar reach the messages.
+ * The same dark surface and hairline as the bar at the bottom (JumpToPresentBar.module.css).
+ */
 .dock {
+    --jump-surface: var(--roomlist-background-color, var(--cpd-color-bg-subtle-secondary));
+    --jump-hairline: var(--roomlist-separator-color, var(--cpd-color-gray-400));
+    --jump-raised: var(--cpd-color-gray-300);
+
     position: absolute;
     top: 0;
     inset-inline: var(--cpd-space-4x);
     z-index: 1000;
     display: flex;
     pointer-events: none;
+    container-type: inline-size;
 }
 
 .visuallyHidden {
@@ -24,17 +32,20 @@
     white-space: nowrap;
 }
 
-/* Unread is what the accent stands for: a slim bar of it, hanging from the top edge */
+/* A slim dark bar hanging from the top edge; unread is said by the accent's dot and words */
 .bar {
     flex: 1;
     min-width: 0;
     display: flex;
     align-items: stretch;
-    min-height: 30px;
+    box-sizing: border-box;
+    min-height: 32px;
+    border: var(--cpd-border-width-1) solid var(--jump-hairline);
+    border-top: none;
     border-radius: 0 0 8px 8px;
-    background-color: var(--cpd-color-bg-accent-rest);
-    color: var(--cpd-color-text-on-solid-primary);
-    font: var(--cpd-font-body-sm-semibold);
+    background-color: var(--jump-surface);
+    color: var(--cpd-color-text-primary);
+    font: var(--cpd-font-body-sm-medium);
     overflow: hidden;
     pointer-events: auto;
     animation: drop 160ms cubic-bezier(0.2, 0, 0, 1);
@@ -44,7 +55,7 @@
 .markRead {
     display: flex;
     align-items: center;
-    gap: var(--cpd-space-1-5x);
+    gap: var(--cpd-space-2x);
     margin: 0;
     border: none;
     background: none;
@@ -54,11 +65,18 @@
     transition: background-color 0.12s linear;
 }
 
+/* Gives way to "Mark as read": in a narrow column the text is cut short, the button never */
 .jump {
-    flex: 1;
+    flex: 1 1 0;
     min-width: 0;
     padding: 0 var(--cpd-space-3x);
     text-align: start;
+}
+
+/* The arrow in the accent: unread is what it stands for */
+.jump svg {
+    flex: none;
+    color: var(--cpd-color-text-action-accent);
 }
 
 .text {
@@ -71,27 +89,51 @@
 .markRead {
     flex: none;
     padding: 0 var(--cpd-space-3x);
-    /* A hairline in the bar's own text colour, faint */
-    border-inline-start: var(--cpd-border-width-1) solid
-        color-mix(in srgb, var(--cpd-color-text-on-solid-primary) 28%, transparent);
+    border-inline-start: var(--cpd-border-width-1) solid var(--jump-hairline);
+    color: var(--cpd-color-text-action-accent);
+    font: var(--cpd-font-body-sm-semibold);
     white-space: nowrap;
 }
 
 .jump:hover,
 .markRead:hover {
-    background-color: var(--cpd-color-bg-accent-hovered);
+    background-color: var(--jump-raised);
 }
 
 .jump:active,
 .markRead:active {
-    background-color: var(--cpd-color-bg-accent-pressed);
+    background-color: var(--cpd-color-gray-400);
+}
+
+/* A column too narrow for both: "Mark as read" alone */
+@container (max-width: 200px) {
+    .jump {
+        flex: none;
+        padding-inline-end: var(--cpd-space-2x);
+    }
+
+    /* Out of sight, still the button's name */
+    .text {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
+
+    .markRead {
+        flex: 1;
+        min-width: 0;
+        justify-content: center;
+        overflow: hidden;
+    }
 }
 
 /* Inside the bar's clipped corners, so drawn inwards */
 .jump:focus-visible,
 .markRead:focus-visible {
-    outline: 2px solid var(--cpd-color-text-on-solid-primary);
-    outline-offset: -4px;
+    outline: 2px solid var(--cpd-color-border-focused);
+    outline-offset: -3px;
     border-radius: 6px;
 }
 

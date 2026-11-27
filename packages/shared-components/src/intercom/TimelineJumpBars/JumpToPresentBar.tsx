@@ -66,10 +66,16 @@ export function JumpToPresentBar({
                     {/* Read out by the live region above */}
                     <span className={styles.status} aria-hidden="true" data-testid="jump-to-present-status">
                         {hasNew && <span className={styles.dot} />}
-                        {status}
+                        <span className={styles.statusText}>{status}</span>
                     </span>
-                    <button type="button" className={styles.jump} onClick={onJump}>
-                        {_t("intercom|timeline|jump_to_present")}
+                    {/* Named for when the column is too narrow for the words and only the arrow shows */}
+                    <button
+                        type="button"
+                        className={styles.jump}
+                        aria-label={_t("intercom|timeline|jump_to_present")}
+                        onClick={onJump}
+                    >
+                        <span className={styles.jumpLabel}>{_t("intercom|timeline|jump_to_present")}</span>
                         <ArrowDownIcon width="16px" height="16px" aria-hidden="true" />
                     </button>
                 </div>
