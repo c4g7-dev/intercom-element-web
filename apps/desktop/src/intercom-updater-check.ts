@@ -21,9 +21,25 @@ export const RELEASES_FALLBACK_PAGE_SIZE = 30;
 /** How long GitHub has to answer, headers and body. */
 export const CHECK_TIMEOUT_MS = 8000;
 
+/** The most of a release's notes that is kept: more than any release has had, and a bound on what one could send. */
+export const NOTES_MAX_CHARS = 20000;
+/** How long the releases feed, a few kB, may take. */
+export const PROBE_TIMEOUT_MS = 8000;
+/** The longest a rate limit is waited out before the next automatic check, whatever GitHub says. */
+export const MAX_RATE_LIMIT_WAIT_MS = 2 * 60 * 60 * 1000;
+/** What is waited after a refusal that says nothing about when to come back. */
+export const DEFAULT_RATE_LIMIT_WAIT_MS = 15 * 60 * 1000;
+
 export function releasesUrl(perPage: number): string {
     return `https://api.github.com/repos/${UPDATE_REPO}/releases?per_page=${perPage}`;
 }
+
+/**
+ * The Atom feed of the releases: the same list as a page of github.com, not of the API. It is
+ * what the frequent look asks, because it does not count against the API's limit of 60 requests
+ * an hour for an address without a login, which an unchanged ("304") answer of the API does.
+ */
+export const RELEASES_FEED_URL = `https://github.com/${UPDATE_REPO}/releases.atom`;
 
 /** The answer of the last check, as it is kept between checks and starts. */
 export interface ReleaseCache {
@@ -32,6 +48,8 @@ export interface ReleaseCache {
     etag: string;
     /** The releases, with the fields the updater reads and nothing else */
     releases: GithubRelease[];
+    /** Whether the releases were kept with their notes; an answer kept by 1.12.35-intercom.12 or older has none and is asked for anew */
+    notes?: boolean;
 }
 
 /** What a check found, and how long it took. */
@@ -58,6 +76,8 @@ export class ReleaseCheckError extends Error {
         public readonly status: number | undefined,
         public readonly ms: number,
         public readonly timedOut = false,
+        /** Where GitHub refused for too many requests: when it may be asked again, in ms since the epoch */
+        public readonly retryAt?: number,
     ) {
         super(message);
         this.name = "ReleaseCheckError";
@@ -83,6 +103,7 @@ export function trimReleases(releases: unknown): GithubRelease[] {
             html_url: r.html_url,
             draft: r.draft || undefined,
             prerelease: r.prerelease || undefined,
+            body: typeof r.body === "string" && r.body ? r.body.slice(0, NOTES_MAX_CHARS) : undefined,
             assets: (Array.isArray(r.assets) ? r.assets : []).map((a) => ({
                 name: a.name,
                 browser_download_url: a.browser_download_url,
@@ -97,8 +118,97 @@ function isUsableCache(cache: ReleaseCache | undefined, url: string): cache is R
         cache.url === url &&
         typeof cache.etag === "string" &&
         cache.etag.length > 0 &&
+        cache.notes === true &&
         Array.isArray(cache.releases)
     );
+}
+
+/**
+ * When GitHub may be asked again after it refused for too many requests, or undefined if the
+ * answer is no such refusal. GitHub says it with `Retry-After` (seconds; the secondary limits)
+ * or with `x-ratelimit-remaining: 0` and `x-ratelimit-reset` (a time in seconds since the epoch;
+ * the hourly limit). A 429, or a 403 with one of the two, is such a refusal; one that names no
+ * time is given {@link DEFAULT_RATE_LIMIT_WAIT_MS}, and none more than {@link MAX_RATE_LIMIT_WAIT_MS}.
+ */
+export function rateLimitRetryAt(
+    status: number,
+    headers: { get(name: string): string | null },
+    now: number,
+): number | undefined {
+    if (status !== 403 && status !== 429) return undefined;
+    const retryAfter = Number(headers.get("retry-after"));
+    const exhausted = headers.get("x-ratelimit-remaining") === "0";
+    const reset = Number(headers.get("x-ratelimit-reset")) * 1000;
+    let wait: number | undefined;
+    if (headers.get("retry-after") !== null && Number.isFinite(retryAfter) && retryAfter >= 0) {
+        wait = retryAfter * 1000;
+    } else if (exhausted && Number.isFinite(reset) && reset > 0) {
+        // A second more than GitHub says, for clocks that differ a little
+        wait = reset - now + 1000;
+    } else if (status === 429 || exhausted) {
+        wait = DEFAULT_RATE_LIMIT_WAIT_MS;
+    }
+    if (wait === undefined) return undefined;
+    return now + Math.min(MAX_RATE_LIMIT_WAIT_MS, Math.max(1000, wait));
+}
+
+/** What a look at the releases feed found. */
+export interface FeedProbe {
+    /** Whether the feed differs from the one seen last, or there was none to compare with: the releases are then asked for */
+    changed: boolean;
+    status: number;
+    /** The feed's ETag, to send next time; the last one where the answer has none */
+    etag?: string;
+    ms: number;
+}
+
+/**
+ * Asks whether the releases feed changed since the answer with `etag`: one small request, which
+ * GitHub answers with "304 Not Modified" and no body while nothing was released.
+ * @throws ReleaseCheckError when GitHub does not answer in time, or answers with an error
+ */
+export async function probeReleasesFeed(deps: {
+    fetch: ReleaseCheckDeps["fetch"];
+    etag?: string;
+    now?: () => number;
+    timeoutMs?: number;
+}): Promise<FeedProbe> {
+    const now = deps.now ?? Date.now;
+    const timeoutMs = deps.timeoutMs ?? PROBE_TIMEOUT_MS;
+    const started = now();
+    const signal = AbortSignal.timeout(timeoutMs);
+    const headers: Record<string, string> = { Accept: "application/atom+xml" };
+    if (deps.etag) headers["If-None-Match"] = deps.etag;
+    let response: Response;
+    try {
+        response = await deps.fetch(RELEASES_FEED_URL, { headers, signal });
+        // The feed itself is not read: that it changed is all it is asked for
+        if (response.status !== 304) await response.body?.cancel().catch(() => {});
+    } catch (e) {
+        if (signal.aborted) {
+            throw new ReleaseCheckError(
+                `GitHub did not answer within ${Math.round(timeoutMs / 1000)} s`,
+                undefined,
+                now() - started,
+                true,
+            );
+        }
+        const reason = e instanceof Error ? e.message : String(e);
+        throw new ReleaseCheckError(`GitHub could not be reached (${reason})`, undefined, now() - started);
+    }
+    const ms = now() - started;
+    if (response.status === 304) return { changed: false, status: 304, etag: deps.etag, ms };
+    if (!response.ok) {
+        throw new ReleaseCheckError(
+            `GitHub: HTTP ${response.status}`,
+            response.status,
+            ms,
+            false,
+            rateLimitRetryAt(response.status, response.headers, now()),
+        );
+    }
+    const etag = response.headers.get("etag") ?? undefined;
+    return { changed: !deps.etag || etag !== deps.etag, status: response.status, etag, ms };
 }
 
 /**
@@ -149,13 +259,14 @@ export async function fetchReleasesCached(deps: ReleaseCheckDeps): Promise<Relea
             return { releases: cache.releases, status: 304, cached: true, bytes: 0, headersMs };
         }
         if (!response.ok) {
-            const limited =
-                (response.status === 403 || response.status === 429) &&
-                response.headers.get("x-ratelimit-remaining") === "0";
+            const retryAt = rateLimitRetryAt(response.status, response.headers, now());
+            const minutes = retryAt === undefined ? 0 : Math.max(1, Math.round((retryAt - now()) / 60000));
             throw new ReleaseCheckError(
-                `GitHub: HTTP ${response.status}${limited ? " (too many requests, try again in an hour)" : ""}`,
+                `GitHub: HTTP ${response.status}${retryAt === undefined ? "" : ` (too many requests, try again in ${minutes} min)`}`,
                 response.status,
                 now() - started,
+                false,
+                retryAt,
             );
         }
         let releases: GithubRelease[];
@@ -170,7 +281,7 @@ export async function fetchReleasesCached(deps: ReleaseCheckDeps): Promise<Relea
         }
         const etag = response.headers.get("etag");
         // Kept for the next check; a profile that cannot be written to only costs the next one its shortcut
-        if (etag) await deps.writeCache({ url, etag, releases }).catch(() => {});
+        if (etag) await deps.writeCache({ url, etag, releases, notes: true }).catch(() => {});
         return { releases, status: response.status, cached: false, bytes: text.length, headersMs };
     };
 

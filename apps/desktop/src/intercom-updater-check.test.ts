@@ -8,11 +8,16 @@ Please see LICENSE files in the repository root for full details.
 import { describe, expect, it, vi } from "vitest";
 
 import {
+    DEFAULT_RATE_LIMIT_WAIT_MS,
     fetchReleasesCached,
+    MAX_RATE_LIMIT_WAIT_MS,
+    probeReleasesFeed,
+    rateLimitRetryAt,
     type ReleaseCache,
     ReleaseCheckError,
     releasesUrl,
     RELEASES_FALLBACK_PAGE_SIZE,
+    RELEASES_FEED_URL,
     RELEASES_PAGE_SIZE,
     trimReleases,
 } from "./intercom-updater-check.js";
@@ -27,7 +32,8 @@ function release(tag: string, files: string[] = []): Record<string, unknown> {
         html_url: `${PAGE}/tag/${tag}`,
         draft: false,
         prerelease: false,
-        body: "Release notes ".repeat(500),
+        body: `- **Notes of ${tag}**`,
+        body_html: "<p>markup</p>".repeat(500),
         author: { login: "somebody" },
         assets: files.map((name) => ({
             name,
@@ -91,9 +97,11 @@ describe("fetchReleasesCached", () => {
             "v1.12.35-intercom.5",
         ]);
 
-        expect(h.cache.value).toMatchObject({ url: releasesUrl(RELEASES_PAGE_SIZE), etag: 'W/"one"' });
+        // Kept with the notes, which "What's new" shows without a connection
+        expect(h.cache.value).toMatchObject({ url: releasesUrl(RELEASES_PAGE_SIZE), etag: 'W/"one"', notes: true });
+        expect(h.cache.value!.releases[0].body).toBe("- **Notes of v1.12.35-intercom.6**");
         const kept = JSON.stringify(h.cache.value);
-        expect(kept).not.toContain("Release notes");
+        expect(kept).not.toContain("markup");
         expect(kept).not.toContain("somebody");
         expect(kept.length).toBeLessThan(3000);
     });
@@ -178,12 +186,35 @@ describe("fetchReleasesCached", () => {
         const h = harness(() => new Response("no", { status: 500 }));
         await expect(h.check()).rejects.toMatchObject({ message: "GitHub: HTTP 500", status: 500, timedOut: false });
 
+        // Forbidden for another reason: no time to come back at
+        const forbidden = harness(() => new Response("no", { status: 403 }));
+        await expect(forbidden.check()).rejects.toMatchObject({ message: "GitHub: HTTP 403", retryAt: undefined });
+    });
+
+    it("says when GitHub may be asked again after too many requests", async () => {
+        // The harness's clock starts at 0: the limit is lifted 25 minutes in
         const limited = harness(
-            () => new Response("limit", { status: 403, headers: { "x-ratelimit-remaining": "0" } }),
+            () =>
+                new Response("limit", {
+                    status: 403,
+                    headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(25 * 60) },
+                }),
         );
         const error = await limited.check().catch((e) => e);
         expect(error).toBeInstanceOf(ReleaseCheckError);
-        expect(error.message).toBe("GitHub: HTTP 403 (too many requests, try again in an hour)");
+        expect(error.message).toBe("GitHub: HTTP 403 (too many requests, try again in 25 min)");
+        expect(error.retryAt).toBe(25 * 60 * 1000 + 1000);
+    });
+
+    it("asks anew when the kept answer has no notes (kept by 1.12.35-intercom.12 or older)", async () => {
+        const h = harness((_url, headers) => {
+            expect(headers["If-None-Match"]).toBeUndefined();
+            return new Response(JSON.stringify([desktop(6)]), { headers: { etag: 'W/"two"' } });
+        });
+        h.cache.value = { url: releasesUrl(RELEASES_PAGE_SIZE), etag: 'W/"one"', releases: [] };
+        const check = await h.check();
+        expect(check).toMatchObject({ status: 200, cached: false });
+        expect(h.cache.value).toMatchObject({ etag: 'W/"two"', notes: true });
     });
 
     it("says so when the answer is not a list of releases", async () => {
@@ -235,6 +266,90 @@ describe("fetchReleasesCached", () => {
     });
 });
 
+describe("rateLimitRetryAt", () => {
+    const NOW = 1_800_000_000_000;
+    const headers = (h: Record<string, string>): Headers => new Headers(h);
+
+    it("takes Retry-After, in seconds, before anything else", () => {
+        expect(rateLimitRetryAt(429, headers({ "retry-after": "120" }), NOW)).toBe(NOW + 120_000);
+        expect(rateLimitRetryAt(403, headers({ "retry-after": "60", "x-ratelimit-remaining": "0" }), NOW)).toBe(
+            NOW + 60_000,
+        );
+    });
+
+    it("takes x-ratelimit-reset when the hour's requests are used up", () => {
+        const reset = NOW / 1000 + 1800;
+        expect(
+            rateLimitRetryAt(403, headers({ "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(reset) }), NOW),
+        ).toBe(NOW + 1_801_000);
+    });
+
+    it("waits a quarter of an hour when no time is named, and never more than two hours", () => {
+        expect(rateLimitRetryAt(429, headers({}), NOW)).toBe(NOW + DEFAULT_RATE_LIMIT_WAIT_MS);
+        expect(rateLimitRetryAt(403, headers({ "x-ratelimit-remaining": "0" }), NOW)).toBe(
+            NOW + DEFAULT_RATE_LIMIT_WAIT_MS,
+        );
+        expect(rateLimitRetryAt(429, headers({ "retry-after": "999999" }), NOW)).toBe(NOW + MAX_RATE_LIMIT_WAIT_MS);
+        // A reset that is past already: asked again in a second, not at once
+        expect(rateLimitRetryAt(403, headers({ "x-ratelimit-remaining": "0", "x-ratelimit-reset": "5" }), NOW)).toBe(
+            NOW + 1000,
+        );
+    });
+
+    it("is undefined for what is no refusal for too many requests", () => {
+        expect(rateLimitRetryAt(403, headers({ "x-ratelimit-remaining": "12" }), NOW)).toBeUndefined();
+        expect(rateLimitRetryAt(500, headers({ "retry-after": "5" }), NOW)).toBeUndefined();
+        expect(rateLimitRetryAt(200, headers({}), NOW)).toBeUndefined();
+    });
+});
+
+describe("probeReleasesFeed", () => {
+    it("asks the feed of github.com, with the ETag of last time, and says whether it changed", async () => {
+        const fetch = vi.fn(async (_url: string, init: { headers: Record<string, string> }) =>
+            init.headers["If-None-Match"] === 'W/"a"'
+                ? new Response(null, { status: 304 })
+                : new Response("<feed/>", { headers: { etag: 'W/"a"' } }),
+        );
+        // Nothing to compare with: taken as changed, and the ETag is handed back
+        expect(await probeReleasesFeed({ fetch })).toMatchObject({ changed: true, status: 200, etag: 'W/"a"' });
+        expect(fetch.mock.calls[0][0]).toBe(RELEASES_FEED_URL);
+        expect(RELEASES_FEED_URL).toBe("https://github.com/c4g7-dev/InterCom/releases.atom");
+        expect(fetch.mock.calls[0][1].headers).toEqual({ Accept: "application/atom+xml" });
+
+        expect(await probeReleasesFeed({ fetch, etag: 'W/"a"' })).toMatchObject({
+            changed: false,
+            status: 304,
+            etag: 'W/"a"',
+        });
+        expect(await probeReleasesFeed({ fetch, etag: 'W/"old"' })).toMatchObject({ changed: true, etag: 'W/"a"' });
+    });
+
+    it("is unchanged when the whole feed comes back under the same ETag", async () => {
+        const fetch = vi.fn(async () => new Response("<feed/>", { headers: { etag: 'W/"a"' } }));
+        expect(await probeReleasesFeed({ fetch, etag: 'W/"a"' })).toMatchObject({ changed: false, status: 200 });
+    });
+
+    it("fails with the time to come back at when GitHub refuses, and with the status otherwise", async () => {
+        const limited = vi.fn(async () => new Response("slow down", { status: 429, headers: { "retry-after": "90" } }));
+        const error = await probeReleasesFeed({ fetch: limited }).catch((e) => e);
+        expect(error).toBeInstanceOf(ReleaseCheckError);
+        expect(error.status).toBe(429);
+        expect(error.retryAt - Date.now()).toBeGreaterThan(85_000);
+        expect(error.retryAt - Date.now()).toBeLessThanOrEqual(90_000);
+
+        const broken = vi.fn(async () => new Response("no", { status: 502 }));
+        await expect(probeReleasesFeed({ fetch: broken })).rejects.toMatchObject({ status: 502, retryAt: undefined });
+
+        const offline = vi.fn(async () => {
+            throw new Error("net::ERR_INTERNET_DISCONNECTED");
+        });
+        await expect(probeReleasesFeed({ fetch: offline })).rejects.toMatchObject({
+            status: undefined,
+            timedOut: false,
+        });
+    });
+});
+
 describe("trimReleases", () => {
     it("keeps the fields the updater reads and leaves out what is not a release", () => {
         expect(trimReleases("nonsense")).toEqual([]);
@@ -244,6 +359,7 @@ describe("trimReleases", () => {
                 html_url: `${PAGE}/tag/v1.12.35-intercom.6`,
                 draft: true,
                 prerelease: undefined,
+                body: "- **Notes of v1.12.35-intercom.6**",
                 assets: [
                     "InterCom-1.12.35-intercom.6-linux-x64.tar.gz",
                     "InterCom-Setup-1.12.35-intercom.6-x64.exe",

@@ -69,6 +69,8 @@ export interface GithubRelease {
     html_url: string;
     draft?: boolean;
     prerelease?: boolean;
+    /** The release's notes, as Markdown: the section of CHANGELOG.md */
+    body?: string;
     assets?: Array<{ name: string; browser_download_url: string; size?: number }>;
 }
 

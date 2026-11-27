@@ -26,13 +26,18 @@ Please see LICENSE files in the repository root for full details.
  * is Element's. SHA256SUMS comes from the same release as the file: it catches a broken or
  * truncated download, not a release that was tampered with.
  *
+ * While the app runs it looks for a new release every few minutes and when the window gets the
+ * focus back, the computer wakes up or the network returns; what that asks of GitHub, and how a
+ * refusal for too many requests is waited out, is in intercom-updater-poll.ts. The notes of the
+ * releases are kept with the answer, for "What's new" (intercom-updater-notes.ts).
+ *
  * A build that is not a packaged release (no `intercomVersion` in package.json) never updates.
  * Every step is written to the diagnostics log as an `updater` record, and how long each check
  * took as an `update_check` record. Where the update stands (intercom-updater-state.ts) is pushed
  * to the window with every change, with the last steps as lines to show.
  */
 
-import { app, ipcMain, net, shell } from "electron";
+import { app, ipcMain, net, powerMonitor, shell } from "electron";
 import { execFile, spawn } from "node:child_process";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
@@ -44,10 +49,16 @@ import { promisify } from "node:util";
 
 import { getIntercomVersion } from "./build-config.js";
 import { logDiagnostics } from "./intercom-diagnostics.js";
-import { fetchReleasesCached, type ReleaseCache, ReleaseCheckError } from "./intercom-updater-check.js";
+import {
+    fetchReleasesCached,
+    probeReleasesFeed,
+    type ReleaseCache,
+    ReleaseCheckError,
+} from "./intercom-updater-check.js";
 import {
     canReplaceDir,
     compareIntercomVersions,
+    type GithubRelease,
     isReleaseUrl,
     looksLikeInstall,
     parseIntercomVersion,
@@ -61,6 +72,8 @@ import {
     verifyDownload,
     WINDOWS_INSTALLER_ARGS,
 } from "./intercom-updater-core.js";
+import { type ReleaseNotes, selectNotes, whatsNew } from "./intercom-updater-notes.js";
+import { type PollCheck, type PollReason, UpdatePoller } from "./intercom-updater-poll.js";
 import {
     initialUpdaterMachine,
     isWorking,
@@ -71,7 +84,6 @@ import {
 } from "./intercom-updater-state.js";
 
 const INITIAL_CHECK_DELAY_MS = 30 * 1000;
-const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 /** How long the release's SHA256SUMS, a few hundred bytes, may take. */
 const SUMS_TIMEOUT_MS = 15 * 1000;
 /** How often the window is told how far a download is. */
@@ -90,20 +102,49 @@ export interface UpdaterState extends UpdaterMachine {
     autoCheck: boolean;
     /** Whether a start looks for an update before the window opens and installs it at once, see intercom-update-on-launch.ts */
     updateOnLaunch: boolean;
+    /** Whether the app looks every few minutes, and when the window is focused or the network returns, rather than every six hours */
+    fastCheck: boolean;
+    /** Whether the notes of a release are shown once after it was installed */
+    showWhatsNew: boolean;
+    /** Whether the update that is on its way is installed, and the app started again, as soon as it is ready: the user asked for it */
+    installWhenReady: boolean;
     channel: "stable";
 }
+
+/** The notes the window shows. */
+export interface UpdaterNotes {
+    /** Of the releases newer than the running one, up to the one that is offered; newest first */
+    pending: ReleaseNotes[];
+    /** Of the releases that came with the last update, to be shown once; empty where there is nothing to show */
+    whatsNew: ReleaseNotes[];
+    currentVersion?: string;
+}
+
+/** Why the releases are asked for; written to the diagnostics log. */
+export type CheckReason = PollReason | "manual" | "click" | "launch" | "startup" | "auto";
 
 const state: UpdaterState = {
     supported: false,
     autoCheck: true,
     updateOnLaunch: true,
+    fastCheck: true,
+    showWhatsNew: true,
+    installWhenReady: false,
     channel: "stable",
     ...initialUpdaterMachine(),
 };
+/** The release whose notes were last shown or passed over */
+let lastSeenVersion: string | undefined;
+/** Whether an InterCom has used this profile before this start */
+let profileUsedBefore = false;
+/** The releases the last check got, or the ones kept from an earlier run */
+let knownReleases: GithubRelease[] | undefined;
+/** How the last check went, for the schedule */
+let lastOutcome: PollCheck = { ok: true, found: false };
+let poller: UpdatePoller | undefined;
 /** How the last check failed, if it did; undefined after one that got its answer */
 let lastCheckFailure: "timeout" | "failed" | undefined;
 let prepared: { version: string; file: string } | undefined;
-let timer: NodeJS.Timeout | undefined;
 const listeners = new Set<(state: UpdaterState) => void>();
 
 /** Where the updater stands. The object is the updater's own: it changes, and is not to be changed. */
@@ -129,18 +170,32 @@ function settingsFile(): string {
     return path.join(app.getPath("userData"), "intercom-updater.json");
 }
 
-/** The updater's two switches, as the profile holds them; both are on until turned off. */
-function readSettings(): { autoCheck: boolean; updateOnLaunch: boolean } {
+type Switches = Pick<UpdaterState, "autoCheck" | "updateOnLaunch" | "fastCheck" | "showWhatsNew">;
+
+/** The updater's switches, as the profile holds them (all are on until turned off), and the release whose notes were seen. */
+function readSettings(): Switches & { lastSeenVersion?: string } {
     try {
         const stored = JSON.parse(fs.readFileSync(settingsFile(), "utf8"));
-        return { autoCheck: stored.autoCheck !== false, updateOnLaunch: stored.updateOnLaunch !== false };
+        return {
+            autoCheck: stored.autoCheck !== false,
+            updateOnLaunch: stored.updateOnLaunch !== false,
+            fastCheck: stored.fastCheck !== false,
+            showWhatsNew: stored.showWhatsNew !== false,
+            lastSeenVersion: typeof stored.lastSeenVersion === "string" ? stored.lastSeenVersion : undefined,
+        };
     } catch {
-        return { autoCheck: true, updateOnLaunch: true };
+        return { autoCheck: true, updateOnLaunch: true, fastCheck: true, showWhatsNew: true };
     }
 }
 
 async function writeSettings(): Promise<void> {
-    const settings = { autoCheck: state.autoCheck, updateOnLaunch: state.updateOnLaunch };
+    const settings = {
+        autoCheck: state.autoCheck,
+        updateOnLaunch: state.updateOnLaunch,
+        fastCheck: state.fastCheck,
+        showWhatsNew: state.showWhatsNew,
+        lastSeenVersion,
+    };
     await fsp.writeFile(settingsFile(), JSON.stringify(settings)).catch(() => {});
 }
 
@@ -298,8 +353,44 @@ async function stage(archive: string): Promise<void> {
     log("staged", { beside: true });
 }
 
+/** The releases that are known: of the last check, or else the ones an earlier run kept. */
+async function releasesKnown(): Promise<GithubRelease[] | undefined> {
+    if (!knownReleases) {
+        const kept = await readReleaseCache().catch(() => undefined);
+        // Not kept in memory: a check may be writing a newer answer
+        if (Array.isArray(kept?.releases)) return kept.releases;
+    }
+    return knownReleases;
+}
+
+/** The notes of the update that is offered and, once after an update, of what it brought. */
+async function getNotes(): Promise<UpdaterNotes> {
+    const releases = await releasesKnown();
+    const current = state.currentVersion;
+    const decision = whatsNew({
+        current,
+        lastSeen: lastSeenVersion,
+        enabled: state.showWhatsNew,
+        profileUsedBefore,
+        releases,
+    });
+    if (decision.markSeen && decision.markSeen !== lastSeenVersion) {
+        lastSeenVersion = decision.markSeen;
+        await writeSettings();
+    }
+    return {
+        pending: state.latestVersion && current ? selectNotes(releases, current, state.latestVersion) : [],
+        whatsNew: decision.notes,
+        currentVersion: current,
+    };
+}
+
 /** Asks GitHub for the releases and writes how long that took to the diagnostics log. */
-async function fetchReleases(manual: boolean, timeoutMs?: number): Promise<ReturnType<typeof selectUpdate>> {
+async function fetchReleases(
+    manual: boolean,
+    reason: CheckReason,
+    timeoutMs?: number,
+): Promise<ReturnType<typeof selectUpdate>> {
     try {
         const check = await fetchReleasesCached({
             fetch: (url, init) => net.fetch(url, init),
@@ -307,8 +398,10 @@ async function fetchReleases(manual: boolean, timeoutMs?: number): Promise<Retur
             writeCache: writeReleaseCache,
             timeoutMs,
         });
+        knownReleases = check.releases;
         logDiagnostics("update_check", {
             manual,
+            reason,
             ok: true,
             ms: check.ms,
             headersMs: check.headersMs,
@@ -323,10 +416,12 @@ async function fetchReleases(manual: boolean, timeoutMs?: number): Promise<Retur
         if (e instanceof ReleaseCheckError) {
             logDiagnostics("update_check", {
                 manual,
+                reason,
                 ok: false,
                 ms: e.ms,
                 status: e.status ?? null,
                 timedOut: e.timedOut,
+                rateLimitedForMs: e.retryAt === undefined ? undefined : Math.max(0, e.retryAt - Date.now()),
             });
         }
         throw e;
@@ -339,8 +434,14 @@ async function fetchReleases(manual: boolean, timeoutMs?: number): Promise<Retur
  *     GitHub not answering) is logged and not shown as an error.
  * @param checkTimeoutMs - how long GitHub has to answer, where that is not the usual time: the
  *     check at the start of the app has less
+ * @param reason - what asked for the check, for the diagnostics log
  */
-export async function checkForUpdate(manual = false, checkTimeoutMs?: number): Promise<UpdaterState> {
+export async function checkForUpdate(
+    manual = false,
+    checkTimeoutMs?: number,
+    reason: CheckReason = manual ? "manual" : "auto",
+): Promise<UpdaterState> {
+    lastOutcome = { ok: true, found: true };
     if (!state.supported || isWorking(state.phase)) return state;
     // What is downloaded already is offered again rather than fetched again
     if (state.phase === "ready" && prepared) {
@@ -349,14 +450,17 @@ export async function checkForUpdate(manual = false, checkTimeoutMs?: number): P
     }
     // "Checking…" is shown before anything is asked
     if (!dispatch({ type: "check" })) return state;
-    log("check", { manual, current: state.currentVersion });
+    log("check", { manual, reason, current: state.currentVersion });
     let checking = true;
     lastCheckFailure = undefined;
     try {
-        const candidate = await fetchReleases(manual, checkTimeoutMs);
+        const candidate = await fetchReleases(manual, reason, checkTimeoutMs);
         checking = false;
+        lastOutcome = { ok: true, found: Boolean(candidate) };
+        poller?.noteCheck(lastOutcome);
         if (!candidate) {
             log("up_to_date");
+            state.installWhenReady = false;
             dispatch({ type: "up_to_date" });
             return state;
         }
@@ -367,6 +471,7 @@ export async function checkForUpdate(manual = false, checkTimeoutMs?: number): P
         if (!candidate.asset || !candidate.sumsUrl || !replaceable) {
             // A release without this platform's file (yet), or an install that is not ours to replace
             log("manual", { asset: Boolean(candidate.asset), sums: Boolean(candidate.sumsUrl), replaceable });
+            state.installWhenReady = false;
             dispatch({ type: "manual", ...found });
             return state;
         }
@@ -379,11 +484,20 @@ export async function checkForUpdate(manual = false, checkTimeoutMs?: number): P
         }
         prepared = { version: candidate.version, file };
         log("ready", { version: candidate.version });
+        const installNow = state.installWhenReady;
+        state.installWhenReady = false;
         dispatch({ type: "ready" });
+        // The user asked for it while it was on its way: no second click
+        if (installNow) await installUpdate();
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         log("error", { message });
-        if (checking) lastCheckFailure = e instanceof ReleaseCheckError && e.timedOut ? "timeout" : "failed";
+        state.installWhenReady = false;
+        if (checking) {
+            lastCheckFailure = e instanceof ReleaseCheckError && e.timedOut ? "timeout" : "failed";
+            lastOutcome = { ok: false, found: false, retryAt: e instanceof ReleaseCheckError ? e.retryAt : undefined };
+            poller?.noteCheck(lastOutcome);
+        }
         dispatch({ type: "error", message, quiet: checking && !manual });
     }
     return state;
@@ -421,11 +535,81 @@ export async function installUpdate(): Promise<void> {
     app.quit();
 }
 
+/**
+ * The click on the update button: the update is installed and the app started again, now if it
+ * is ready, and otherwise as soon as it is, with the download started or carried on meanwhile.
+ * A release this install cannot put in place is shown on its page instead.
+ */
+export async function updateNow(): Promise<void> {
+    if (!state.supported || state.phase === "installing") return;
+    if (state.phase === "ready" && prepared) {
+        await installUpdate();
+        return;
+    }
+    if (state.phase === "manual") {
+        await shell.openExternal(isReleaseUrl(state.releaseUrl) ? state.releaseUrl! : RELEASES_PAGE);
+        return;
+    }
+    log("install_when_ready", { phase: state.phase });
+    publish({ installWhenReady: true });
+    if (!isWorking(state.phase)) void checkForUpdate(true, undefined, "click");
+}
+
+/** Sets the schedule of the looks for a new release as the switches say. */
 function schedule(): void {
-    if (timer) clearInterval(timer);
-    timer = undefined;
-    if (!state.supported || !state.autoCheck) return;
-    timer = setInterval(() => void checkForUpdate(), CHECK_INTERVAL_MS);
+    poller?.configure({ enabled: state.supported && state.autoCheck, fast: state.fastCheck });
+}
+
+/** The window got the focus, the computer woke up or the network is back: a reason to look now. */
+function trigger(reason: "focus" | "online" | "resume"): void {
+    if (poller?.trigger(reason)) log("check_triggered", { reason });
+}
+
+function createPoller(): UpdatePoller {
+    return new UpdatePoller({
+        now: Date.now,
+        setTimer: (callback, ms) => setTimeout(callback, ms),
+        clearTimer: (timer) => clearTimeout(timer as NodeJS.Timeout),
+        probe: async (etag, reason) => {
+            try {
+                const probe = await probeReleasesFeed({ fetch: (url, init) => net.fetch(url, init), etag });
+                logDiagnostics("update_check", {
+                    probe: true,
+                    reason,
+                    ok: true,
+                    ms: probe.ms,
+                    status: probe.status,
+                    changed: probe.changed,
+                });
+                return probe;
+            } catch (e) {
+                if (e instanceof ReleaseCheckError) {
+                    logDiagnostics("update_check", {
+                        probe: true,
+                        reason,
+                        ok: false,
+                        ms: e.ms,
+                        status: e.status ?? null,
+                        timedOut: e.timedOut,
+                        rateLimitedForMs: e.retryAt === undefined ? undefined : Math.max(0, e.retryAt - Date.now()),
+                    });
+                }
+                throw e;
+            }
+        },
+        check: async (reason) => {
+            await checkForUpdate(false, undefined, reason);
+            return lastOutcome;
+        },
+        onPoll: (record) => {
+            if (record.did === "skip" || record.blockedUntil !== undefined) {
+                log("check_rate_limited", {
+                    reason: record.reason,
+                    forMs: Math.max(0, (record.blockedUntil ?? 0) - Date.now()),
+                });
+            }
+        },
+    });
 }
 
 /** What is left of earlier updates: downloads of releases that are not newer than this one. */
@@ -442,8 +626,8 @@ async function tidyCache(): Promise<void> {
 }
 
 /**
- * Starts the updater: a first check after half a minute, then every six hours, unless the user
- * turned automatic checks off. Call once the app is ready and the diagnostics log is open.
+ * Starts the updater: a first check after half a minute, then the schedule of
+ * intercom-updater-poll.ts, unless the user turned automatic checks off. Call once the app is ready and the diagnostics log is open.
  * @param allowed - false when the app was started with `--no-update`
  */
 export function initUpdater(allowed: boolean): void {
@@ -454,17 +638,51 @@ export function initUpdater(allowed: boolean): void {
     else if (!allowed) reason = "disabled-by-flag";
     else if (process.platform !== "linux" && process.platform !== "win32") reason = "platform";
 
-    Object.assign(state, { supported: !reason, reason, currentVersion, ...readSettings() });
+    // Asked before anything is written: a profile without either file never ran an updater
+    profileUsedBefore = fs.existsSync(settingsFile()) || fs.existsSync(cacheFile());
+    const { lastSeenVersion: seen, ...switches } = readSettings();
+    lastSeenVersion = seen;
+    Object.assign(state, { supported: !reason, reason, currentVersion, ...switches });
     log("init", {
         supported: state.supported,
         reason,
         current: currentVersion,
         autoCheck: state.autoCheck,
         updateOnLaunch: state.updateOnLaunch,
+        fastCheck: state.fastCheck,
+        showWhatsNew: state.showWhatsNew,
     });
 
-    ipcMain.handle(CHANNEL, async (_ev, action: string, arg?: unknown): Promise<UpdaterState> => {
+    ipcMain.handle(CHANNEL, async (_ev, action: string, arg?: unknown): Promise<UpdaterState | UpdaterNotes> => {
         switch (action) {
+            case "update":
+                await updateNow();
+                break;
+            case "getNotes":
+                return getNotes();
+            case "whatsNewSeen":
+                if (state.currentVersion && lastSeenVersion !== state.currentVersion) {
+                    lastSeenVersion = state.currentVersion;
+                    await writeSettings();
+                    log("whats_new_seen", { version: lastSeenVersion });
+                }
+                break;
+            case "setFastCheck":
+                state.fastCheck = Boolean(arg);
+                await writeSettings();
+                log("fast_check", { on: state.fastCheck });
+                schedule();
+                publish();
+                break;
+            case "setShowWhatsNew":
+                state.showWhatsNew = Boolean(arg);
+                await writeSettings();
+                log("show_whats_new", { on: state.showWhatsNew });
+                publish();
+                break;
+            case "online":
+                trigger("online");
+                break;
             case "check":
                 // Not awaited: the window follows the state that is pushed to it
                 void checkForUpdate(true);
@@ -494,6 +712,10 @@ export function initUpdater(allowed: boolean): void {
 
     if (!state.supported) return;
     void tidyCache();
-    if (state.autoCheck) setTimeout(() => void checkForUpdate(), INITIAL_CHECK_DELAY_MS);
+    if (state.autoCheck) setTimeout(() => void checkForUpdate(false, undefined, "startup"), INITIAL_CHECK_DELAY_MS);
+    poller = createPoller();
     schedule();
+    app.on("browser-window-focus", () => trigger("focus"));
+    powerMonitor.on("resume", () => trigger("resume"));
+    powerMonitor.on("unlock-screen", () => trigger("resume"));
 }

@@ -230,7 +230,7 @@ export async function updateOnLaunch(options: { allowed: boolean; hidden: boolea
     }
 
     if (!options.hidden) showSplash();
-    void checkForUpdate(false, LAUNCH_CHECK_TIMEOUT_MS);
+    void checkForUpdate(false, LAUNCH_CHECK_TIMEOUT_MS, "launch");
     // The updater says "checking" before it asks anything, so a check that ends at once is not missed
     const step = await waitForStep(guard, started, getUpdaterState().phase !== "idle");
 
