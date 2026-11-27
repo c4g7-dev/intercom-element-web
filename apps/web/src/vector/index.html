@@ -2,7 +2,7 @@
 <html lang="en" style="height: 100%;">
   <head>
     <meta charset="utf-8">
-    <title>InterCom</title>
+    <title>Lattice</title>
     <link rel="apple-touch-icon" sizes="120x120" href="<%= require('../../res/vector-icons/120.png') %>">
     <link rel="apple-touch-icon" sizes="144x144" href="<%= require('../../res/vector-icons/144.png') %>">
     <link rel="apple-touch-icon" sizes="152x152" href="<%= require('../../res/vector-icons/152.png') %>">
@@ -13,8 +13,8 @@
     <link rel="icon" type="image/png" sizes="144x144" href="<%= require('../../res/vector-icons/144.png') %>">
     <link rel="icon" type="image/png" sizes="512x512" href="<%= require('../../res/vector-icons/512.png') %>">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="apple-mobile-web-app-title" content="InterCom">
-    <meta name="application-name" content="InterCom">
+    <meta name="apple-mobile-web-app-title" content="Lattice">
+    <meta name="application-name" content="Lattice">
     <meta name="theme-color" content="#ffffff">
     <meta property="og:image" content="<%= og_image_url %>" />
     <meta http-equiv="Content-Security-Policy" content="
@@ -52,8 +52,16 @@
 
   </head>
   <body style="height: 100%; margin: 0;">
-    <noscript>Sorry, InterCom requires JavaScript to be enabled.</noscript> <!-- TODO: Translate this? -->
-    <div id="matrixchat" style="height: 100%;" class="notranslate"></div>
+    <noscript>Sorry, Lattice requires JavaScript to be enabled.</noscript> <!-- TODO: Translate this? -->
+    <!-- Lattice: the mark, moving, until the app has loaded and draws over it (the drawing of
+         apps/desktop/intercom/brand/lattice-loading.svg; its classes are its own, as its style sheet is the page's) -->
+    <div id="matrixchat" style="height: 100%;" class="notranslate"><div style="height: 100%; display: flex; align-items: center; justify-content: center;"><svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 512 512" aria-hidden="true"><style>
+        .lx-dot { fill: #6875f5; opacity: .25; animation: lx-dot 1.6s ease-in-out infinite; }
+        .lx-bar { transform-box: fill-box; transform-origin: 50% 50%; animation: lx-eq 1.1s ease-in-out infinite; }
+        @keyframes lx-eq { 0%, 100% { transform: scaleY(.45); } 50% { transform: scaleY(1); } }
+        @keyframes lx-dot { 0%, 100% { opacity: .18; } 40% { opacity: .75; } }
+        @media (prefers-reduced-motion: reduce) { .lx-bar, .lx-dot { animation: none; } .lx-dot { opacity: .4; } }
+    </style><rect x="16" y="16" width="480" height="480" rx="112" fill="#101013"/><rect x="17.5" y="17.5" width="477" height="477" rx="110.5" fill="none" stroke="#26262d" stroke-width="3"/><circle class="lx-dot" cx="156" cy="132" r="22"/><circle class="lx-dot" style="animation-delay: .12s" cx="256" cy="132" r="22"/><circle class="lx-dot" style="animation-delay: .24s" cx="356" cy="132" r="22"/><circle class="lx-dot" style="animation-delay: .36s" cx="356" cy="380" r="22"/><circle class="lx-dot" style="animation-delay: .48s" cx="256" cy="380" r="22"/><circle class="lx-dot" style="animation-delay: .6s" cx="156" cy="380" r="22"/><rect class="lx-bar" style="animation-delay: -.35s" x="134" y="196" width="44" height="120" rx="22" fill="#6875f5"/><rect class="lx-bar" x="234" y="176" width="44" height="160" rx="22" fill="#eef0ff"/><rect class="lx-bar" style="animation-delay: -.7s" x="334" y="186" width="44" height="140" rx="22" fill="#6875f5"/></svg></div></div>
 
 <%
     // insert <script> tags for the JS entry points

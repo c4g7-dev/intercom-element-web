@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Lattice — connecting</title>
+  <style>
+    circle { fill:#6875f5; opacity:.15; animation: c 2.4s linear infinite; }
+    @keyframes c { 0% {opacity:.15} 8% {opacity:1} 30% {opacity:.15} 100% {opacity:.15} }
+    @media (prefers-reduced-motion: reduce) { circle { animation:none; opacity:.5 } }
+  </style>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="#101013"/>
+  <circle cx="156" cy="156" r="26" style="animation-delay:0s"/><circle cx="256" cy="156" r="26" style="animation-delay:.27s"/><circle cx="356" cy="156" r="26" style="animation-delay:.53s"/>
+  <circle cx="356" cy="256" r="26" style="animation-delay:.8s"/><circle cx="356" cy="356" r="26" style="animation-delay:1.07s"/><circle cx="256" cy="356" r="26" style="animation-delay:1.33s"/>
+  <circle cx="156" cy="356" r="26" style="animation-delay:1.6s"/><circle cx="156" cy="256" r="26" style="animation-delay:1.87s"/>
+  <circle cx="256" cy="256" r="34" style="fill:#eef0ff;opacity:.9;animation:none"/>
+</svg>

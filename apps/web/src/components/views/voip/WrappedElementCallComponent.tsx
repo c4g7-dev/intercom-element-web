@@ -14,11 +14,11 @@ import { CallStore } from "../../../stores/CallStore";
 import { useSettingValue } from "../../../hooks/useSettings";
 import { useEventEmitterState } from "../../../hooks/useEventEmitter";
 import { DocumentPipStoreEvent } from "../../../stores/DocumentPipStore";
-import { getCurrentLanguage } from "../../../languageHandler";
+import { _t, getCurrentLanguage } from "../../../languageHandler";
 import { useTheme } from "../../../hooks/useTheme";
 import { SDKContext } from "../../../contexts/SDKContext";
 import { useMatrixClientContext } from "../../../contexts/MatrixClientContext";
-import Spinner from "../elements/Spinner";
+import { LatticeLoading } from "../../../intercom/LatticeLoading";
 import { ElementWebHostBridge } from "./ElementWebHostBridge";
 
 /**
@@ -112,7 +112,7 @@ export const WrappedElementCallComponent: FC<{
     const { intent, config } = call.componentOptions;
 
     return (
-        <Suspense fallback={<Spinner />}>
+        <Suspense fallback={<LatticeLoading variant="connecting" message={_t("voip|connecting")} />}>
             <ElementCall
                 client={client}
                 roomId={call.roomId}

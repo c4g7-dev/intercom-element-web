@@ -26,6 +26,10 @@ interface BuildConfig {
     // InterCom: the InterCom release this build is, e.g. "1.12.35-intercom.5". Written into
     // package.json when a release is packaged (INTERCOM_VERSION); absent from any other build.
     intercomVersion: string | undefined;
+    // Lattice: the name people see. Not Electron's `app.getName()` at the start, which stays what
+    // the app was called before (the package's productName): the profile directory and, on Linux,
+    // the keyring entry of the stored session are named after that.
+    brand: string;
 }
 
 export function getBuildConfig(): BuildConfig {
@@ -36,6 +40,7 @@ export function getBuildConfig(): BuildConfig {
             protocol: (packageJson["electron_protocol"] as string) || "com.c4g7.intercom",
             windowsCertSubjectName: packageJson["electron_windows_cert_sn"] as string,
             intercomVersion: (packageJson["intercomVersion"] as string) || undefined,
+            brand: (packageJson["intercomBrand"] as string) || "Lattice",
         };
     }
 
@@ -45,4 +50,9 @@ export function getBuildConfig(): BuildConfig {
 /** InterCom: the InterCom release this build is, or undefined for a build that is not a release. */
 export function getIntercomVersion(): string | undefined {
     return getBuildConfig().intercomVersion;
+}
+
+/** Lattice: the name of the app as people see it. */
+export function getBrand(): string {
+    return getBuildConfig().brand;
 }

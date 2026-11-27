@@ -11,6 +11,7 @@ import HeadphonesOffSolidIcon from "@vector-im/compound-design-tokens/assets/web
 import classNames from "classnames";
 
 import styles from "./VoiceParticipantsView.module.css";
+import { LatticeMark } from "../LatticeMark";
 import { type ViewModel, useViewModel } from "../../core/viewmodel";
 import { useI18n } from "../../core/i18n/i18nContext";
 import { type RenderIntercomAvatar, renderIntercomAvatar } from "../IntercomAvatar/IntercomAvatar";
@@ -62,7 +63,7 @@ interface VoiceParticipantsViewProps {
 
 /**
  * The people in the call of a voice room, shown under the room in the room list: avatar with a
- * ring while they talk, name, and what is off (microphone, hearing) or on (a shared screen).
+ * ring and the mark's three moving bars while they talk, name, and what is off (microphone, hearing) or on (a shared screen).
  * Renders nothing while nobody is in the call.
  */
 export function VoiceParticipantsView({ vm, renderAvatar }: Readonly<VoiceParticipantsViewProps>): JSX.Element | null {
@@ -115,6 +116,9 @@ export function VoiceParticipantsView({ vm, renderAvatar }: Readonly<VoicePartic
                         <span className={styles.name} title={participant.name}>
                             {participant.name}
                         </span>
+                        {participant.speaking && !participant.muted && !participant.deafened && (
+                            <LatticeMark variant="speaking" size="14px" className={styles.speakingMark} />
+                        )}
                         {participant.live && (
                             <span className={styles.live} title={_t("intercom|voice|sharing_screen")}>
                                 {_t("intercom|voice|live")}

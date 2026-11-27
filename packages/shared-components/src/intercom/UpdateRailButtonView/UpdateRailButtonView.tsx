@@ -73,7 +73,7 @@ const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
  * while a newer release is available, on its way or ready, and nothing while the app is up to
  * date. A ring around it fills as the download goes.
  *
- * Pointing at it, or focusing it, opens a card beside it: "InterCom <version>", where the update
+ * Pointing at it, or focusing it, opens a card beside it: "Lattice <version>", where the update
  * stands, and what is new in it. One click is all it takes: a ready update is installed and the
  * app started again; one on its way is installed as soon as it is downloaded and checked.
  */

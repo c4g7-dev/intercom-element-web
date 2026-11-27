@@ -69,6 +69,7 @@ import {
     swapInstallDir,
     type UpdateCandidate,
     UPDATE_REPO,
+    versionOfDownload,
     verifyDownload,
     WINDOWS_INSTALLER_ARGS,
 } from "./intercom-updater-core.js";
@@ -344,7 +345,7 @@ async function stage(archive: string): Promise<void> {
         // The archive holds one directory (intercom-<version>/), whose contents are the install
         await promisify(execFile)("tar", ["-xzf", archive, "-C", staging, "--strip-components=1"]);
         if (!(await looksLikeInstall(staging, path.basename(process.execPath)))) {
-            throw new Error("The archive does not hold an InterCom install");
+            throw new Error("The archive does not hold a Lattice install");
         }
     } catch (e) {
         await removeTree(staging);
@@ -617,7 +618,7 @@ async function tidyCache(): Promise<void> {
     const current = parseIntercomVersion(state.currentVersion);
     if (!current) return;
     for (const name of await fsp.readdir(cacheDir()).catch(() => [] as string[])) {
-        const version = /^InterCom-(?:Setup-)?(.+?)-(?:linux-)?x64\.(?:tar\.gz|exe)(?:\.part)?$/.exec(name)?.[1];
+        const version = versionOfDownload(name);
         const parsed = parseIntercomVersion(version);
         if (name.endsWith(".part") || (parsed && compareIntercomVersions(parsed, current) <= 0)) {
             await fsp.rm(path.join(cacheDir(), name), { force: true });

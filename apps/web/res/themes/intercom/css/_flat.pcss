@@ -144,3 +144,21 @@ Please see LICENSE files in the repository root for full details.
 :root:root .mx_Dialog_border > .mx_Dialog {
     border-radius: 0;
 }
+
+/*
+ * Lattice's mark where the app starts or a call is being joined (src/intercom/LatticeLoading.tsx):
+ * the mark in the middle, what is going on in a quiet line under it.
+ */
+.mx_LatticeLoading {
+    flex-direction: column;
+    gap: var(--cpd-space-3x);
+}
+
+.mx_LatticeLoading_mark {
+    display: flex;
+}
+
+.mx_LatticeLoading_message {
+    font: var(--cpd-font-body-md-regular);
+    color: var(--cpd-color-text-secondary);
+}

@@ -1,13 +1,49 @@
-This directory contains the build variant and the bundled config.json for InterCom,
+This directory contains the build variant and the bundled config.json for Lattice,
 an unofficial, modified build of Element Desktop / Element Web.
 
-InterCom is not affiliated with, endorsed by or supported by Element (New Vector Ltd).
+Lattice is not affiliated with, endorsed by or supported by Element (New Vector Ltd).
 "Element" is a trademark of New Vector Ltd and is deliberately not used in the name,
 icon or branding of this build. The upstream licence and copyright notices are kept.
 
-build.json electron-builder variant (app id, executable name, protocols)
+build.json electron-builder variant (app id, executable name, protocols, the name people see)
 config.json config baked into webapp.asar (brand, theme, no Element services)
-icon.svg source of every icon; regenerate the rasters with gen-icons.sh
+brand/ the Lattice icon set: lattice.svg (master), lattice-small.svg (32 px and below),
+              lattice-tray-mono.svg (tray), the three animated marks, rasters
+icon.svg the master again, where it always was; regenerate the rasters with gen-icons.sh
+installer.nsh what the Windows installer does about an install from before the rename
+
+The name
+--------
+
+The app was called InterCom up to 1.12.35-intercom.14 and is called Lattice since. Only what people
+see was renamed. What stays, so that an update is an update and nobody is signed out:
+
+- "productName" in build.json and in the packaged package.json is still InterCom. Electron takes
+  it for the app's name at the start, and with that for the profile directory (~/.config/InterCom,
+  %APPDATA%\InterCom) and, on Linux, for the keyring entry the stored session is encrypted with
+  (libsecret looks it up by application name, KWallet by "<name> Safe Storage"). "brand" in
+  build.json is the name people see: electron-builder names the installer, the shortcuts, the
+  desktop entry and the executable's description after it, the packaged package.json carries it as
+  "intercomBrand", and src/electron-main.ts gives it to Electron (app.setName) once the app is
+  ready, when the profile and the keyring have been found under the old name.
+- The app id (chat.intercom.desktop), the URL schemes (com.c4g7.intercom, intercom), the names of
+  the environment variables (INTERCOM_…), the command line switches, the files in the profile
+  (intercom-updater.json, …), the keys in localStorage, the io.intercom.* event fields, the theme
+  ids ("custom-InterCom Dark", shown as "Lattice Dark") and the git branch.
+- The executable: intercom on Linux (a link named lattice sits beside it), InterCom.exe on
+  Windows, in the same install directory (%LOCALAPPDATA%\Programs\intercom). Launchers, key
+  bindings, pinned taskbar icons, the autostart entry and firewall rules point to it.
+- The version numbers: 1.12.35-intercom.N. Every install compares them, old ones can read
+  nothing else, and the tags are what the releases are found by.
+- The releases' repository, github.com/c4g7-dev/InterCom, for now: installs up to .14 take a
+  release's files only from URLs under that name. From .15 on the app takes them under
+  c4g7-dev/Lattice as well (UPDATE_REPOS in src/intercom-updater-core.ts), so the repository can
+  be renamed once the installs out there are that new.
+- The files of a release exist under both names (Lattice-…, InterCom-…) for as long as there are
+  installs that look for the old one; the app takes Lattice-… where it is there.
+
+The tray icon on Linux is the mark alone, in white (build/tray-mono.png); INTERCOM_TRAY_ICON=colour
+gives the app's icon instead, for a light panel. On Windows it is the app's icon.
 
 Building (Linux)
 ----------------
@@ -50,7 +86,7 @@ Audio
   playing into each) and src/intercom-share-audio.ts makes a real source of the chosen ones:
   pactl load-module module-remap-source master=<sink>.monitor source_name=intercom-share-<sink>
   A remap of the same monitor that is already loaded (your own, e.g. from pipewire-pulse.conf.d)
-  is used as it is and never unloaded; what InterCom loaded is unloaded when the source leaves the
+  is used as it is and never unloaded; what Lattice loaded is unloaded when the source leaves the
   mix, when the share ends and when the app quits. Needs pactl; without it the section is hidden.
 - Sources described as InterCom-Share-_, InterCom-Screen-_ or "InterCom share: *" are share sources:
   they are offered for a share's audio and kept out of the microphone list.
@@ -73,7 +109,7 @@ diagnostics log: HTTP status, kind of error, protocol (h2, h3, http/1.1), never 
 Sounds
 ------
 
-The cues for joining and leaving a call and for mute, unmute, deafen and undeafen are InterCom's
+The cues for joining and leaving a call and for mute, unmute, deafen and undeafen are Lattice's
 own: gen-sounds.py works them out from sine waves (two soft notes, rising for on, falling for
 off) and writes apps/web/res/media/intercom/*.ogg. Nothing is sampled from anywhere. The web app
 plays the user's own cues (src/intercom/Sounds.ts); the call plays the sounds of others joining
@@ -95,7 +131,7 @@ A release build updates itself from the releases of github.com/c4g7-dev/InterCom
 30 s after it started and every 6 hours, takes the newest tag of the form v<Element
 version>-intercom.<n> (drafts, pre-releases and the android-v… releases are passed over), downloads
 this platform's file and checks it against the release's SHA256SUMS. Then a toast offers "Restart
-to update"; nothing is installed before that click. Settings > InterCom has the switch for the
+to update"; nothing is installed before that click. Settings > Lattice has the switch for the
 automatic check, "Check now" and the state.
 
 - The app knows its own version from "intercomVersion" in its package.json, which the build
@@ -209,11 +245,11 @@ toggles the overlay; ../../../../tools/diag-summary.py turns one or more logs in
 Windows build from Linux
 ------------------------
 
-INTERCOM_TARGET=win intercom/build.sh --skip-web builds dist-win/InterCom-Setup-x64.exe (NSIS,
+INTERCOM_TARGET=win intercom/build.sh --skip-web builds dist-win/Lattice-Setup-x64.exe (NSIS,
 per user, x64) and dist-win/win-unpacked. It needs wine on the PATH, for the executable's icon
 and version details and for NSIS to write its uninstaller; unset DISPLAY and WAYLAND_DISPLAY to
 keep wine off the desktop, and set WINEPREFIX to keep it out of ~/.wine.
-On Windows itself (Git Bash) the same command needs no wine; the release workflow of the InterCom
+On Windows itself (Git Bash) the same command needs no wine; the release workflow of the Lattice
 repository builds the installer that way.
 
 - It is not code signed, so SmartScreen warns on first start.

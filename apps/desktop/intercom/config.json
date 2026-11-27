@@ -1,5 +1,5 @@
 {
-    "brand": "InterCom",
+    "brand": "Lattice",
     "default_server_config": {
         "m.homeserver": {
             "base_url": "https://matrix-client.matrix.org",
@@ -22,7 +22,7 @@
     },
     "help_url": "https://github.com/element-hq/element-web/tree/develop/docs",
     "element_call": {
-        "brand": "InterCom Call"
+        "brand": "Lattice Call"
     },
     "desktop_builds": {
         "available": false,

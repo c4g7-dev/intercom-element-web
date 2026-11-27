@@ -27,8 +27,8 @@ describe("WhatsNewView", () => {
                 onDismiss={() => {}}
             />,
         );
-        expect(screen.getByRole("heading", { name: "What's new in InterCom 1.12.35-intercom.13" })).toBeInTheDocument();
-        expect(screen.getByRole("region", { name: "What's new in InterCom 1.12.35-intercom.13" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "What's new in Lattice 1.12.35-intercom.13" })).toBeInTheDocument();
+        expect(screen.getByRole("region", { name: "What's new in Lattice 1.12.35-intercom.13" })).toBeInTheDocument();
         expect(screen.getByText("Updates arrive within minutes.")).toBeInTheDocument();
         expect(screen.getByText("Jump to present")).toBeInTheDocument();
         const all = screen.getByRole("link", { name: "All release notes" });

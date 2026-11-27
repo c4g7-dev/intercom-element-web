@@ -50,7 +50,7 @@ describe("UpdaterSettingsView", () => {
         render(<UpToDate />);
         expect(screen.getByText("1.12.35-intercom.5")).toBeInTheDocument();
         expect(screen.getByText("Stable")).toBeInTheDocument();
-        expect(screen.getByRole("status")).toHaveTextContent("InterCom is up to date. Last checked today at 14:02.");
+        expect(screen.getByRole("status")).toHaveTextContent("Lattice is up to date. Last checked today at 14:02.");
         expect(screen.getByRole("switch", { name: "Check for updates automatically" })).toBeChecked();
         expect(screen.getByRole("switch", { name: "Update automatically on launch" })).toBeChecked();
         expect(screen.queryByRole("button", { name: "Restart to update" })).toBeNull();
@@ -76,15 +76,15 @@ describe("UpdaterSettingsView", () => {
 
     it("shows a download with its progress and no second check meanwhile", () => {
         render(<Downloading />);
-        expect(screen.getByRole("status")).toHaveTextContent("Downloading InterCom 1.12.35-intercom.6… 42%");
+        expect(screen.getByRole("status")).toHaveTextContent("Downloading Lattice 1.12.35-intercom.6… 42%");
         expect(screen.getByRole("progressbar")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Check now" })).toBeDisabled();
     });
 
     it.each([
-        ["the checksum is checked", Verifying, "Verifying the checksum of InterCom 1.12.35-intercom.6…"],
-        ["the update is unpacked", Unpacking, "Unpacking InterCom 1.12.35-intercom.6…"],
-        ["the update is installed", Installing, "Installing InterCom 1.12.35-intercom.6 and restarting…"],
+        ["the checksum is checked", Verifying, "Verifying the checksum of Lattice 1.12.35-intercom.6…"],
+        ["the update is unpacked", Unpacking, "Unpacking Lattice 1.12.35-intercom.6…"],
+        ["the update is installed", Installing, "Installing Lattice 1.12.35-intercom.6 and restarting…"],
     ])("says so while %s, and starts no check meanwhile", (_what, Story, text) => {
         render(<Story />);
         expect(screen.getByRole("status")).toHaveTextContent(text);
@@ -94,7 +94,7 @@ describe("UpdaterSettingsView", () => {
     it("offers the restart when an update is ready", () => {
         render(<Ready />);
         expect(screen.getByRole("status")).toHaveTextContent(
-            "InterCom 1.12.35-intercom.6 is ready. Restart to update.",
+            "Lattice 1.12.35-intercom.6 is ready. Restart to update.",
         );
         expect(screen.getByRole("button", { name: "Restart to update" })).toBeEnabled();
         expect(screen.getByRole("button", { name: "Release notes" })).toBeEnabled();
@@ -102,7 +102,7 @@ describe("UpdaterSettingsView", () => {
 
     it("points at the release page where the app cannot replace itself", () => {
         render(<Manual />);
-        expect(screen.getByRole("status").textContent).toContain("InterCom 1.12.35-intercom.6 is available.");
+        expect(screen.getByRole("status").textContent).toContain("Lattice 1.12.35-intercom.6 is available.");
         expect(screen.queryByRole("button", { name: "Restart to update" })).toBeNull();
     });
 

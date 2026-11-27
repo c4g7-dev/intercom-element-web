@@ -91,12 +91,12 @@ describe("UpdateStatusViewModel", () => {
             ...idle,
             phase: "checking",
             log: [
-                { t: 1000, text: "InterCom is up to date" },
+                { t: 1000, text: "Lattice is up to date" },
                 { t: 2000, text: "Checking for updates…" },
             ],
         });
         expect(vm.getSnapshot().log).toEqual([
-            { time: "t1000", text: "InterCom is up to date" },
+            { time: "t1000", text: "Lattice is up to date" },
             { time: "t2000", text: "Checking for updates…" },
         ]);
     });

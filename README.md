@@ -1,9 +1,10 @@
 > [!NOTE]
-> **InterCom fork** — see https://github.com/c4g7-dev/InterCom. Not affiliated with or endorsed by Element.
+> **Lattice fork** (formerly InterCom) — see https://github.com/c4g7-dev/InterCom. Not affiliated with or endorsed by Element.
 >
-> The `intercom` branch rebrands Element Web / Desktop as InterCom and adds a flat theme, call pop-out
-> windows, screen share audio capture, hardware video decoding and call diagnostics to the desktop
-> app. The upstream README follows.
+> The `intercom` branch rebrands Element Web / Desktop as Lattice and adds a flat theme, Discord-like
+> channels, call pop-out windows, screen share audio capture, hardware video decoding, a self-updater
+> and call diagnostics to the desktop app. The branch, like the identifiers in the code, keeps the
+> name the app had before. The upstream README follows.
 
 [![Chat](https://img.shields.io/matrix/element-web:matrix.org?logo=matrix)](https://matrix.to/#/#element-web:matrix.org)
 ![Tests](https://github.com/element-hq/element-web/actions/workflows/tests.yaml/badge.svg)

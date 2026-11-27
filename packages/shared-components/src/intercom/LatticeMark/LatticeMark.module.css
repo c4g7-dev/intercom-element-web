@@ -1,0 +1,149 @@
+/*
+ * Copyright 2026 InterCom contributors
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
+ */
+
+/* The colours are the icon's own, not the theme's: the tile is the same picture in every theme. */
+.mark {
+    --lattice-tile: #101013;
+    --lattice-border: #26262d;
+    --lattice-accent: #6875f5;
+    --lattice-light: #eef0ff;
+
+    flex: none;
+    display: block;
+}
+
+.tile {
+    fill: var(--lattice-tile);
+    stroke: var(--lattice-border);
+    stroke-width: 3px;
+}
+
+/* loading: the bars rise and fall out of step, the dots light up one after the other */
+.bar {
+    transform-box: fill-box;
+    transform-origin: 50% 50%;
+    animation: lattice-eq 1.1s ease-in-out infinite;
+}
+
+.bar:nth-of-type(2) {
+    animation-delay: -0.35s;
+}
+
+.bar:nth-of-type(4) {
+    animation-delay: -0.7s;
+}
+
+.accent {
+    fill: var(--lattice-accent);
+}
+
+.light {
+    fill: var(--lattice-light);
+}
+
+.dot {
+    fill: var(--lattice-accent);
+    opacity: 0.25;
+    animation: lattice-dot 1.6s ease-in-out infinite;
+}
+
+/* connecting: one light goes round the ring */
+.ring {
+    fill: var(--lattice-accent);
+    opacity: 0.15;
+    animation: lattice-ring 2.4s linear infinite;
+}
+
+.centre {
+    fill: var(--lattice-light);
+    opacity: 0.9;
+}
+
+/* speaking: three bars in the colour of the text, no tile */
+.speaking {
+    display: inline-block;
+    vertical-align: -0.125em;
+}
+
+.voice {
+    fill: currentColor;
+    transform-box: fill-box;
+    transform-origin: 50% 50%;
+    animation: lattice-voice 0.7s ease-in-out infinite alternate;
+}
+
+.voice:nth-of-type(1) {
+    animation-delay: -0.2s;
+}
+
+.voice:nth-of-type(3) {
+    animation-delay: -0.45s;
+}
+
+@keyframes lattice-eq {
+    0%,
+    100% {
+        transform: scaleY(0.45);
+    }
+
+    50% {
+        transform: scaleY(1);
+    }
+}
+
+@keyframes lattice-dot {
+    0%,
+    100% {
+        opacity: 0.18;
+    }
+
+    40% {
+        opacity: 0.75;
+    }
+}
+
+@keyframes lattice-ring {
+    0% {
+        opacity: 0.15;
+    }
+
+    8% {
+        opacity: 1;
+    }
+
+    30%,
+    100% {
+        opacity: 0.15;
+    }
+}
+
+@keyframes lattice-voice {
+    from {
+        transform: scaleY(0.35);
+    }
+
+    to {
+        transform: scaleY(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bar,
+    .dot,
+    .ring,
+    .voice {
+        animation: none;
+    }
+
+    .dot {
+        opacity: 0.4;
+    }
+
+    .ring {
+        opacity: 0.5;
+    }
+}

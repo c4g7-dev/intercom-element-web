@@ -93,26 +93,99 @@ exports[`<MatrixChat /> > Multi-tab lockout > waits for other tab to stop during
     class="mx_MatrixChat_splash"
   >
     <div
-      class="mx_Spinner"
+      class="mx_Spinner mx_LatticeLoading"
     >
-      <svg
+      <div
         aria-label="Loading…"
-        class="_icon"
+        class="mx_LatticeLoading_mark"
         data-testid="spinner"
-        fill="currentColor"
-        height="1em"
         role="progressbar"
-        style="width: 32px; height: 32px;"
-        viewBox="0 0 24 24"
-        width="1em"
-        xmlns="http://www.w3.org/2000/svg"
       >
-        <path
-          clip-rule="evenodd"
-          d="M12 4.031a8 8 0 1 0 8 8 1 1 0 0 1 2 0c0 5.523-4.477 10-10 10s-10-4.477-10-10 4.477-10 10-10a1 1 0 1 1 0 2"
-          fill-rule="evenodd"
-        />
-      </svg>
+        <svg
+          aria-hidden="true"
+          class="_mark mx_LatticeMark"
+          data-testid="lattice-mark"
+          data-variant="loading"
+          height="72px"
+          viewBox="0 0 512 512"
+          width="72px"
+        >
+          <rect
+            class="_tile"
+            height="480"
+            rx="112"
+            width="480"
+            x="16"
+            y="16"
+          />
+          <circle
+            class="_dot"
+            cx="156"
+            cy="132"
+            r="22"
+            style="animation-delay: 0.00s;"
+          />
+          <circle
+            class="_dot"
+            cx="256"
+            cy="132"
+            r="22"
+            style="animation-delay: 0.12s;"
+          />
+          <circle
+            class="_dot"
+            cx="356"
+            cy="132"
+            r="22"
+            style="animation-delay: 0.24s;"
+          />
+          <circle
+            class="_dot"
+            cx="356"
+            cy="380"
+            r="22"
+            style="animation-delay: 0.36s;"
+          />
+          <circle
+            class="_dot"
+            cx="256"
+            cy="380"
+            r="22"
+            style="animation-delay: 0.48s;"
+          />
+          <circle
+            class="_dot"
+            cx="156"
+            cy="380"
+            r="22"
+            style="animation-delay: 0.60s;"
+          />
+          <rect
+            class="_bar _accent"
+            height="120"
+            rx="22"
+            width="44"
+            x="134"
+            y="196"
+          />
+          <rect
+            class="_bar _light"
+            height="160"
+            rx="22"
+            width="44"
+            x="234"
+            y="176"
+          />
+          <rect
+            class="_bar _accent"
+            height="140"
+            rx="22"
+            width="44"
+            x="334"
+            y="186"
+          />
+        </svg>
+      </div>
     </div>
   </div>
 </div>
@@ -384,26 +457,99 @@ exports[`<MatrixChat /> > should render spinner while app is loading 1`] = `
     class="mx_MatrixChat_splash"
   >
     <div
-      class="mx_Spinner"
+      class="mx_Spinner mx_LatticeLoading"
     >
-      <svg
+      <div
         aria-label="Loading…"
-        class="_icon"
+        class="mx_LatticeLoading_mark"
         data-testid="spinner"
-        fill="currentColor"
-        height="1em"
         role="progressbar"
-        style="width: 32px; height: 32px;"
-        viewBox="0 0 24 24"
-        width="1em"
-        xmlns="http://www.w3.org/2000/svg"
       >
-        <path
-          clip-rule="evenodd"
-          d="M12 4.031a8 8 0 1 0 8 8 1 1 0 0 1 2 0c0 5.523-4.477 10-10 10s-10-4.477-10-10 4.477-10 10-10a1 1 0 1 1 0 2"
-          fill-rule="evenodd"
-        />
-      </svg>
+        <svg
+          aria-hidden="true"
+          class="_mark mx_LatticeMark"
+          data-testid="lattice-mark"
+          data-variant="loading"
+          height="72px"
+          viewBox="0 0 512 512"
+          width="72px"
+        >
+          <rect
+            class="_tile"
+            height="480"
+            rx="112"
+            width="480"
+            x="16"
+            y="16"
+          />
+          <circle
+            class="_dot"
+            cx="156"
+            cy="132"
+            r="22"
+            style="animation-delay: 0.00s;"
+          />
+          <circle
+            class="_dot"
+            cx="256"
+            cy="132"
+            r="22"
+            style="animation-delay: 0.12s;"
+          />
+          <circle
+            class="_dot"
+            cx="356"
+            cy="132"
+            r="22"
+            style="animation-delay: 0.24s;"
+          />
+          <circle
+            class="_dot"
+            cx="356"
+            cy="380"
+            r="22"
+            style="animation-delay: 0.36s;"
+          />
+          <circle
+            class="_dot"
+            cx="256"
+            cy="380"
+            r="22"
+            style="animation-delay: 0.48s;"
+          />
+          <circle
+            class="_dot"
+            cx="156"
+            cy="380"
+            r="22"
+            style="animation-delay: 0.60s;"
+          />
+          <rect
+            class="_bar _accent"
+            height="120"
+            rx="22"
+            width="44"
+            x="134"
+            y="196"
+          />
+          <rect
+            class="_bar _light"
+            height="160"
+            rx="22"
+            width="44"
+            x="234"
+            y="176"
+          />
+          <rect
+            class="_bar _accent"
+            height="140"
+            rx="22"
+            width="44"
+            x="334"
+            y="186"
+          />
+        </svg>
+      </div>
     </div>
   </div>
 </div>

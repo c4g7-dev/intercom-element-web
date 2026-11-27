@@ -85,7 +85,7 @@ describe("startUpdateToasts", () => {
     it("offers the restart when an update is ready, with a link to the release notes", async () => {
         const { api, toasts, push } = setUp();
         push(ready);
-        expect(renderToast(toasts)).toBe("InterCom 1.12.35-intercom.6 is available");
+        expect(renderToast(toasts)).toBe("Lattice 1.12.35-intercom.6 is available");
         expect(screen.getByText(/Restart to update\./)).toBeTruthy();
 
         await userEvent.click(screen.getByRole("link", { name: "Release notes" }));

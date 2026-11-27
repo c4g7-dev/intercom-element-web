@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Lattice — speaking indicator</title>
+  <style>
+    rect { fill:#eef0ff; transform-box: fill-box; transform-origin: 50% 50%; animation: v .7s ease-in-out infinite alternate; }
+    .a{animation-delay:-.2s}.c{animation-delay:-.45s}
+    @keyframes v { from { transform: scaleY(.35) } to { transform: scaleY(1) } }
+    @media (prefers-reduced-motion: reduce) { rect { animation: none } }
+  </style>
+  <rect class="a" x="12" y="20" width="9" height="24" rx="4.5"/>
+  <rect class="b" x="27.5" y="12" width="9" height="40" rx="4.5"/>
+  <rect class="c" x="43" y="17" width="9" height="30" rx="4.5"/>
+</svg>

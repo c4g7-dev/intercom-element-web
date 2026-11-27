@@ -154,7 +154,7 @@ export function getArgs(protocolHandler: ProtocolHandler): Args {
         console.log(
             `  --toggle-mute, --mute, --unmute, --toggle-deafen, --toggle-camera, --toggle-screenshare,\n` +
                 `  --leave-call:\n` +
-                `                         Act on the call of the InterCom that is already running, and exit. For\n` +
+                `                         Act on the call of the Lattice that is already running, and exit. For\n` +
                 `                         global shortcuts, bind them in the compositor or desktop.`,
         );
         console.log("  --no-global-shortcuts: Windows: do not take Ctrl+Shift+M and Ctrl+Shift+D while in a call.");

@@ -3688,32 +3688,100 @@ exports[`RoomView > video rooms > should render joined video room view 1`] = `
                 class="mx_AppTileBody_fadeInSpinner"
               >
                 <div
-                  class="mx_Spinner"
+                  class="mx_Spinner mx_LatticeLoading"
                 >
                   <div
-                    class="mx_Spinner_Msg"
-                  >
-                    Loading…
-                  </div>
-                   
-                  <svg
-                    aria-label="Loading…"
-                    class="_icon"
+                    aria-label="Connecting"
+                    class="mx_LatticeLoading_mark"
                     data-testid="spinner"
-                    fill="currentColor"
-                    height="1em"
                     role="progressbar"
-                    style="width: 32px; height: 32px;"
-                    viewBox="0 0 24 24"
-                    width="1em"
-                    xmlns="http://www.w3.org/2000/svg"
                   >
-                    <path
-                      clip-rule="evenodd"
-                      d="M12 4.031a8 8 0 1 0 8 8 1 1 0 0 1 2 0c0 5.523-4.477 10-10 10s-10-4.477-10-10 4.477-10 10-10a1 1 0 1 1 0 2"
-                      fill-rule="evenodd"
-                    />
-                  </svg>
+                    <svg
+                      aria-hidden="true"
+                      class="_mark mx_LatticeMark"
+                      data-testid="lattice-mark"
+                      data-variant="connecting"
+                      height="72px"
+                      viewBox="0 0 512 512"
+                      width="72px"
+                    >
+                      <rect
+                        class="_tile"
+                        height="480"
+                        rx="112"
+                        width="480"
+                        x="16"
+                        y="16"
+                      />
+                      <circle
+                        class="_ring"
+                        cx="156"
+                        cy="156"
+                        r="26"
+                        style="animation-delay: 0.00s;"
+                      />
+                      <circle
+                        class="_ring"
+                        cx="256"
+                        cy="156"
+                        r="26"
+                        style="animation-delay: 0.27s;"
+                      />
+                      <circle
+                        class="_ring"
+                        cx="356"
+                        cy="156"
+                        r="26"
+                        style="animation-delay: 0.53s;"
+                      />
+                      <circle
+                        class="_ring"
+                        cx="356"
+                        cy="256"
+                        r="26"
+                        style="animation-delay: 0.80s;"
+                      />
+                      <circle
+                        class="_ring"
+                        cx="356"
+                        cy="356"
+                        r="26"
+                        style="animation-delay: 1.07s;"
+                      />
+                      <circle
+                        class="_ring"
+                        cx="256"
+                        cy="356"
+                        r="26"
+                        style="animation-delay: 1.33s;"
+                      />
+                      <circle
+                        class="_ring"
+                        cx="156"
+                        cy="356"
+                        r="26"
+                        style="animation-delay: 1.60s;"
+                      />
+                      <circle
+                        class="_ring"
+                        cx="156"
+                        cy="256"
+                        r="26"
+                        style="animation-delay: 1.87s;"
+                      />
+                      <circle
+                        class="_centre"
+                        cx="256"
+                        cy="256"
+                        r="34"
+                      />
+                    </svg>
+                  </div>
+                  <div
+                    class="mx_LatticeLoading_message"
+                  >
+                    Connecting
+                  </div>
                 </div>
               </div>
             </div>

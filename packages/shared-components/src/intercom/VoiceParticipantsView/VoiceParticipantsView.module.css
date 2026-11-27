@@ -60,6 +60,11 @@
     color: var(--cpd-color-text-primary);
 }
 
+/* The three moving bars beside the name of somebody who talks, in the ring's green */
+.speakingMark {
+    color: var(--cpd-color-icon-success-primary);
+}
+
 .icon {
     flex: none;
     color: var(--cpd-color-icon-tertiary);

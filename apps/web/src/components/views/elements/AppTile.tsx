@@ -36,6 +36,7 @@ import { _t } from "../../../languageHandler";
 import AppPermission from "./AppPermission";
 import AppWarning from "./AppWarning";
 import Spinner from "./Spinner";
+import { LatticeLoading } from "../../../intercom/LatticeLoading";
 import dis from "../../../dispatcher/dispatcher";
 import ActiveWidgetStore from "../../../stores/ActiveWidgetStore";
 import SettingsStore from "../../../settings/SettingsStore";
@@ -729,9 +730,14 @@ export default class AppTile extends React.Component<IProps, IState> {
             appTileBodyStyles.pointerEvents = this.props.pointerEvents;
         }
 
+        // Lattice: a call that is being joined shows the mark's connecting animation
         const loadingElement = (
             <div className="mx_AppTileBody_fadeInSpinner">
-                <Spinner message={_t("common|loading")} />
+                {this.props.app.type === WidgetType.CALL.preferred ? (
+                    <LatticeLoading variant="connecting" message={_t("voip|connecting")} />
+                ) : (
+                    <Spinner message={_t("common|loading")} />
+                )}
             </div>
         );
 

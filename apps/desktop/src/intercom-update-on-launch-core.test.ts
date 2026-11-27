@@ -236,7 +236,7 @@ describe("the small window", () => {
     });
 
     it("is a page that loads and runs nothing", () => {
-        const html = splashHtml("InterCom", "Checking for updates…");
+        const html = splashHtml("Lattice", "Checking for updates…");
         expect(html).toContain("Content-Security-Policy");
         expect(html).toContain("default-src 'none'; style-src 'unsafe-inline'");
         expect(html).not.toMatch(/<script|https?:\/\/(?!www\.w3\.org\/2000\/svg)|<link|<img|url\(/i);

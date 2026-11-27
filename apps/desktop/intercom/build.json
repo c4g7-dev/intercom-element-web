@@ -2,6 +2,7 @@
     "appId": "chat.intercom.desktop",
     "name": "intercom",
     "productName": "InterCom",
-    "description": "InterCom: a Matrix client based on Element",
+    "brand": "Lattice",
+    "description": "Lattice: a Matrix client based on Element",
     "protocols": ["com.c4g7.intercom", "intercom"]
 }

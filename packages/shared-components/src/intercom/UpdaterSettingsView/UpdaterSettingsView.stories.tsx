@@ -104,7 +104,7 @@ export const ReadyWithNotes: Story = {
         notes: [
             {
                 version: "1.12.35-intercom.7",
-                body: "- **Updates arrive within minutes.** InterCom asks every five minutes.\n- The update button in the rail of spaces.",
+                body: "- **Updates arrive within minutes.** Lattice asks every five minutes.\n- The update button in the rail of spaces.",
             },
             { version: "1.12.35-intercom.6", body: "- **Mute and deafen** are one state for the whole app." },
         ],

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Lattice (small sizes)</title>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#101013"/>
+  <rect x="14" y="24" width="8" height="16" rx="4" fill="#6875f5"/>
+  <rect x="28" y="16" width="8" height="32" rx="4" fill="#eef0ff"/>
+  <rect x="42" y="21" width="8" height="22" rx="4" fill="#6875f5"/>
+</svg>

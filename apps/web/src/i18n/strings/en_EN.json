@@ -1379,21 +1379,21 @@
             "voice_channel": "Voice channel"
         },
         "settings": {
-            "dialog_title": "<strong>Settings:</strong> InterCom",
-            "title": "InterCom"
+            "dialog_title": "<strong>Settings:</strong> Lattice",
+            "title": "Lattice"
         },
         "updater": {
-            "description": "InterCom updates itself from the releases of its GitHub repository. An update is downloaded and checked, and installed when you restart.",
+            "description": "Lattice updates itself from the releases of its GitHub repository. An update is downloaded and checked, and installed when you restart.",
             "heading": "Updates",
             "open_release_page": "Open the release page",
             "release_notes": "Release notes",
             "restart": "Restart to update",
             "toast_manual": "This install cannot update itself. Get the new version from the release page.",
             "toast_ready": "Restart to update.",
-            "toast_title": "InterCom %(version)s is available"
+            "toast_title": "Lattice %(version)s is available"
         },
         "whats_new": {
-            "title": "What's new in InterCom %(version)s"
+            "title": "What's new in Lattice %(version)s"
         }
     },
     "invite": {
@@ -3883,15 +3883,6 @@
     "upload_failed_size": "The file '%(fileName)s' exceeds the size limit for uploads",
     "upload_failed_title": "Upload Failed",
     "upload_file": {
-        "batch_caption_placeholder": "Add a caption (optional)",
-        "batch_summary": {
-            "one": "%(count)s image, %(size)s. Sent as one gallery.",
-            "other": "%(count)s images, %(size)s in total. Sent as one gallery."
-        },
-        "batch_title": {
-            "one": "Upload %(count)s image",
-            "other": "Upload %(count)s images"
-        },
         "cancel_all_button": "Cancel All",
         "error_file_too_large": "This file is <b>too large</b> to upload. The file size limit is %(limit)s but this file is %(sizeOfThisFile)s.",
         "error_files_too_large": "These files are <b>too large</b> to upload. The file size limit is %(limit)s.",

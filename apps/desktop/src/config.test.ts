@@ -53,7 +53,7 @@ describe("loadConfig", () => {
 
     it("should ignore localConfigPath if does not exist", async () => {
         const config = await loadConfig("/invalid-path/custom-config.json");
-        expect(config.brand).toBe("InterCom");
+        expect(config.brand).toBe("Lattice");
         expect(config.web_base_url).toBe("https://chat.org.com");
         expect(config.default_hs_url).toBe("https://matrix.org.com");
     });
@@ -146,8 +146,8 @@ describe("loadConfig", () => {
         expect(dialog.showMessageBox).toHaveBeenCalledWith({
             detail: "Unexpected token 'N', \"NOT_JSON\" is not valid JSON",
             message:
-                "Your custom InterCom configuration contains invalid JSON. Please correct the problem and reopen InterCom.",
-            title: "Your InterCom is misconfigured",
+                "Your custom Lattice configuration contains invalid JSON. Please correct the problem and reopen Lattice.",
+            title: "Your Lattice is misconfigured",
             type: "error",
         });
     });

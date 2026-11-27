@@ -39,12 +39,20 @@ describe("VoiceParticipantsView", () => {
             "false",
             "false",
         ]);
+        // And the mark's three bars move beside their name, and beside nobody else's
+        expect(rows.map((row) => row.querySelector('[data-variant="speaking"]') !== null)).toEqual([
+            true,
+            false,
+            false,
+            false,
+        ]);
         expect(rows[1].querySelector('[aria-label="Muted"]')).not.toBeNull();
         expect(rows[2].textContent).toContain("LIVE");
         // Deafened says more than muted, so it is shown alone
         expect(rows[3].querySelector('[aria-label="Deafened"]')).not.toBeNull();
         expect(rows[3].querySelector('[aria-label="Muted"]')).toBeNull();
-        expect(rows[0].querySelector("svg")).toBeNull();
+        // Who only talks has the moving bars and no other icon
+        expect(rows[0].querySelector('svg:not([data-variant="speaking"])')).toBeNull();
     });
 
     it("renders nothing while nobody is in the call", () => {

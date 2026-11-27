@@ -23,6 +23,7 @@ import { app, BrowserWindow } from "electron";
 import fsp from "node:fs/promises";
 import path from "node:path";
 
+import { getBrand } from "./build-config.js";
 import { logDiagnostics } from "./intercom-diagnostics.js";
 import {
     type LaunchGuard,
@@ -101,7 +102,7 @@ function showSplash(): void {
         fullscreenable: false,
         skipTaskbar: true,
         show: false,
-        title: "InterCom",
+        title: getBrand(),
         backgroundColor: "#00000000",
         webPreferences: {
             // The page is a string of this app's own: it loads nothing and is given nothing
@@ -121,7 +122,7 @@ function showSplash(): void {
     window.on("closed", () => {
         if (splash === window) splash = undefined;
     });
-    const html = splashHtml("InterCom", statusText({ kind: "checking" }));
+    const html = splashHtml(getBrand(), statusText({ kind: "checking" }));
     void window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 }
 

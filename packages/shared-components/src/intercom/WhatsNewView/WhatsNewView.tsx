@@ -26,7 +26,7 @@ interface WhatsNewViewProps {
 }
 
 /**
- * What is new after an update: "What's new in InterCom <version>", the notes of every release
+ * What is new after an update: "What's new in Lattice <version>", the notes of every release
  * the update brought in a list that scrolls, "Got it" and a link to all release notes. The body
  * of a dialog; whoever shows it gives it the frame.
  */

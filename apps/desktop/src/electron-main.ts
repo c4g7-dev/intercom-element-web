@@ -113,7 +113,7 @@ if (!gotLock) {
 } else if (parseCallAction(process.argv) !== undefined) {
     // InterCom: a call action (--toggle-mute and the like) is for the instance that is running. With
     // none running there is no call to act on, and starting the app would be a surprise.
-    console.log("InterCom is not running: nothing to do");
+    console.log("Lattice is not running: nothing to do");
     app.exit();
 }
 
@@ -157,6 +157,11 @@ if (store.get("disableHardwareAcceleration")) {
 }
 
 app.on("ready", async () => {
+    // Lattice: from here on Electron calls the app by the name people see (notifications, the
+    // titles of its own windows and dialogs). Not earlier: up to this point the name is the one
+    // from before the rename, which the profile directory (set above) and, on Linux, the keyring
+    // entry of the stored session were looked up with.
+    app.setName(buildConfig.brand);
     console.debug("Reached Electron ready state");
 
     let asarPath: string;

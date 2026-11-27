@@ -31,7 +31,7 @@ const VERSION = "1.12.35-intercom.13";
 const notes = [
     {
         version: VERSION,
-        body: "- **Updates arrive within minutes.** InterCom asks every five minutes whether a release came out.\n- **An update button in the rail of spaces**, above the settings.",
+        body: "- **Updates arrive within minutes.** Lattice asks every five minutes whether a release came out.\n- **An update button in the rail of spaces**, above the settings.",
     },
     { version: "1.12.35-intercom.12", body: "- **The way back to the newest messages is Discord's.**" },
 ];

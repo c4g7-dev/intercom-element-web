@@ -165,7 +165,7 @@ export function updaterTransition(state: UpdaterMachine, event: UpdaterEvent, no
                 latestVersion: undefined,
                 releaseUrl: undefined,
                 lastChecked: now,
-                log: withLine(state.log, now, "InterCom is up to date"),
+                log: withLine(state.log, now, "Lattice is up to date"),
             };
         case "manual":
             return {

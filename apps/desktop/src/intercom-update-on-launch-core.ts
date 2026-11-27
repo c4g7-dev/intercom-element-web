@@ -251,15 +251,30 @@ export function splashStatusFor(progress: LaunchProgress): SplashStatus {
     }
 }
 
-/** InterCom's icon: a speech bubble carrying a voice waveform. Original artwork, CC0 (intercom/icon.svg). */
+/**
+ * Lattice's mark while something loads (intercom/brand/lattice-loading.svg): the three bars rise
+ * and fall and the dots of the lattice light up in turn. The classes are its own (`lx-…`), since
+ * its style sheet is part of the page it is put in. Still with reduced motion.
+ */
 const LOGO_SVG =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 1024 1024" aria-hidden="true">' +
-    '<rect width="1024" height="1024" rx="228" fill="#4F5BD5"/>' +
-    '<path fill="#FFFFFF" d="M296 232h432c61.9 0 112 50.1 112 112v248c0 61.9-50.1 112-112 112H468L330.6 812.9' +
-    'c-18.3 14.5-45.4 1.5-45.4-21.9V703.3C227.8 698 184 649.8 184 592V344c0-61.9 50.1-112 112-112z"/>' +
-    '<g fill="#4F5BD5"><rect x="316" y="424" width="56" height="88" rx="28"/>' +
-    '<rect x="412" y="364" width="56" height="208" rx="28"/><rect x="508" y="316" width="56" height="304" rx="28"/>' +
-    '<rect x="604" y="380" width="56" height="176" rx="28"/><rect x="700" y="432" width="56" height="72" rx="28"/></g></svg>';
+    '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 512 512" aria-hidden="true"><style>' +
+    ".lx-dot{fill:#6875f5;opacity:.25;animation:lx-dot 1.6s ease-in-out infinite}" +
+    ".lx-bar{transform-box:fill-box;transform-origin:50% 50%;animation:lx-eq 1.1s ease-in-out infinite}" +
+    ".lx-b1{animation-delay:-.35s}.lx-b2{animation-delay:0s}.lx-b3{animation-delay:-.7s}" +
+    ".lx-d1{animation-delay:0s}.lx-d2{animation-delay:.12s}.lx-d3{animation-delay:.24s}" +
+    ".lx-d4{animation-delay:.36s}.lx-d5{animation-delay:.48s}.lx-d6{animation-delay:.6s}" +
+    "@keyframes lx-eq{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}" +
+    "@keyframes lx-dot{0%,100%{opacity:.18}40%{opacity:.75}}" +
+    "@media (prefers-reduced-motion:reduce){.lx-bar,.lx-dot{animation:none}.lx-dot{opacity:.4}}" +
+    "</style>" +
+    '<rect x="16" y="16" width="480" height="480" rx="112" fill="#101013"/>' +
+    '<rect x="17.5" y="17.5" width="477" height="477" rx="110.5" fill="none" stroke="#26262d" stroke-width="3"/>' +
+    '<circle class="lx-dot lx-d1" cx="156" cy="132" r="22"/><circle class="lx-dot lx-d2" cx="256" cy="132" r="22"/>' +
+    '<circle class="lx-dot lx-d3" cx="356" cy="132" r="22"/><circle class="lx-dot lx-d6" cx="156" cy="380" r="22"/>' +
+    '<circle class="lx-dot lx-d5" cx="256" cy="380" r="22"/><circle class="lx-dot lx-d4" cx="356" cy="380" r="22"/>' +
+    '<rect class="lx-bar lx-b1" x="134" y="196" width="44" height="120" rx="22" fill="#6875f5"/>' +
+    '<rect class="lx-bar lx-b2" x="234" y="176" width="44" height="160" rx="22" fill="#eef0ff"/>' +
+    '<rect class="lx-bar lx-b3" x="334" y="186" width="44" height="140" rx="22" fill="#6875f5"/></svg>';
 
 function escapeHtml(text: string): string {
     return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -280,7 +295,7 @@ export function splashHtml(brand: string, status: string): string {
         "html,body{height:100%;margin:0;background:transparent;overflow:hidden}" +
         "body{display:flex;font:13px/1.4 Inter,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;" +
         "color:#f0f0f3;user-select:none;cursor:default}" +
-        "main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;" +
+        "main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;" +
         "box-sizing:border-box;margin:0;padding:24px 28px;border:1px solid #202025;border-radius:12px;" +
         "background:#101013;-webkit-app-region:drag}" +
         "p{margin:0;color:#8d8d97;white-space:nowrap;font-variant-numeric:tabular-nums}" +

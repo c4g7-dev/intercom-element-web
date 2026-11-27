@@ -46,6 +46,14 @@
         "state_encryption_enabled": "Experimental state encryption enabled"
     },
     "composer": {
+        "attachments": {
+            "failed": "Upload failed",
+            "label": "Attachments",
+            "remove": "Remove attachment %(name)s",
+            "retry": "Retry upload of %(name)s",
+            "retry_title": "Retry",
+            "uploading": "Uploading %(name)s"
+        },
         "url_preview": {
             "clear_all": "Clear all",
             "collapse": "Collapse URL previews",
@@ -162,14 +170,14 @@
             "hint_release_page": "This install cannot update itself. Click for the release page",
             "hint_restart": "Click to restart and update",
             "hint_retry": "Click to try again",
-            "hint_will_restart": "InterCom restarts by itself when it is ready",
+            "hint_will_restart": "Lattice restarts by itself when it is ready",
             "installing": "Restarting to update…",
-            "label": "InterCom %(version)s — %(status)s",
+            "label": "Lattice %(version)s — %(status)s",
             "manual": "Available",
             "name": "Update",
             "preparing": "Verifying…",
             "ready": "Ready to install",
-            "title": "InterCom %(version)s",
+            "title": "Lattice %(version)s",
             "whats_new": "What's new in %(version)s"
         },
         "update_status": {
@@ -194,37 +202,37 @@
         "updater": {
             "all_releases": "All releases",
             "auto_check": "Check for updates automatically",
-            "auto_check_help": "Looks for a new release when InterCom starts and while it runs, and downloads it. You choose when to restart.",
+            "auto_check_help": "Looks for a new release when Lattice starts and while it runs, and downloads it. You choose when to restart.",
             "channel": "Channel",
             "channel_stable": "Stable",
             "check_now": "Check now",
             "checking": "Checking for updates…",
             "download_progress": "Download progress",
-            "downloading": "Downloading InterCom %(version)s… %(percent)s",
+            "downloading": "Downloading Lattice %(version)s… %(percent)s",
             "error": "The update check failed: %(message)s",
             "fast_check": "Check for updates every few minutes",
-            "fast_check_help": "Asks GitHub every five minutes, and when you come back to the window or the network returns, whether a release came out: one small request. Off, InterCom looks every six hours.",
-            "installing": "Installing InterCom %(version)s and restarting…",
-            "manual": "InterCom %(version)s is available. This install cannot replace itself: get it from the release page.",
+            "fast_check_help": "Asks GitHub every five minutes, and when you come back to the window or the network returns, whether a release came out: one small request. Off, Lattice looks every six hours.",
+            "installing": "Installing Lattice %(version)s and restarting…",
+            "manual": "Lattice %(version)s is available. This install cannot replace itself: get it from the release page.",
             "not_checked": "Not checked for updates yet.",
-            "ready": "InterCom %(version)s is ready. Restart to update.",
+            "ready": "Lattice %(version)s is ready. Restart to update.",
             "release_notes": "Release notes",
             "restart": "Restart to update",
             "show_whats_new": "Show what's new after updates",
-            "show_whats_new_help": "After an update, InterCom shows the release notes once.",
-            "unpacking": "Unpacking InterCom %(version)s…",
+            "show_whats_new_help": "After an update, Lattice shows the release notes once.",
+            "unpacking": "Unpacking Lattice %(version)s…",
             "unsupported": {
-                "disabled_by_flag": "Updates are turned off: InterCom was started with --no-update.",
+                "disabled_by_flag": "Updates are turned off: Lattice was started with --no-update.",
                 "no_version": "This build is not a release, so it does not update itself.",
-                "platform": "InterCom does not update itself on this system. New versions are on the release page.",
+                "platform": "Lattice does not update itself on this system. New versions are on the release page.",
                 "unpackaged": "This build is not a release, so it does not update itself.",
                 "web": "Updates are for the desktop app."
             },
-            "up_to_date_checked": "InterCom is up to date. Last checked %(when)s.",
+            "up_to_date_checked": "Lattice is up to date. Last checked %(when)s.",
             "update_on_launch": "Update automatically on launch",
-            "update_on_launch_help": "When InterCom starts and a new release is out, it is downloaded and installed before the window opens. A start that finds nothing is held up for a moment at most; without a connection InterCom starts as it is.",
-            "verifying": "Verifying the checksum of InterCom %(version)s…",
-            "version": "InterCom version",
+            "update_on_launch_help": "When Lattice starts and a new release is out, it is downloaded and installed before the window opens. A start that finds nothing is held up for a moment at most; without a connection Lattice starts as it is.",
+            "verifying": "Verifying the checksum of Lattice %(version)s…",
+            "version": "Lattice version",
             "version_unknown": "Not a release build",
             "whats_new_in": "What's new in %(version)s"
         },
@@ -317,8 +325,8 @@
         "whats_new": {
             "all_notes": "All release notes",
             "got_it": "Got it",
-            "subtitle": "InterCom was updated. Here is what changed.",
-            "title": "What's new in InterCom %(version)s"
+            "subtitle": "Lattice was updated. Here is what changed.",
+            "title": "What's new in Lattice %(version)s"
         }
     },
     "keyboard": {

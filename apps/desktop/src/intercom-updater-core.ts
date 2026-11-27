@@ -86,20 +86,63 @@ export interface UpdateCandidate {
     sumsUrl?: string;
 }
 
-/** The repository whose releases are InterCom's. */
+/**
+ * The repository whose releases are the app's, and the one the API and the feed are asked for.
+ * It still has the name the app had before it became Lattice; GitHub redirects requests for a
+ * repository that was renamed.
+ */
 export const UPDATE_REPO = "c4g7-dev/InterCom";
 
-/** Whether a URL is a page or a file of a release of {@link UPDATE_REPO}; nothing else is opened or downloaded. */
-export function isReleaseUrl(url: string | undefined, repo = UPDATE_REPO): boolean {
-    return typeof url === "string" && url.startsWith(`https://github.com/${repo}/releases/`);
+/**
+ * Every name the releases' repository may answer under: the one it has and the one it is to get.
+ * After a rename GitHub's API names the files of a release under the new name, so an app that
+ * knows only the old one finds no file in any release. This one (1.12.35-intercom.15 on) knows
+ * both, which is what makes the rename possible once the installs out there are this new.
+ */
+export const UPDATE_REPOS: readonly string[] = [UPDATE_REPO, "c4g7-dev/Lattice"];
+
+/**
+ * Whether a URL is a page or a file of a release of the app's repository, under any of its names
+ * ({@link UPDATE_REPOS}); nothing else is opened or downloaded.
+ * @param repos - the repositories to accept, `owner/name`; one name or several
+ */
+export function isReleaseUrl(url: string | undefined, repos: string | readonly string[] = UPDATE_REPOS): boolean {
+    if (typeof url !== "string") return false;
+    const accepted = typeof repos === "string" ? [repos] : repos;
+    return accepted.some((repo) => url.startsWith(`https://github.com/${repo}/releases/`));
 }
 
-/** The name of the file of a release that is installed on a platform. */
+/** What the files of a release begin with: the app's name, and the name it had up to 1.12.35-intercom.14. */
+export const ASSET_PREFIXES: readonly string[] = ["Lattice", "InterCom"];
+
+/**
+ * The names the file of a release that is installed on a platform may have, the preferred one
+ * first. A release has the same file under both names for as long as there are installs that know
+ * only the old one.
+ */
+export function assetNamesFor(version: string, platform: NodeJS.Platform, arch: string): string[] {
+    if (arch !== "x64") return [];
+    if (platform === "linux") return ASSET_PREFIXES.map((prefix) => `${prefix}-${version}-linux-x64.tar.gz`);
+    if (platform === "win32") return ASSET_PREFIXES.map((prefix) => `${prefix}-Setup-${version}-x64.exe`);
+    return [];
+}
+
+/** The preferred name of the file of a release that is installed on a platform. */
 export function assetNameFor(version: string, platform: NodeJS.Platform, arch: string): string | undefined {
-    if (arch !== "x64") return undefined;
-    if (platform === "linux") return `InterCom-${version}-linux-x64.tar.gz`;
-    if (platform === "win32") return `InterCom-Setup-${version}-x64.exe`;
-    return undefined;
+    return assetNamesFor(version, platform, arch)[0];
+}
+
+const DOWNLOAD_NAME_RE = new RegExp(
+    `^(?:${ASSET_PREFIXES.join("|")})-(?:Setup-)?(.+?)-(?:linux-)?x64\\.(?:tar\\.gz|exe)(?:\\.part)?$`,
+);
+
+/**
+ * The version a downloaded file of a release is of, read from its name, under either prefix and
+ * also while it is still a `.part`.
+ * @returns undefined for a file that is not one of a release
+ */
+export function versionOfDownload(fileName: string): string | undefined {
+    return DOWNLOAD_NAME_RE.exec(fileName)?.[1];
 }
 
 /**
@@ -127,8 +170,10 @@ export function selectUpdate(
 
     const version = best.release.tag_name.slice(1);
     const assets = (best.release.assets ?? []).filter((a) => isReleaseUrl(a?.browser_download_url));
-    const wanted = assetNameFor(version, platform, arch);
-    const asset = assets.find((a) => a.name === wanted);
+    // The first of the names that the release has: Lattice-… where it is there, else InterCom-…
+    const asset = assetNamesFor(version, platform, arch)
+        .map((wanted) => assets.find((a) => a.name === wanted))
+        .find((found) => found !== undefined);
     return {
         version,
         releaseUrl: isReleaseUrl(best.release.html_url)

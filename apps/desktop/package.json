@@ -4,9 +4,9 @@
     "main": "lib/electron-main.js",
     "exports": "./lib/electron-main.js",
     "version": "1.12.35",
-    "description": "InterCom: a Matrix client based on Element",
+    "description": "Lattice: a Matrix client based on Element",
     "author": {
-        "name": "InterCom contributors"
+        "name": "Lattice contributors"
     },
     "homepage": "https://github.com/c4g7-dev/InterCom",
     "repository": {

@@ -22,7 +22,7 @@ vi.mock("electron", () => ({
         buildFromTemplate: vi.fn(),
     },
     nativeImage: {
-        createFromPath: vi.fn(),
+        createFromPath: vi.fn(() => ({ isEmpty: (): boolean => false })),
     },
     app: {
         isPackaged: true,

@@ -13,12 +13,15 @@ import path from "node:path";
 
 import {
     assetNameFor,
+    assetNamesFor,
     backupDirFor,
     canReplaceDir,
     compareIntercomVersions,
     findSha256,
     type GithubRelease,
     isReleaseUrl,
+    UPDATE_REPOS,
+    versionOfDownload,
     looksLikeInstall,
     parseIntercomVersion,
     relaunchCommand,
@@ -159,10 +162,88 @@ describe("selectUpdate", () => {
 });
 
 describe("assetNameFor", () => {
-    it("names the file of each platform", () => {
-        expect(assetNameFor("1.12.35-intercom.5", "linux", "x64")).toBe("InterCom-1.12.35-intercom.5-linux-x64.tar.gz");
-        expect(assetNameFor("1.12.35-intercom.5", "win32", "x64")).toBe("InterCom-Setup-1.12.35-intercom.5-x64.exe");
-        expect(assetNameFor("1.12.35-intercom.5", "darwin", "x64")).toBeUndefined();
+    it("names the file of each platform, under the app's name first and its old name second", () => {
+        expect(assetNameFor("1.12.35-intercom.15", "linux", "x64")).toBe(
+            "Lattice-1.12.35-intercom.15-linux-x64.tar.gz",
+        );
+        expect(assetNameFor("1.12.35-intercom.15", "win32", "x64")).toBe("Lattice-Setup-1.12.35-intercom.15-x64.exe");
+        expect(assetNameFor("1.12.35-intercom.15", "darwin", "x64")).toBeUndefined();
+        expect(assetNamesFor("1.12.35-intercom.15", "linux", "x64")).toEqual([
+            "Lattice-1.12.35-intercom.15-linux-x64.tar.gz",
+            "InterCom-1.12.35-intercom.15-linux-x64.tar.gz",
+        ]);
+        expect(assetNamesFor("1.12.35-intercom.15", "win32", "x64")).toEqual([
+            "Lattice-Setup-1.12.35-intercom.15-x64.exe",
+            "InterCom-Setup-1.12.35-intercom.15-x64.exe",
+        ]);
+        expect(assetNamesFor("1.12.35-intercom.15", "linux", "arm64")).toEqual([]);
+    });
+});
+
+describe("the rename to Lattice", () => {
+    const version = "1.12.35-intercom.15";
+    const names = (prefix: string): string[] => [
+        `${prefix}-${version}-linux-x64.tar.gz`,
+        `${prefix}-Setup-${version}-x64.exe`,
+    ];
+
+    it("prefers the file under the new name where a release has both", () => {
+        const both = release(`v${version}`, [...names("InterCom"), ...names("Lattice"), "SHA256SUMS"]);
+        expect(selectUpdate([both], "1.12.35-intercom.14", "linux", "x64")?.asset?.name).toBe(
+            `Lattice-${version}-linux-x64.tar.gz`,
+        );
+        expect(selectUpdate([both], "1.12.35-intercom.14", "win32", "x64")?.asset?.name).toBe(
+            `Lattice-Setup-${version}-x64.exe`,
+        );
+    });
+
+    it("falls back to the file under the old name", () => {
+        const old = release(`v${version}`);
+        expect(selectUpdate([old], "1.12.35-intercom.14", "linux", "x64")?.asset?.name).toBe(
+            `InterCom-${version}-linux-x64.tar.gz`,
+        );
+        expect(selectUpdate([old], "1.12.35-intercom.14", "win32", "x64")?.asset?.name).toBe(
+            `InterCom-Setup-${version}-x64.exe`,
+        );
+    });
+
+    it("takes the files of a release of the repository under its new name", () => {
+        const renamed = release(`v${version}`, [...names("Lattice"), "SHA256SUMS"]);
+        const moved = (url: string): string => url.replace("/c4g7-dev/InterCom/", "/c4g7-dev/Lattice/");
+        renamed.html_url = moved(renamed.html_url);
+        for (const asset of renamed.assets!) asset.browser_download_url = moved(asset.browser_download_url);
+
+        const found = selectUpdate([renamed], "1.12.35-intercom.14", "linux", "x64");
+        expect(found).toEqual({
+            version,
+            releaseUrl: `https://github.com/c4g7-dev/Lattice/releases/tag/v${version}`,
+            asset: {
+                name: `Lattice-${version}-linux-x64.tar.gz`,
+                url: `https://github.com/c4g7-dev/Lattice/releases/download/v${version}/Lattice-${version}-linux-x64.tar.gz`,
+                size: 1,
+            },
+            sumsUrl: `https://github.com/c4g7-dev/Lattice/releases/download/v${version}/SHA256SUMS`,
+        });
+    });
+
+    it("accepts both names of the repository and nothing that only looks like them", () => {
+        expect(UPDATE_REPOS).toEqual(["c4g7-dev/InterCom", "c4g7-dev/Lattice"]);
+        expect(isReleaseUrl("https://github.com/c4g7-dev/InterCom/releases/tag/v1")).toBe(true);
+        expect(isReleaseUrl("https://github.com/c4g7-dev/Lattice/releases/tag/v1")).toBe(true);
+        expect(isReleaseUrl("https://github.com/c4g7-dev/Lattice-evil/releases/x")).toBe(false);
+        expect(isReleaseUrl("https://github.com/c4g7-dev/lattice-element-web/releases/x")).toBe(false);
+        expect(isReleaseUrl("https://github.com/someone/Lattice/releases/x")).toBe(false);
+        expect(isReleaseUrl("https://github.com.example.org/c4g7-dev/Lattice/releases/x")).toBe(false);
+        expect(isReleaseUrl("http://github.com/c4g7-dev/Lattice/releases/x")).toBe(false);
+        expect(isReleaseUrl("https://github.com/c4g7-dev/Lattice/releases/x", "c4g7-dev/InterCom")).toBe(false);
+    });
+
+    it("reads the version of a download under either name", () => {
+        expect(versionOfDownload(`Lattice-${version}-linux-x64.tar.gz`)).toBe(version);
+        expect(versionOfDownload(`InterCom-${version}-linux-x64.tar.gz.part`)).toBe(version);
+        expect(versionOfDownload(`Lattice-Setup-${version}-x64.exe`)).toBe(version);
+        expect(versionOfDownload(`InterCom-Setup-${version}-x64.exe`)).toBe(version);
+        expect(versionOfDownload("notes.txt")).toBeUndefined();
     });
 });
 

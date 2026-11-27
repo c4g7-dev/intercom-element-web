@@ -9,7 +9,7 @@ Please see LICENSE files in the repository root for full details.
 import React, { type JSX } from "react";
 
 import { messageForSyncError } from "../../../utils/ErrorUtils";
-import Spinner from "../../views/elements/Spinner";
+import { LatticeLoading } from "../../../intercom/LatticeLoading";
 import AccessibleButton, { type ButtonEvent } from "../../views/elements/AccessibleButton";
 import { _t } from "../../../languageHandler";
 
@@ -39,7 +39,7 @@ export function LoginSplashView(props: Props): JSX.Element {
     return (
         <div className="mx_MatrixChat_splash">
             {errorBox}
-            <Spinner />
+            <LatticeLoading />
             <div className="mx_LoginSplashView_splashButtons">
                 <AccessibleButton kind="link_inline" onClick={props.onLogoutClick}>
                     {_t("action|logout")}

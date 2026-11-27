@@ -84,7 +84,7 @@ import { UIFeature } from "../../settings/UIFeature";
 import DialPadModal from "../views/voip/DialPadModal";
 import { showToast as showMobileGuideToast } from "../../toasts/MobileGuideToast";
 import { shouldUseLoginForWelcome } from "../../utils/pages";
-import Spinner from "../views/elements/Spinner";
+import { LatticeLoading } from "../../intercom/LatticeLoading";
 import QuestionDialog from "../views/dialogs/QuestionDialog";
 import UserSettingsDialog from "../views/dialogs/UserSettingsDialog";
 import CreateRoomDialog from "../views/dialogs/CreateRoomDialog";
@@ -2230,7 +2230,7 @@ export default class MatrixChat extends React.PureComponent<IProps, IState> {
             case Views.LOADING:
                 return (
                     <div className="mx_MatrixChat_splash">
-                        <Spinner />
+                        <LatticeLoading />
                     </div>
                 );
             case Views.CONFIRM_LOCK_THEFT:

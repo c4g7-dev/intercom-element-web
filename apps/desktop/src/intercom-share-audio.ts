@@ -21,6 +21,7 @@ Please see LICENSE files in the repository root for full details.
 import { execFile, spawnSync } from "node:child_process";
 import { app, ipcMain, type IpcMainInvokeEvent } from "electron";
 
+import { getBrand } from "./build-config.js";
 import { logDiagnostics } from "./intercom-diagnostics.js";
 
 /** The prefix of every source InterCom makes, which is also how one left by a crash is recognised. */
@@ -503,7 +504,7 @@ export function initShareAudio(shareAudio?: ShareAudio): ShareAudio {
     const audio =
         shareAudio ??
         new ShareAudio(runPactl, {
-            appNames: [...new Set([app.getName(), "InterCom", "intercom"])],
+            appNames: [...new Set([app.getName(), getBrand(), "InterCom", "intercom"])],
             log: logDiagnostics,
         });
 

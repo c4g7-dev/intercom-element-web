@@ -56,6 +56,8 @@ interface ExtraMetadata extends Metadata {
     electron_windows_cert_sn?: string;
     /** InterCom: the InterCom release being packaged, which the updater compares with the releases on GitHub. */
     intercomVersion?: string;
+    /** Lattice: the name people see, where it differs from `productName`; see `Variant.brand`. */
+    intercomBrand?: string;
 }
 
 /**
@@ -63,6 +65,13 @@ interface ExtraMetadata extends Metadata {
  */
 interface Variant extends Metadata {
     "appId": string;
+    /**
+     * Lattice: the name people see (installer, shortcuts, desktop entry, the executable's
+     * description). `productName` stays what it was before the app was renamed: it is what Electron
+     * takes for the profile directory and, on Linux, for the entry of the keyring that the stored
+     * session is encrypted with, so changing it would sign everybody out.
+     */
+    "brand"?: string;
     "linux.executableName"?: string;
     "linux.deb.name"?: string;
     "protocols": string[];
@@ -92,6 +101,9 @@ if (process.env.VARIANT_PATH) {
     console.warn(`No VARIANT_PATH specified, using default variant configuration '${DEFAULT_VARIANT}':`);
 }
 
+/** Lattice: the name people see */
+const brand = variant.brand || variant.productName;
+
 for (const key in variant) {
     console.log(`${key}: ${variant[key as keyof Variant]}`);
 }
@@ -115,6 +127,9 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
     electronFuses: Required<Configuration["electronFuses"]>;
 } = {
     appId: variant.appId,
+    // Lattice: what electron-builder names things after; the packaged package.json keeps
+    // `productName` (extraMetadata below), which the running app's identity hangs on
+    productName: brand,
     asarUnpack: "**/*.node",
     electronFuses: {
         enableCookieEncryption: true,
@@ -131,7 +146,7 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         enableEmbeddedAsarIntegrityValidation: true,
     },
     files: ["package.json", "lib/**"],
-    extraResources: ["build/icon.*", "webapp.asar"],
+    extraResources: ["build/icon.*", "build/tray-*.png", "webapp.asar"],
     extraMetadata: {
         name: variant.name,
         productName: variant.productName,
@@ -142,6 +157,7 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         desktopName: `${variant.name}.desktop`,
         electron_appId: variant.appId,
         electron_protocol: variant.protocols[0],
+        intercomBrand: brand,
     },
     linux: {
         target: ["tar.gz", "deb"],
@@ -152,7 +168,7 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         syncDesktopName: true,
         desktop: {
             entry: {
-                Name: variant.productName,
+                Name: brand,
                 GenericName: "Matrix Client",
                 Comment: variant.description,
                 Keywords: "matrix;chat;call;voip;",
@@ -212,7 +228,7 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         output: process.env.INTERCOM_DIST_DIR || "dist",
     },
     protocols: {
-        name: variant.productName,
+        name: brand,
         schemes: variant.protocols,
     },
     nativeRebuilder: "sequential",
@@ -262,6 +278,21 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
 };
 
 /**
+ * Lattice: the Linux executable is still called `intercom`, which launchers and key bindings of
+ * installs from before the rename point to; `lattice` beside it is a link to it.
+ */
+const pruneSeshat = config.afterPack as (context: AfterPackContext) => Promise<void>;
+config.afterPack = async (context: AfterPackContext): Promise<void> => {
+    const alias = brand.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    if (context.electronPlatformName === "linux" && alias && alias !== variant.name) {
+        const link = path.join(context.appOutDir, alias);
+        await fsp.rm(link, { force: true });
+        await fsp.symlink(variant.name, link);
+    }
+    await pruneSeshat(context);
+};
+
+/**
  * InterCom: the Windows installer (INTERCOM_TARGET=win intercom/build.sh): NSIS, per user. It is made
  * on Windows by the release workflow, or on another system with wine. Nothing can be compiled for
  * Windows on another system, and the two builds are to hold the same files, so in both cases native
@@ -275,7 +306,18 @@ if (process.env.INTERCOM_TARGET === "win") {
         oneClick: true,
         perMachine: false,
         artifactName: "${productName}-Setup-${arch}.${ext}",
+        // Lattice: the Start menu and desktop shortcuts and the entry under "Apps" carry the new
+        // name. An update renames the shortcuts of an install from before the rename (their name is
+        // in the registry), and intercom/installer.nsh sees to what that leaves behind.
+        shortcutName: brand,
+        uninstallDisplayName: `${brand} \${version}`,
+        include: path.join("intercom", "installer.nsh"),
     };
+    // Lattice: the program file keeps its name, and with it the install directory
+    // (%LOCALAPPDATA%\Programs\<name>), so that what points to it goes on working after the update:
+    // pinned taskbar shortcuts, the autostart entry, firewall rules. Its description, which the task
+    // manager and "Open with" show, is the new name.
+    config.win.executableName = variant.productName;
 }
 
 /**

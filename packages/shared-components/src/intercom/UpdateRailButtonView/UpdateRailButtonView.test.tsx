@@ -49,13 +49,13 @@ describe("UpdateRailButtonView", () => {
     });
 
     it.each([
-        ["available", Available, `InterCom ${V} — Available`],
-        ["downloading", Downloading, `InterCom ${V} — Downloading · 41 %`],
-        ["downloading, size unknown", DownloadingUnknownSize, `InterCom ${V} — Downloading…`],
-        ["preparing", Preparing, `InterCom ${V} — Verifying…`],
-        ["ready", Ready, `InterCom ${V} — Ready to install`],
-        ["manual", Manual, `InterCom ${V} — Available`],
-        ["failed", Failed, `InterCom ${V} — The update failed`],
+        ["available", Available, `Lattice ${V} — Available`],
+        ["downloading", Downloading, `Lattice ${V} — Downloading · 41 %`],
+        ["downloading, size unknown", DownloadingUnknownSize, `Lattice ${V} — Downloading…`],
+        ["preparing", Preparing, `Lattice ${V} — Verifying…`],
+        ["ready", Ready, `Lattice ${V} — Ready to install`],
+        ["manual", Manual, `Lattice ${V} — Available`],
+        ["failed", Failed, `Lattice ${V} — The update failed`],
     ])("is a button with a red dot, named by version and state, when %s", (_name, Story, label) => {
         render(<Story />);
         expect(screen.getByRole("button", { name: label })).toBeEnabled();
@@ -64,7 +64,7 @@ describe("UpdateRailButtonView", () => {
 
     it("cannot be clicked while the app is about to start again", () => {
         render(<Installing />);
-        expect(screen.getByRole("button", { name: `InterCom ${V} — Restarting to update…` })).toBeDisabled();
+        expect(screen.getByRole("button", { name: `Lattice ${V} — Restarting to update…` })).toBeDisabled();
     });
 
     it("hands the click to the view model, whatever the state", async () => {
@@ -84,7 +84,7 @@ describe("UpdateRailButtonView", () => {
         expect(screen.queryByRole("tooltip")).toBeNull();
         await user.hover(screen.getByRole("button"));
         const card = await screen.findByRole("tooltip");
-        expect(card.textContent).toContain(`InterCom ${V}`);
+        expect(card.textContent).toContain(`Lattice ${V}`);
         expect(card.textContent).toContain("Ready to install");
         expect(card.textContent).toContain("Click to restart and update");
         expect(card.textContent).toContain(`What's new in ${V}`);
@@ -96,7 +96,7 @@ describe("UpdateRailButtonView", () => {
                 .map((h) => h.textContent),
         ).toEqual(["1.12.35-intercom.12"]);
         expect(card.textContent).toContain("Updates arrive within minutes.");
-        expect(screen.getByRole("button", { name: `InterCom ${V} — Ready to install` })).toHaveAttribute(
+        expect(screen.getByRole("button", { name: `Lattice ${V} — Ready to install` })).toHaveAttribute(
             "aria-describedby",
             card.id,
         );
@@ -133,7 +133,7 @@ describe("UpdateRailButtonView", () => {
         await user.hover(screen.getByRole("button"));
         card = await screen.findByRole("tooltip");
         expect(card.textContent).toContain("Downloading · 80 %");
-        expect(card.textContent).toContain("InterCom restarts by itself when it is ready");
+        expect(card.textContent).toContain("Lattice restarts by itself when it is ready");
     });
 
     it("says what a click does for a release it cannot install, and after a failure", async () => {

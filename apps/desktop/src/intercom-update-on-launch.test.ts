@@ -70,7 +70,10 @@ vi.mock("electron", () => {
         shell: { openExternal: vi.fn() },
     };
 });
-vi.mock("./build-config.js", () => ({ getIntercomVersion: (): string | undefined => electron.version }));
+vi.mock("./build-config.js", () => ({
+    getIntercomVersion: (): string | undefined => electron.version,
+    getBrand: (): string => "Lattice",
+}));
 vi.mock("./intercom-diagnostics.js", () => ({
     logDiagnostics: (type: string, fields: Record<string, unknown>): void => {
         electron.records.push({ type, ...fields });

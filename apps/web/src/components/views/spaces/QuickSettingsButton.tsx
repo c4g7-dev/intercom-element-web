@@ -107,7 +107,7 @@ const QuickSettingsButton: React.FC<{
         button = (
             <Tooltip
                 label={_t("quick_settings|title")}
-                caption={intercomVersion ? `InterCom ${intercomVersion}` : undefined}
+                caption={intercomVersion ? `Lattice ${intercomVersion}` : undefined}
                 placement="right"
             >
                 {button}

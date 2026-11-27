@@ -15,7 +15,7 @@ import path from "node:path";
 
 import { _t } from "./language-helper.js";
 import { getBuildConfig } from "./build-config.js";
-import { getIconPath } from "./icon.js";
+import { getIconPath, getTrayIconPath } from "./icon.js";
 import { getConfig } from "./config.js";
 import { openDiagnosticsFolder } from "./intercom-diagnostics.js";
 import { getUpdaterState, installUpdate, onUpdaterState } from "./intercom-updater.js";
@@ -55,6 +55,9 @@ export async function create(): Promise<void> {
     if (process.platform === "darwin" || trayIcon) return;
     const iconPath = await getIconPath();
     const defaultIcon = nativeImage.createFromPath(iconPath);
+    // Lattice: the tray has an icon of its own on Linux; where that file is missing, the app's
+    const ownTrayIcon = nativeImage.createFromPath(await getTrayIconPath());
+    const trayDefaultIcon = ownTrayIcon.isEmpty() ? defaultIcon : ownTrayIcon;
 
     const buildConfig = getBuildConfig();
     if (process.platform === "win32" && app.isPackaged && buildConfig.windowsCertSubjectName) {
@@ -63,9 +66,9 @@ export async function create(): Promise<void> {
         // We generate the GUID in a custom arbitrary namespace and use the subject name & userData path
         // to differentiate different app builds on the same system.
         const guid = uuidv5(`${buildConfig.windowsCertSubjectName}:${app.getPath("userData")}`, UUID_NAMESPACE);
-        trayIcon = new Tray(defaultIcon, guid);
+        trayIcon = new Tray(trayDefaultIcon, guid);
     } else {
-        trayIcon = new Tray(defaultIcon);
+        trayIcon = new Tray(trayDefaultIcon);
     }
 
     trayIcon.setToolTip(getConfig().brand);
@@ -90,7 +93,7 @@ export async function create(): Promise<void> {
         if (!favicons || favicons.length <= 0 || !favicons[0].startsWith("data:")) {
             if (lastFavicon !== null) {
                 global.mainWindow?.setIcon(defaultIcon);
-                trayIcon?.setImage(defaultIcon);
+                trayIcon?.setImage(trayDefaultIcon);
                 lastFavicon = null;
             }
             return;

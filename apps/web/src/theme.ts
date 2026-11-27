@@ -103,7 +103,9 @@ export function enumerateThemes(): { [key: string]: string } {
 
     try {
         for (const { name } of customThemes) {
-            customThemeNames[`custom-${name}`] = name;
+            // Lattice: the themes the app comes with kept the names they had while it was called
+            // InterCom, since the name is what the setting stores; people see the new one
+            customThemeNames[`custom-${name}`] = name.replace(/^InterCom(?= )/, "Lattice");
         }
     } catch (err) {
         logger.warn("Error loading custom themes", {

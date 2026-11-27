@@ -1,6 +1,6 @@
 {
-    "name": "InterCom",
-    "short_name": "InterCom",
+    "name": "Lattice",
+    "short_name": "Lattice",
     "display": "standalone",
     "theme_color": "#4F5BD5",
     "start_url": "index.html",
