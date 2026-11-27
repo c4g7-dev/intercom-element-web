@@ -21,6 +21,8 @@ type Props = UpdaterSettingsViewSnapshot & UpdaterSettingsViewActions;
 const Wrapper = ({
     onAutoCheckChange,
     onUpdateOnLaunchChange,
+    onFastCheckChange,
+    onShowWhatsNewChange,
     onCheckNow,
     onRestart,
     onOpenReleasePage,
@@ -29,6 +31,8 @@ const Wrapper = ({
     const vm = useMockedViewModel(rest, {
         onAutoCheckChange,
         onUpdateOnLaunchChange,
+        onFastCheckChange,
+        onShowWhatsNewChange,
         onCheckNow,
         onRestart,
         onOpenReleasePage,
@@ -45,10 +49,15 @@ const meta = {
         currentVersion: "1.12.35-intercom.5",
         autoCheck: true,
         updateOnLaunch: true,
+        fastCheck: true,
+        showWhatsNew: true,
+        notes: [],
         phase: "idle",
         lastChecked: "today at 14:02",
         onAutoCheckChange: fn(),
         onUpdateOnLaunchChange: fn(),
+        onFastCheckChange: fn(),
+        onShowWhatsNewChange: fn(),
         onCheckNow: fn(),
         onRestart: fn(),
         onOpenReleasePage: fn(),
@@ -86,4 +95,18 @@ export const Failed: Story = { args: { phase: "error", error: "GitHub: HTTP 403"
 
 export const DevelopmentBuild: Story = {
     args: { supported: false, reason: "no-version", currentVersion: undefined },
+};
+
+export const ReadyWithNotes: Story = {
+    args: {
+        phase: "ready",
+        latestVersion: "1.12.35-intercom.7",
+        notes: [
+            {
+                version: "1.12.35-intercom.7",
+                body: "- **Updates arrive within minutes.** InterCom asks every five minutes.\n- The update button in the rail of spaces.",
+            },
+            { version: "1.12.35-intercom.6", body: "- **Mute and deafen** are one state for the whole app." },
+        ],
+    },
 };

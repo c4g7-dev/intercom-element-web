@@ -31,6 +31,21 @@ function setUp(initial: UpdaterState = idle): {
         setAutoCheck: vi.fn().mockImplementation(async (on: boolean) => ({ ...initial, autoCheck: on })),
         setUpdateOnLaunch: vi.fn().mockImplementation(async (on: boolean) => ({ ...initial, updateOnLaunch: on })),
         openReleasePage: vi.fn().mockResolvedValue(initial),
+        update: vi.fn().mockResolvedValue(initial),
+        getNotes: vi.fn().mockResolvedValue({
+            pending: [
+                {
+                    version: "1.12.35-intercom.6",
+                    body: "- Newest",
+                    url: "https://github.com/c4g7-dev/InterCom/releases",
+                },
+            ],
+            whatsNew: [],
+        }),
+        whatsNewSeen: vi.fn().mockResolvedValue(initial),
+        setFastCheck: vi.fn().mockImplementation(async (on: boolean) => ({ ...initial, fastCheck: on })),
+        setShowWhatsNew: vi.fn().mockImplementation(async (on: boolean) => ({ ...initial, showWhatsNew: on })),
+        networkOnline: vi.fn().mockResolvedValue(initial),
     };
     let listener: ((state: UpdaterState) => void) | undefined;
     const unsubscribe = vi.fn();
@@ -74,6 +89,10 @@ describe("UpdaterSettingsViewModel", () => {
             autoCheck: true,
             // A desktop app that does not name the switch has it on
             updateOnLaunch: true,
+            // As are the switches of 1.12.35-intercom.13, and there are no notes while nothing is offered
+            fastCheck: true,
+            showWhatsNew: true,
+            notes: [],
             phase: "idle",
             latestVersion: undefined,
             progress: undefined,
@@ -132,6 +151,45 @@ describe("UpdaterSettingsViewModel", () => {
         vm.onOpenReleasePage();
         expect(api.install).toHaveBeenCalledTimes(1);
         expect(api.openReleasePage).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows and passes on the frequent check and what is new after updates", async () => {
+        const { api, vm, push } = setUp({ ...idle, fastCheck: false, showWhatsNew: false });
+        await settled();
+        expect(vm.getSnapshot()).toMatchObject({ fastCheck: false, showWhatsNew: false });
+        push({ ...idle, fastCheck: true, showWhatsNew: true });
+        expect(vm.getSnapshot()).toMatchObject({ fastCheck: true, showWhatsNew: true });
+
+        vm.onFastCheckChange(false);
+        // Shown before the answer is there
+        expect(vm.getSnapshot().fastCheck).toBe(false);
+        expect(api.setFastCheck).toHaveBeenCalledWith(false);
+        vm.onShowWhatsNewChange(false);
+        expect(vm.getSnapshot().showWhatsNew).toBe(false);
+        expect(api.setShowWhatsNew).toHaveBeenCalledWith(false);
+        await settled();
+        expect(vm.getSnapshot()).toMatchObject({ fastCheck: false, showWhatsNew: false });
+    });
+
+    it("shows the notes of the release that is offered, asked for once", async () => {
+        const { api, vm, push } = setUp();
+        await settled();
+        expect(api.getNotes).not.toHaveBeenCalled();
+        const found: UpdaterState = {
+            ...idle,
+            phase: "downloading",
+            latestVersion: "1.12.35-intercom.6",
+            progress: 0.1,
+        };
+        push(found);
+        push({ ...found, progress: 0.5 });
+        push({ ...found, phase: "ready" });
+        await settled();
+        expect(api.getNotes).toHaveBeenCalledTimes(1);
+        expect(vm.getSnapshot().notes).toEqual([{ version: "1.12.35-intercom.6", body: "- Newest" }]);
+        // Up to date again: nothing is offered, nothing is shown
+        push(idle);
+        expect(vm.getSnapshot().notes).toEqual([]);
     });
 
     it("stops listening when disposed, and takes nothing that arrives after", async () => {

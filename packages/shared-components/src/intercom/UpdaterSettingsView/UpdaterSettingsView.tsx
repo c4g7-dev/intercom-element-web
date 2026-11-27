@@ -6,11 +6,12 @@
  */
 
 import React, { type JSX } from "react";
-import { Button, Form, SettingsToggleInput, Text } from "@vector-im/compound-web";
+import { Button, Form, Heading, SettingsToggleInput, Text } from "@vector-im/compound-web";
 
 import styles from "./UpdaterSettingsView.module.css";
 import { type ViewModel, useViewModel } from "../../core/viewmodel";
 import { useI18n } from "../../core/i18n/i18nContext";
+import { type ReleaseNotesEntry, ReleaseNotesView } from "../ReleaseNotesView";
 
 /**
  * Where the updater stands. idle: nothing newer is known. checking, downloading, verifying (the
@@ -43,6 +44,12 @@ export interface UpdaterSettingsViewSnapshot {
     autoCheck: boolean;
     /** Whether the app installs a newer release when it starts, before its window opens */
     updateOnLaunch: boolean;
+    /** Whether the app looks every few minutes rather than every six hours */
+    fastCheck: boolean;
+    /** Whether the notes of a release are shown once after it was installed */
+    showWhatsNew: boolean;
+    /** The notes of the releases a known update brings, newest first; empty where none is known */
+    notes: ReleaseNotesEntry[];
     phase: UpdaterPhase;
     /** The newer release, once one is known */
     latestVersion?: string;
@@ -59,6 +66,10 @@ export interface UpdaterSettingsViewActions {
     onAutoCheckChange: (on: boolean) => void;
     /** Turns updating when the app starts on or off */
     onUpdateOnLaunchChange: (on: boolean) => void;
+    /** Turns looking every few minutes on or off */
+    onFastCheckChange: (on: boolean) => void;
+    /** Turns showing what is new after an update on or off */
+    onShowWhatsNewChange: (on: boolean) => void;
     /** Looks for an update now */
     onCheckNow: () => void;
     /** Installs the update that is ready and starts the app again */
@@ -77,7 +88,9 @@ interface UpdaterSettingsViewProps {
 
 /**
  * The update settings of InterCom: the version that runs, whether to look for updates
- * automatically and to install them when the app starts, a button to look now, and what was found.
+ * automatically (and how often) and to install them when the app starts, whether to show what
+ * is new after an update, a button to look now, what was found, and the notes of a release that
+ * is offered.
  */
 export function UpdaterSettingsView({ vm }: Readonly<UpdaterSettingsViewProps>): JSX.Element {
     const { translate: _t } = useI18n();
@@ -87,6 +100,9 @@ export function UpdaterSettingsView({ vm }: Readonly<UpdaterSettingsViewProps>):
         currentVersion,
         autoCheck,
         updateOnLaunch,
+        fastCheck,
+        showWhatsNew,
+        notes,
         phase,
         latestVersion,
         progress,
@@ -174,6 +190,22 @@ export function UpdaterSettingsView({ vm }: Readonly<UpdaterSettingsViewProps>):
                         disabled={!autoCheck}
                         onChange={(e) => vm.onUpdateOnLaunchChange(e.target.checked)}
                     />
+                    <SettingsToggleInput
+                        name="intercom_fast_check"
+                        label={_t("intercom|updater|fast_check")}
+                        helpMessage={_t("intercom|updater|fast_check_help")}
+                        // Without the automatic check there is no schedule to speed up
+                        checked={fastCheck && autoCheck}
+                        disabled={!autoCheck}
+                        onChange={(e) => vm.onFastCheckChange(e.target.checked)}
+                    />
+                    <SettingsToggleInput
+                        name="intercom_show_whats_new"
+                        label={_t("intercom|updater|show_whats_new")}
+                        helpMessage={_t("intercom|updater|show_whats_new_help")}
+                        checked={showWhatsNew}
+                        onChange={(e) => vm.onShowWhatsNewChange(e.target.checked)}
+                    />
                     <div className={styles.status}>
                         <Text size="md" role="status" className={phase === "error" ? styles.error : undefined}>
                             {status}
@@ -200,6 +232,20 @@ export function UpdaterSettingsView({ vm }: Readonly<UpdaterSettingsViewProps>):
                             {latestVersion ? _t("intercom|updater|release_notes") : _t("intercom|updater|all_releases")}
                         </Button>
                     </div>
+                    {latestVersion && notes.length > 0 && (
+                        <section className={styles.whatsNew} aria-labelledby="intercom-updater-whats-new">
+                            <Heading
+                                as="h3"
+                                size="sm"
+                                weight="semibold"
+                                id="intercom-updater-whats-new"
+                                className={styles.whatsNewTitle}
+                            >
+                                {_t("intercom|updater|whats_new_in", { version: latestVersion })}
+                            </Heading>
+                            <ReleaseNotesView notes={notes} titledByFirst />
+                        </section>
+                    )}
                 </>
             )}
         </Form.Root>

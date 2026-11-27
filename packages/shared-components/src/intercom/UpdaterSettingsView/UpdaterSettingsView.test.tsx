@@ -5,7 +5,7 @@
  * Please see LICENSE files in the repository root for full details.
  */
 
-import { render, screen } from "@test-utils";
+import { render, screen, within } from "@test-utils";
 import { composeStories } from "@storybook/react-vite";
 import React from "react";
 import userEvent from "@testing-library/user-event";
@@ -32,11 +32,14 @@ const {
     Manual,
     Failed,
     DevelopmentBuild,
+    ReadyWithNotes,
 } = composeStories(stories);
 
 class TestViewModel extends MockViewModel<UpdaterSettingsViewSnapshot> implements UpdaterSettingsViewActions {
     public onAutoCheckChange = vi.fn();
     public onUpdateOnLaunchChange = vi.fn();
+    public onFastCheckChange = vi.fn();
+    public onShowWhatsNewChange = vi.fn();
     public onCheckNow = vi.fn();
     public onRestart = vi.fn();
     public onOpenReleasePage = vi.fn();
@@ -122,6 +125,9 @@ describe("UpdaterSettingsView", () => {
             currentVersion: "1.12.35-intercom.5",
             autoCheck: true,
             updateOnLaunch: true,
+            fastCheck: true,
+            showWhatsNew: true,
+            notes: [],
             phase: "ready",
             latestVersion: "1.12.35-intercom.6",
         });
@@ -131,11 +137,40 @@ describe("UpdaterSettingsView", () => {
         expect(vm.onAutoCheckChange).toHaveBeenCalledWith(false);
         await user.click(screen.getByRole("switch", { name: "Update automatically on launch" }));
         expect(vm.onUpdateOnLaunchChange).toHaveBeenCalledWith(false);
+        await user.click(screen.getByRole("switch", { name: "Check for updates every few minutes" }));
+        expect(vm.onFastCheckChange).toHaveBeenCalledWith(false);
+        await user.click(screen.getByRole("switch", { name: "Show what's new after updates" }));
+        expect(vm.onShowWhatsNewChange).toHaveBeenCalledWith(false);
         await user.click(screen.getByRole("button", { name: "Check now" }));
         await user.click(screen.getByRole("button", { name: "Restart to update" }));
         await user.click(screen.getByRole("button", { name: "Release notes" }));
         expect(vm.onCheckNow).toHaveBeenCalledTimes(1);
         expect(vm.onRestart).toHaveBeenCalledTimes(1);
         expect(vm.onOpenReleasePage).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows what is new in the release that is offered, every release since the running one", () => {
+        render(<ReadyWithNotes />);
+        const whatsNew = screen.getByRole("region", { name: "What's new in 1.12.35-intercom.7" });
+        expect(within(whatsNew).getByRole("heading", { name: "1.12.35-intercom.6" })).toBeInTheDocument();
+        expect(within(whatsNew).queryByRole("heading", { name: "1.12.35-intercom.7" })).toBeNull();
+        expect(whatsNew.textContent).toContain("Updates arrive within minutes.");
+        expect(whatsNew.textContent).toContain("Mute and deafen are one state for the whole app.");
+    });
+
+    it("shows no notes while nothing is offered, and cannot speed up a check that is off", () => {
+        render(<UpToDate />);
+        expect(screen.queryByRole("region")).toBeNull();
+        expect(screen.getByRole("switch", { name: "Check for updates every few minutes" })).toBeChecked();
+        expect(screen.getByRole("switch", { name: "Show what's new after updates" })).toBeChecked();
+    });
+
+    it("shows the frequent check as off, and locked, while the automatic check is off", () => {
+        render(<AutoCheckOff />);
+        const fast = screen.getByRole("switch", { name: "Check for updates every few minutes" });
+        expect(fast).not.toBeChecked();
+        expect(fast).toBeDisabled();
+        // What is new does not depend on it
+        expect(screen.getByRole("switch", { name: "Show what's new after updates" })).toBeEnabled();
     });
 });

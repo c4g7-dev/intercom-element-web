@@ -127,6 +127,26 @@
             "new_since": "New messages since %(time)s",
             "viewing_older": "You're viewing older messages"
         },
+        "update_button": {
+            "available": "Available",
+            "downloading": "Downloading…",
+            "downloading_percent": "Downloading · %(percent)s",
+            "failed": "The update failed",
+            "hint_download": "Click to download and install it",
+            "hint_install_when_ready": "Click to restart and update as soon as it is ready",
+            "hint_release_page": "This install cannot update itself. Click for the release page",
+            "hint_restart": "Click to restart and update",
+            "hint_retry": "Click to try again",
+            "hint_will_restart": "InterCom restarts by itself when it is ready",
+            "installing": "Restarting to update…",
+            "label": "InterCom %(version)s — %(status)s",
+            "manual": "Available",
+            "name": "Update",
+            "preparing": "Verifying…",
+            "ready": "Ready to install",
+            "title": "InterCom %(version)s",
+            "whats_new": "What's new in %(version)s"
+        },
         "update_status": {
             "checking": "Checking for updates…",
             "details": "Details",
@@ -149,7 +169,7 @@
         "updater": {
             "all_releases": "All releases",
             "auto_check": "Check for updates automatically",
-            "auto_check_help": "Looks for a new release when InterCom starts and every six hours, and downloads it. You choose when to restart.",
+            "auto_check_help": "Looks for a new release when InterCom starts and while it runs, and downloads it. You choose when to restart.",
             "channel": "Channel",
             "channel_stable": "Stable",
             "check_now": "Check now",
@@ -157,12 +177,16 @@
             "download_progress": "Download progress",
             "downloading": "Downloading InterCom %(version)s… %(percent)s",
             "error": "The update check failed: %(message)s",
+            "fast_check": "Check for updates every few minutes",
+            "fast_check_help": "Asks GitHub every five minutes, and when you come back to the window or the network returns, whether a release came out: one small request. Off, InterCom looks every six hours.",
             "installing": "Installing InterCom %(version)s and restarting…",
             "manual": "InterCom %(version)s is available. This install cannot replace itself: get it from the release page.",
             "not_checked": "Not checked for updates yet.",
             "ready": "InterCom %(version)s is ready. Restart to update.",
             "release_notes": "Release notes",
             "restart": "Restart to update",
+            "show_whats_new": "Show what's new after updates",
+            "show_whats_new_help": "After an update, InterCom shows the release notes once.",
             "unpacking": "Unpacking InterCom %(version)s…",
             "unsupported": {
                 "disabled_by_flag": "Updates are turned off: InterCom was started with --no-update.",
@@ -176,7 +200,8 @@
             "update_on_launch_help": "When InterCom starts and a new release is out, it is downloaded and installed before the window opens. A start that finds nothing is held up for a moment at most; without a connection InterCom starts as it is.",
             "verifying": "Verifying the checksum of InterCom %(version)s…",
             "version": "InterCom version",
-            "version_unknown": "Not a release build"
+            "version_unknown": "Not a release build",
+            "whats_new_in": "What's new in %(version)s"
         },
         "user_panel": {
             "camera": "Camera",
@@ -216,6 +241,12 @@
             "new_voice_channel": "New voice channel",
             "new_voice_room": "New voice room",
             "sharing_screen": "Sharing a screen"
+        },
+        "whats_new": {
+            "all_notes": "All release notes",
+            "got_it": "Got it",
+            "subtitle": "InterCom was updated. Here is what changed.",
+            "title": "What's new in InterCom %(version)s"
         }
     },
     "keyboard": {

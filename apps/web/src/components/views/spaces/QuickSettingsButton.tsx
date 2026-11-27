@@ -21,6 +21,7 @@ import QuickThemeSwitcher from "./QuickThemeSwitcher";
 import Modal from "../../../Modal";
 import DevtoolsDialog from "../dialogs/DevtoolsDialog";
 import { SDKContext } from "../../../contexts/SDKContext.ts";
+import { useIntercomVersion } from "../../../intercom/updater/useIntercomVersion";
 
 const QuickSettingsButton: React.FC<{
     isPanelCollapsed: boolean;
@@ -30,6 +31,8 @@ const QuickSettingsButton: React.FC<{
 
     const currentRoomId = sdkContext.roomViewStore.getRoomId();
     const developerModeEnabled = useSettingValue("developerMode");
+    // InterCom: the release that runs, under the tooltip of the settings
+    const intercomVersion = useIntercomVersion();
 
     let contextMenu: JSX.Element | undefined;
     if (menuDisplayed && handle.current) {
@@ -102,7 +105,11 @@ const QuickSettingsButton: React.FC<{
 
     if (isPanelCollapsed) {
         button = (
-            <Tooltip label={_t("quick_settings|title")} placement="right">
+            <Tooltip
+                label={_t("quick_settings|title")}
+                caption={intercomVersion ? `InterCom ${intercomVersion}` : undefined}
+                placement="right"
+            >
                 {button}
             </Tooltip>
         );

@@ -37,6 +37,8 @@ export class UpdaterSettingsViewModel
     implements UpdaterSettingsViewActions
 {
     private readonly api?: UpdaterApi;
+    /** The release whose notes are shown or asked for */
+    private notesFor?: string;
 
     public constructor(props: Props = {}) {
         const api = "api" in props ? props.api : getUpdaterApi();
@@ -45,6 +47,9 @@ export class UpdaterSettingsViewModel
             reason: api ? undefined : "web",
             autoCheck: true,
             updateOnLaunch: true,
+            fastCheck: true,
+            showWhatsNew: true,
+            notes: [],
             phase: "idle",
         });
         this.api = api;
@@ -57,13 +62,30 @@ export class UpdaterSettingsViewModel
     private readonly onState = (state: UpdaterState): void => {
         if (this.isDisposed) return;
         const format = this.props.formatTime ?? ((date: Date): string => formatRelativeTime(date));
-        this.snapshot.set({
+        // The notes are asked for once per release, not with every step of its download
+        const wanted = state.supported ? state.latestVersion : undefined;
+        if (wanted !== this.notesFor) {
+            this.notesFor = wanted;
+            this.snapshot.merge({ notes: [] });
+            if (wanted) {
+                this.api?.getNotes?.().then(
+                    (notes) => {
+                        if (this.isDisposed || this.notesFor !== wanted) return;
+                        this.snapshot.merge({ notes: notes.pending.map(({ version, body }) => ({ version, body })) });
+                    },
+                    () => {},
+                );
+            }
+        }
+        this.snapshot.merge({
             supported: state.supported,
             reason: state.reason,
             currentVersion: state.currentVersion,
             autoCheck: state.autoCheck,
             // A desktop app that does not say is one that has no such switch: shown as on, as it is by default
             updateOnLaunch: state.updateOnLaunch !== false,
+            fastCheck: state.fastCheck !== false,
+            showWhatsNew: state.showWhatsNew !== false,
             phase: state.phase,
             latestVersion: state.latestVersion,
             progress: state.progress,
@@ -82,6 +104,17 @@ export class UpdaterSettingsViewModel
         // Shown at once; the desktop app's answer follows
         this.snapshot.merge({ updateOnLaunch: on });
         this.api?.setUpdateOnLaunch(on).then(this.onState, () => {});
+    };
+
+    public onFastCheckChange = (on: boolean): void => {
+        // Shown at once; the desktop app's answer follows
+        this.snapshot.merge({ fastCheck: on });
+        this.api?.setFastCheck?.(on).then(this.onState, () => {});
+    };
+
+    public onShowWhatsNewChange = (on: boolean): void => {
+        this.snapshot.merge({ showWhatsNew: on });
+        this.api?.setShowWhatsNew?.(on).then(this.onState, () => {});
     };
 
     public onCheckNow = (): void => {

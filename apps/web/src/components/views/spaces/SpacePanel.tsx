@@ -58,6 +58,7 @@ import SettingsStore from "../../../settings/SettingsStore";
 import { SettingLevel } from "../../../settings/SettingLevel";
 import UIStore from "../../../stores/UIStore";
 import QuickSettingsButton from "./QuickSettingsButton";
+import { UpdateRailButton } from "../../../intercom/updater/UpdateRailButton";
 import { useSettingValue } from "../../../hooks/useSettings";
 import IndicatorScrollbar from "../../structures/IndicatorScrollbar";
 import { useDispatcher } from "../../../hooks/useDispatcher";
@@ -468,6 +469,9 @@ const SpacePanel: React.FC = () => {
                         </Droppable>
 
                         <ThreadsActivityCentre displayButtonLabel={!isPanelCollapsed} />
+
+                        {/* InterCom: an update that is available, on its way or ready, one click from installed */}
+                        <UpdateRailButton isPanelCollapsed={isPanelCollapsed} />
 
                         <QuickSettingsButton isPanelCollapsed={isPanelCollapsed} />
                     </nav>

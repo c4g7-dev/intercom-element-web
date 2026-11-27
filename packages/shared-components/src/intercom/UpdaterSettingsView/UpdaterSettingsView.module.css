@@ -72,3 +72,20 @@
 .progress::-moz-progress-bar {
     background-color: var(--cpd-color-bg-accent-rest);
 }
+
+/* The notes of the release that is offered, on the card's surface */
+.whatsNew {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cpd-space-3x);
+    padding: var(--cpd-space-4x);
+    border: var(--cpd-border-width-1) solid var(--roomlist-separator-color, var(--cpd-color-gray-400));
+    border-radius: 12px;
+    background-color: var(--roomlist-background-color, var(--cpd-color-bg-subtle-secondary));
+}
+
+.whatsNewTitle {
+    margin: 0;
+    color: var(--cpd-color-text-primary);
+    font: var(--cpd-font-body-lg-semibold);
+}

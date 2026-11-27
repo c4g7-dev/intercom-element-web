@@ -25,6 +25,12 @@ export interface UpdaterState {
     autoCheck: boolean;
     /** Whether a start installs a newer release before the window opens; absent from a desktop app older than 1.12.35-intercom.7 */
     updateOnLaunch?: boolean;
+    /** Whether the app looks for a release every few minutes rather than every six hours; absent before 1.12.35-intercom.13 */
+    fastCheck?: boolean;
+    /** Whether the notes of a release are shown once after it was installed; absent before 1.12.35-intercom.13 */
+    showWhatsNew?: boolean;
+    /** Whether the update on its way is installed, and the app started again, as soon as it is ready; absent before 1.12.35-intercom.13 */
+    installWhenReady?: boolean;
     channel: "stable";
     phase: UpdaterPhase;
     latestVersion?: string;
@@ -39,6 +45,25 @@ export interface UpdaterState {
     log?: Array<{ t: number; text: string }>;
 }
 
+/** The notes of one release. */
+export interface UpdaterReleaseNotes {
+    /** e.g. `1.12.35-intercom.13` */
+    version: string;
+    /** Markdown, as the release's page has it: shown as text and lists, never as HTML */
+    body: string;
+    /** The release's page */
+    url: string;
+}
+
+/** The notes the desktop app has; see apps/desktop/src/intercom-updater-notes.ts. */
+export interface UpdaterNotes {
+    /** Of the releases newer than the running one, up to the one that is offered; newest first */
+    pending: UpdaterReleaseNotes[];
+    /** Of the releases the last update brought, to be shown once; empty for nothing to show */
+    whatsNew: UpdaterReleaseNotes[];
+    currentVersion?: string;
+}
+
 /** The desktop app's updater, as the window reaches it. */
 export interface UpdaterApi {
     getState(): Promise<UpdaterState>;
@@ -47,7 +72,20 @@ export interface UpdaterApi {
     setAutoCheck(on: boolean): Promise<UpdaterState>;
     setUpdateOnLaunch(on: boolean): Promise<UpdaterState>;
     openReleasePage(): Promise<UpdaterState>;
+    // What follows came with 1.12.35-intercom.13
+    /** The click on the update button: installs now, or as soon as the update is downloaded and checked */
+    update?(): Promise<UpdaterState>;
+    getNotes?(): Promise<UpdaterNotes>;
+    /** The user has seen what is new in the running release */
+    whatsNewSeen?(): Promise<UpdaterState>;
+    setFastCheck?(on: boolean): Promise<UpdaterState>;
+    setShowWhatsNew?(on: boolean): Promise<UpdaterState>;
+    /** The network is back: a reason to look for a release now */
+    networkOnline?(): Promise<UpdaterState>;
 }
+
+/** All pages of releases, for "All release notes". */
+export const RELEASES_URL = "https://github.com/c4g7-dev/InterCom/releases";
 
 /** Something that is told when the updater's state changes; returns what stops the telling. */
 export type UpdaterSubscribe = (listener: (state: UpdaterState) => void) => () => void;

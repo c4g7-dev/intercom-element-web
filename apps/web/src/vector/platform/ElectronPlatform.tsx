@@ -45,6 +45,7 @@ import { installCallShortcuts, performCallAction } from "../../intercom/CallActi
 import { VoiceStateStore, VoiceStateStoreEvent } from "../../intercom/VoiceStateStore";
 import { type VoiceState } from "../../intercom/VoiceState";
 import { startUpdateToasts } from "../../intercom/updater/UpdateToast";
+import { startWhatsNew, tellUpdaterWhenOnline } from "../../intercom/updater/WhatsNew";
 import { IPCManager } from "./IPCManager";
 import { _t } from "../../languageHandler";
 import { BadgeOverlayRenderer } from "../../favicon";
@@ -204,6 +205,9 @@ export default class ElectronPlatform extends BasePlatform {
         tellVoiceState(VoiceStateStore.instance.state);
         // InterCom: tells when an update from the GitHub releases is ready
         startUpdateToasts();
+        // InterCom: what is new, once after an update; and the network coming back, as a reason to look
+        startWhatsNew();
+        tellUpdaterWhenOnline();
 
         this.electron.on("openDesktopCapturerSourcePicker", async () => {
             const { finished } = Modal.createDialog(DesktopCapturerSourcePicker);
