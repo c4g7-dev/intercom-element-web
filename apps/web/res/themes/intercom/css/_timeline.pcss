@@ -128,6 +128,13 @@ Please see LICENSE files in the repository root for full details.
     margin-right: 0;
 }
 
+/* The attachment tray: on the composer's surface, from edge to edge of it, above the text */
+:root:root .mx_MessageComposer .mx_IntercomAttachmentTray {
+    /* The sides of .mx_MessageComposer_wrapper, taken back so that the rule under the tray is whole */
+    margin: 0 -10px 0 -8px;
+    padding: 10px;
+}
+
 /* --- Side panel ------------------------------------------------------------------------ */
 
 :root:root .mx_RightPanel {

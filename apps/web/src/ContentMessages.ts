@@ -13,6 +13,7 @@ import {
     MsgType,
     HTTPError,
     type IEventRelation,
+    type IMentions,
     type ISendEventResponse,
     type MatrixEvent,
     type UploadOpts,
@@ -61,7 +62,6 @@ import { PosthogAnalytics } from "./PosthogAnalytics.ts";
 import { cacheUploadedMedia } from "./utils/UploadedMediaCache";
 import { UploadTrace, type UploadTracePart } from "./intercom/UploadDiagnostics";
 import { secureRandomString } from "matrix-js-sdk/src/randomstring";
-import BatchUploadDialog from "./intercom/gallery/BatchUploadDialog";
 import { GALLERY_BATCH_FIELD } from "./intercom/gallery/grouping";
 import { uploadContentWithRetry, UploadTokenRefreshError } from "./intercom/UploadRetry";
 
@@ -76,6 +76,26 @@ export class UploadFailedError extends Error {
         this.cause = cause;
     }
 }
+
+/**
+ * Text sent with a file as its caption (MSC2530): the body, and beside it what a text message
+ * would have had, so that formatting and mentions of the composer's text are kept.
+ */
+export interface AttachmentCaption {
+    "body": string;
+    "format"?: "org.matrix.custom.html";
+    "formatted_body"?: string;
+    "m.mentions"?: IMentions;
+}
+
+/**
+ * What became of a file given to {@link ContentMessages.sendContentToRoom}:
+ * - `sent`: uploaded and its message sent
+ * - `cancelled`: stopped by the user
+ * - `failed`: the upload failed; no message was made
+ * - `not_sent`: uploaded, but sending the message failed; the room has it as an unsent message
+ */
+export type AttachmentOutcome = "sent" | "cancelled" | "failed" | "not_sent";
 
 interface IMediaConfig {
     "m.upload.size"?: number;
@@ -531,35 +551,22 @@ export default class ContentMessages {
     }
 
     /**
-     * Sends a list of files to a room.
-     * @param files - The files to send.
-     * @param roomId - The ID of the room to send the files to.
-     * @param relation - The relation to the event being replied to.
-     * @param replyToEvent - The event being replied to, if any.
-     * @param matrixClient - The Matrix client to use for sending the files.
-     * @param context - The context in which the files are being sent.
-     * @returns A promise that resolves when the files have been sent.
+     * Sorts out the files the homeserver would refuse for their size: says so in the upload
+     * failure dialog and gives back the files that may be uploaded. Fetches the homeserver's
+     * limit first if it is not known yet.
+     * @param files - The files chosen.
+     * @param matrixClient - The Matrix client to ask for the limit.
+     * @returns The files that may be uploaded: none when there are none, or when the user chose
+     *     to send none of them.
      */
-    public async sendContentListToRoom(
-        files: File[],
-        roomId: string,
-        relation: IEventRelation | undefined,
-        replyToEvent: MatrixEvent | undefined,
-        matrixClient: MatrixClient,
-        context = TimelineRenderingType.Room,
-    ): Promise<void> {
-        if (matrixClient.isGuest()) {
-            dis.dispatch({ action: "require_registration" });
-            return;
-        }
-
+    public async filterUploadable(files: File[], matrixClient: MatrixClient): Promise<File[]> {
         if (!this.mediaConfig) {
             // hot-path optimization to not flash a spinner if we don't need to
             const modal = Modal.createDialog(Spinner, undefined, "mx_Dialog_spinner");
             await Promise.race([this.ensureMediaConfigFetched(matrixClient), modal.finished]);
             if (!this.mediaConfig) {
                 // User cancelled by clicking away on the spinner
-                return;
+                return [];
             } else {
                 modal.close();
             }
@@ -583,27 +590,113 @@ export default class ContentMessages {
                 contentMessages: this,
             });
             const [shouldContinue] = await finished;
-            if (!shouldContinue) return;
+            if (!shouldContinue) return [];
+        }
+        return okFiles;
+    }
+
+    /**
+     * Sends the files of the composer's attachment tray, without asking: they were looked at in
+     * the tray. They are sent one after the other, in their order. Several pictures and nothing
+     * else are marked as one gallery batch; any other set is sent as it always was, file by file.
+     * @param files - The files to send; already checked with {@link filterUploadable}.
+     * @param roomId - The ID of the room to send the files to.
+     * @param relation - The relation the files are sent with (a thread).
+     * @param replyToEvent - The event being replied to, if any.
+     * @param matrixClient - The Matrix client to use for sending the files.
+     * @param caption - Text sent with the first file as its caption.
+     * @param onUpload - Called with each file's index and its upload once the upload begins.
+     * @returns For each file, in order, a promise of what became of it. None of them rejects.
+     */
+    public sendAttachments(
+        files: File[],
+        roomId: string,
+        relation: IEventRelation | undefined,
+        replyToEvent: MatrixEvent | undefined,
+        matrixClient: MatrixClient,
+        caption?: AttachmentCaption,
+        onUpload?: (index: number, upload: RoomUpload) => void,
+    ): Promise<AttachmentOutcome>[] {
+        // The mark that makes the pictures one gallery, however far apart their uploads end
+        const batchId =
+            files.length > 1 && files.every((file) => file.type.startsWith("image/"))
+                ? secureRandomString(16)
+                : undefined;
+
+        // Each file waits for the one before it, so that they arrive in their order
+        let promBefore: Promise<unknown> = Promise.resolve();
+        const outcomes = files.map((file, i) => {
+            const loopPromiseBefore = promBefore;
+            const outcome = doMaybeLocalRoomAction(
+                roomId,
+                (actualRoomId) =>
+                    this.sendContentToRoom(
+                        file,
+                        actualRoomId,
+                        relation,
+                        matrixClient,
+                        replyToEvent,
+                        loopPromiseBefore,
+                        i === 0 ? caption : undefined,
+                        batchId ? { id: batchId, index: i, count: files.length } : undefined,
+                        (upload) => onUpload?.(i, upload),
+                    ),
+                matrixClient,
+            ).catch((e): AttachmentOutcome => {
+                logger.warn("Failed to send an attachment", e);
+                return "failed";
+            });
+            promBefore = outcome;
+            return outcome;
+        });
+
+        if (files.length) {
+            const types = files.map((file) => file.type.split("/")[0]);
+            // Find the most common type.
+            const [type] = types.sort(
+                (a, b) => types.filter((v) => v === b).length - types.filter((v) => v === a).length,
+            );
+            PosthogAnalytics.instance.trackEvent<AttachmentSend>({
+                eventName: "AttachmentSend",
+                isReply: !!replyToEvent,
+                inThread: relation?.rel_type === "m.thread",
+                count: files.length,
+                kind: "local",
+                type,
+            });
+        }
+        return outcomes;
+    }
+
+    /**
+     * Sends a list of files to a room, asking about each of them first.
+     *
+     * Files chosen in the composer do not come this way: they wait in its attachment tray
+     * (AttachmentTrayStore) and are sent with {@link sendAttachments}.
+     * @param files - The files to send.
+     * @param roomId - The ID of the room to send the files to.
+     * @param relation - The relation to the event being replied to.
+     * @param replyToEvent - The event being replied to, if any.
+     * @param matrixClient - The Matrix client to use for sending the files.
+     * @param context - The context in which the files are being sent.
+     * @returns A promise that resolves when the files have been sent.
+     */
+    public async sendContentListToRoom(
+        files: File[],
+        roomId: string,
+        relation: IEventRelation | undefined,
+        replyToEvent: MatrixEvent | undefined,
+        matrixClient: MatrixClient,
+        context = TimelineRenderingType.Room,
+    ): Promise<void> {
+        if (matrixClient.isGuest()) {
+            dis.dispatch({ action: "require_registration" });
+            return;
         }
 
+        const okFiles = await this.filterUploadable(files, matrixClient);
+
         let uploadAll = false;
-        // Text sent with the first file, when the files were confirmed as one batch
-        let caption: string | undefined;
-        // Set when the files were confirmed as one batch: marks them as one gallery
-        let batchId: string | undefined;
-        if (okFiles.length > 1 && okFiles.every((file) => file.type.startsWith("image/"))) {
-            // Several pictures chosen together are asked for once and sent as one batch, one after
-            // the other, so that they arrive as the gallery they were chosen as.
-            const { finished } = Modal.createDialog(BatchUploadDialog, { files: okFiles });
-            const [confirmed, text] = await finished;
-            if (confirmed) {
-                uploadAll = true;
-                caption = text;
-                batchId = secureRandomString(16);
-            } else {
-                okFiles.length = 0;
-            }
-        }
         // Promise to complete before sending next file into room, used for synchronisation of file-sending
         // to match the order the files were specified in
         let promBefore: Promise<any> = Promise.resolve();
@@ -636,8 +729,6 @@ export default class ContentMessages {
                         matrixClient,
                         replyToEvent ?? undefined,
                         loopPromiseBefore,
-                        i === 0 ? caption : undefined,
-                        batchId ? { id: batchId, index: i, count: okFiles.length } : undefined,
                     ),
                 matrixClient,
             );
@@ -706,13 +797,26 @@ export default class ContentMessages {
         matrixClient: MatrixClient,
         replyToEvent: MatrixEvent | undefined,
         promBefore?: Promise<any>,
-        caption?: string,
+        caption?: string | AttachmentCaption,
         batch?: { id: string; index: number; count: number },
-    ): Promise<void> {
+        onUpload?: (upload: RoomUpload) => void,
+    ): Promise<AttachmentOutcome> {
         const fileName = file.name || _t("common|attachment");
-        const content: Omit<MediaEventContent, "info"> & { info: Partial<MediaEventInfo> } = {
+        const captionContent: AttachmentCaption | undefined = typeof caption === "string" ? { body: caption } : caption;
+        const content: Omit<MediaEventContent, "info"> & {
+            "info": Partial<MediaEventInfo>;
+            "m.mentions"?: IMentions;
+        } = {
             // With a caption the body is the caption and the file name goes beside it
-            ...(caption ? { body: caption, filename: fileName } : { body: fileName }),
+            ...(captionContent?.body
+                ? {
+                      body: captionContent.body,
+                      filename: fileName,
+                      ...(captionContent.format && captionContent.formatted_body
+                          ? { format: captionContent.format, formatted_body: captionContent.formatted_body }
+                          : {}),
+                  }
+                : { body: fileName }),
             info: {
                 size: file.size,
             },
@@ -723,6 +827,16 @@ export default class ContentMessages {
 
         // Attach mentions, which really only applies if there's a replyToEvent.
         attachMentions(matrixClient.getSafeUserId(), content, null, replyToEvent);
+        // ... and if the caption mentions someone: those are added to them
+        const captionMentions = captionContent?.body ? captionContent["m.mentions"] : undefined;
+        if (captionMentions) {
+            const userIds = new Set([...(content["m.mentions"]?.user_ids ?? []), ...(captionMentions.user_ids ?? [])]);
+            content["m.mentions"] = {
+                ...content["m.mentions"],
+                ...(userIds.size ? { user_ids: [...userIds] } : {}),
+                ...(captionMentions.room ? { room: true } : {}),
+            };
+        }
         attachRelation(content, relation);
         if (replyToEvent) {
             addReplyToMessageContent(content, replyToEvent);
@@ -739,6 +853,7 @@ export default class ContentMessages {
 
         const upload = new RoomUpload(roomId, fileName, relation, file.size);
         this.inprogress.push(upload);
+        onUpload?.(upload);
         dis.dispatch<UploadStartedPayload>({ action: Action.UploadStarted, upload });
 
         function onProgress(progress: UploadProgress): void {
@@ -748,6 +863,9 @@ export default class ContentMessages {
 
         const trace = new UploadTrace(file.size, file.type || "unknown");
         let outcome: "sent" | "failed" | "cancelled" = "failed";
+        // Set once the file is up and its message is being sent: a failure after that leaves an
+        // unsent message in the room, which is where it is sent again from
+        let sending = false;
 
         // The file itself goes up while its thumbnail and metadata are being made, rather than
         // after them: neither needs the other, and for a picture the two requests used to be made
@@ -812,6 +930,7 @@ export default class ContentMessages {
             if (upload.cancelled) throw new UploadCanceledError();
             const threadId = relation?.rel_type === THREAD_RELATION_TYPE.name ? relation.event_id : null;
 
+            sending = true;
             const response = await trace.time("send_event", () =>
                 matrixClient.sendMessage(roomId, threadId ?? null, content as MediaEventContent),
             );
@@ -857,6 +976,8 @@ export default class ContentMessages {
             trace.finish(outcome, { kind: content.msgtype });
             removeElement(this.inprogress, (e) => e.promise === upload.promise);
         }
+        if (outcome === "failed" && sending) return "not_sent";
+        return outcome;
     }
 
     private isFileSizeAcceptable(file: File): boolean {

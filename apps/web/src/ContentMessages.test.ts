@@ -23,13 +23,14 @@ import encrypt, { type IEncryptedFile } from "matrix-encrypt-attachment";
 import { createTestClient, flushPromises, mkEvent } from "test-utils";
 
 import ContentMessages, { UploadCanceledError, isHidpiPng, uploadFile } from "./ContentMessages";
-import BatchUploadDialog from "./intercom/gallery/BatchUploadDialog";
 import { clearUploadedMediaCache, queryUploadedMediaCache } from "./utils/UploadedMediaCache";
 import { doMaybeLocalRoomAction } from "./utils/local-room";
 import { BlurhashEncoder } from "./BlurhashEncoder";
 import Modal from "./Modal";
 import ErrorDialog from "./components/views/dialogs/ErrorDialog";
 import UploadConfirmDialog from "./components/views/dialogs/UploadConfirmDialog";
+import UploadFailureDialog from "./components/views/dialogs/UploadFailureDialog";
+import { type RoomUpload } from "./models/RoomUpload";
 import { _t } from "./languageHandler";
 import { PosthogAnalytics } from "./PosthogAnalytics";
 
@@ -493,7 +494,7 @@ describe("sendContentListToRoom analytics", () => {
             <T>(roomId: string, fn: (actualRoomId: string) => Promise<T>) => fn(roomId),
         );
         contentMessages = new ContentMessages();
-        vi.spyOn(contentMessages, "sendContentToRoom").mockResolvedValue(undefined);
+        vi.spyOn(contentMessages, "sendContentToRoom").mockResolvedValue("sent");
         trackEvent = vi.spyOn(PosthogAnalytics.instance, "trackEvent").mockImplementation(() => {});
         // Automatically continue through the per-file confirmation dialog.
         vi.spyOn(Modal, "createDialog").mockImplementation((component: unknown, ...rest: any[]) => {
@@ -677,39 +678,164 @@ describe("InterCom upload pipeline", () => {
         expect(JSON.stringify(records)).not.toContain("secret-name");
     });
 
-    it("asks once for several pictures and sends the caption with the first", async () => {
+    const pictures = (...names: string[]): File[] =>
+        names.map((name) => new File([new Uint8Array(10)], name, { type: "image/jpeg" }));
+    const sentContents = (): Record<string, any>[] =>
+        vi.mocked(client.sendMessage).mock.calls.map((call) => call[2] as unknown as Record<string, any>);
+
+    describe("sendAttachments", () => {
+        beforeEach(() => {
+            vi.spyOn(Modal, "createDialog");
+            vi.mocked(client.uploadContent).mockResolvedValue({ content_uri: "mxc://server/file" });
+            vi.spyOn(PosthogAnalytics.instance, "trackEvent").mockImplementation(() => {});
+        });
+
+        it("sends several pictures as one batch, without asking, with the caption on the first", async () => {
+            const outcomes = contentMessages.sendAttachments(
+                pictures("a.jpg", "b.jpg", "c.jpg"),
+                roomId,
+                undefined,
+                undefined,
+                client,
+                { body: "our trip" },
+            );
+            await expect(Promise.all(outcomes)).resolves.toEqual(["sent", "sent", "sent"]);
+
+            expect(Modal.createDialog).not.toHaveBeenCalled();
+            const contents = sentContents();
+            expect(contents.map((c) => c.body)).toEqual(["our trip", "b.jpg", "c.jpg"]);
+            expect(contents[0].filename).toBe("a.jpg");
+            expect(contents[1].filename).toBeUndefined();
+            // The three are marked as one batch, in the order they were chosen
+            const marks = contents.map((c) => c["io.intercom.gallery"] as { id: string; index: number; count: number });
+            expect(marks.map((m) => [m.index, m.count])).toEqual([
+                [0, 3],
+                [1, 3],
+                [2, 3],
+            ]);
+            expect(typeof marks[0].id).toBe("string");
+            expect(new Set(marks.map((m) => m.id)).size).toBe(1);
+            expect(PosthogAnalytics.instance.trackEvent).toHaveBeenCalledWith(
+                expect.objectContaining({ eventName: "AttachmentSend", count: 3, type: "image" }),
+            );
+        });
+
+        it("keeps the formatting and the mentions of a caption", async () => {
+            const [outcome] = contentMessages.sendAttachments(pictures("a.jpg"), roomId, undefined, undefined, client, {
+                "body": "look, @bob",
+                "format": "org.matrix.custom.html",
+                "formatted_body": "<b>look</b>, @bob",
+                "m.mentions": { user_ids: ["@bob:example.org"] },
+            });
+            await outcome;
+
+            const [content] = sentContents();
+            expect(content).toMatchObject({
+                "msgtype": "m.image",
+                "body": "look, @bob",
+                "filename": "a.jpg",
+                "format": "org.matrix.custom.html",
+                "formatted_body": "<b>look</b>, @bob",
+                "m.mentions": { user_ids: ["@bob:example.org"] },
+            });
+            // One picture is no gallery
+            expect(content["io.intercom.gallery"]).toBeUndefined();
+        });
+
+        it("does not mark files that are not all pictures as a batch", async () => {
+            const files = [...pictures("a.jpg"), new File(["text"], "notes.txt", { type: "text/plain" })];
+            await Promise.all(contentMessages.sendAttachments(files, roomId, undefined, undefined, client));
+
+            const contents = sentContents();
+            expect(contents.map((c) => c.msgtype)).toEqual(["m.image", "m.file"]);
+            expect(contents.map((c) => c.body)).toEqual(["a.jpg", "notes.txt"]);
+            expect(contents.some((c) => "io.intercom.gallery" in c)).toBe(false);
+        });
+
+        it("hands out the upload of each file", async () => {
+            const uploads: [number, RoomUpload][] = [];
+            await Promise.all(
+                contentMessages.sendAttachments(
+                    pictures("a.jpg", "b.jpg"),
+                    roomId,
+                    undefined,
+                    undefined,
+                    client,
+                    undefined,
+                    (index, upload) => uploads.push([index, upload]),
+                ),
+            );
+            expect(uploads.map(([index, upload]) => [index, upload.fileName])).toEqual([
+                [0, "a.jpg"],
+                [1, "b.jpg"],
+            ]);
+        });
+
+        it("says which file failed to upload and which could not be sent", async () => {
+            vi.mocked(Modal.createDialog).mockReturnValue({ finished: new Promise(() => {}), close: vi.fn() } as any);
+            // Not an error of the connection: those are tried once more
+            vi.mocked(client.uploadContent).mockRejectedValueOnce(new MatrixError({ errcode: "M_FORBIDDEN" }, 403));
+            const file = new File(["text"], "notes.txt", { type: "text/plain" });
+            await expect(
+                contentMessages.sendAttachments([file], roomId, undefined, undefined, client)[0],
+            ).resolves.toBe("failed");
+            expect(client.sendMessage).not.toHaveBeenCalled();
+
+            vi.mocked(client.sendMessage).mockRejectedValueOnce(new Error("no connection"));
+            await expect(
+                contentMessages.sendAttachments([file], roomId, undefined, undefined, client)[0],
+            ).resolves.toBe("not_sent");
+        });
+    });
+
+    describe("filterUploadable", () => {
+        it("refuses files over the homeserver's limit with the upload failure dialog", async () => {
+            vi.mocked(client.getMediaConfig).mockResolvedValue({ "m.upload.size": 100 });
+            const small = new File([new Uint8Array(10)], "small.bin");
+            const large = new File([new Uint8Array(1000)], "large.bin");
+            vi.spyOn(Modal, "createDialog").mockImplementation(((component: unknown) => ({
+                // "Upload the others" in the dialog; the spinner stays until it is closed
+                finished: component === UploadFailureDialog ? Promise.resolve([true]) : new Promise(() => {}),
+                close: vi.fn(),
+            })) as unknown as typeof Modal.createDialog);
+
+            await expect(contentMessages.filterUploadable([small, large], client)).resolves.toEqual([small]);
+            expect(Modal.createDialog).toHaveBeenCalledWith(
+                UploadFailureDialog,
+                expect.objectContaining({ badFiles: [large], totalFiles: 2 }),
+            );
+        });
+
+        it("gives back nothing when the dialog is cancelled, and everything when there is no limit", async () => {
+            vi.mocked(client.getMediaConfig).mockResolvedValue({ "m.upload.size": 100 });
+            const small = new File([new Uint8Array(10)], "small.bin");
+            const large = new File([new Uint8Array(1000)], "large.bin");
+            vi.spyOn(Modal, "createDialog").mockImplementation(((component: unknown) => ({
+                finished: component === UploadFailureDialog ? Promise.resolve([false]) : new Promise(() => {}),
+                close: vi.fn(),
+            })) as unknown as typeof Modal.createDialog);
+            await expect(contentMessages.filterUploadable([small, large], client)).resolves.toEqual([]);
+
+            const unlimited = new ContentMessages();
+            vi.mocked(client.getMediaConfig).mockResolvedValue({});
+            await expect(unlimited.filterUploadable([small, large], client)).resolves.toEqual([small, large]);
+        });
+    });
+
+    it("asks about each picture when they do not come from the composer's tray", async () => {
         vi.spyOn(Modal, "createDialog").mockImplementation(((component: unknown) => ({
-            // The spinner shown while the media config is fetched stays until it is closed
-            finished: component === BatchUploadDialog ? Promise.resolve([true, "our trip"]) : new Promise(() => {}),
+            // "Upload all" in the first dialog; the spinner stays until it is closed
+            finished: component === UploadConfirmDialog ? Promise.resolve([true, true]) : new Promise(() => {}),
             close: vi.fn(),
         })) as unknown as typeof Modal.createDialog);
         vi.mocked(client.getMediaConfig).mockResolvedValue({});
         vi.mocked(client.uploadContent).mockResolvedValue({ content_uri: "mxc://server/file" });
         vi.spyOn(PosthogAnalytics.instance, "trackEvent").mockImplementation(() => {});
-        const files = ["a.jpg", "b.jpg", "c.jpg"].map(
-            (name) => new File([new Uint8Array(10)], name, { type: "image/jpeg" }),
-        );
 
-        await contentMessages.sendContentListToRoom(files, roomId, undefined, undefined, client);
-        await flushPromises();
-        await vi.waitFor(() => expect(client.sendMessage).toHaveBeenCalledTimes(3));
+        await contentMessages.sendContentListToRoom(pictures("a.jpg", "b.jpg"), roomId, undefined, undefined, client);
+        await vi.waitFor(() => expect(client.sendMessage).toHaveBeenCalledTimes(2));
 
-        expect(vi.mocked(Modal.createDialog).mock.calls.filter(([c]) => c === BatchUploadDialog)).toHaveLength(1);
-        expect(vi.mocked(Modal.createDialog).mock.calls.some(([c]) => c === UploadConfirmDialog)).toBe(false);
-        const contents = vi
-            .mocked(client.sendMessage)
-            .mock.calls.map((call) => call[2] as unknown as Record<string, unknown>);
-        expect(contents.map((c) => c.body)).toEqual(["our trip", "b.jpg", "c.jpg"]);
-        expect(contents[0].filename).toBe("a.jpg");
-        expect(contents[1].filename).toBeUndefined();
-        // The three are marked as one batch, in the order they were chosen
-        const marks = contents.map((c) => c["io.intercom.gallery"] as { id: string; index: number; count: number });
-        expect(marks.map((m) => [m.index, m.count])).toEqual([
-            [0, 3],
-            [1, 3],
-            [2, 3],
-        ]);
-        expect(typeof marks[0].id).toBe("string");
-        expect(new Set(marks.map((m) => m.id)).size).toBe(1);
+        expect(vi.mocked(Modal.createDialog).mock.calls.filter(([c]) => c === UploadConfirmDialog)).toHaveLength(1);
+        expect(sentContents().some((c) => "io.intercom.gallery" in c)).toBe(false);
     });
 });

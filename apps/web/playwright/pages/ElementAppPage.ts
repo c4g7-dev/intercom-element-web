@@ -192,8 +192,18 @@ export class ElementAppPage {
     }
 
     /**
-     * Sets the files on the composers file input, causing it to open the file
-     * upload dialog.
+     * Sends the files that wait in a composer's attachment tray, with whatever is typed there.
+     * @param location Should the main room composer or the thread view composer be used.
+     */
+    public async sendComposerAttachments(location: "room" | "thread"): Promise<void> {
+        const composer = this.getComposer(location === "thread");
+        await expect(composer.getByRole("list", { name: "Attachments" })).toBeVisible();
+        await composer.getByRole("button", { name: "Send message" }).click();
+    }
+
+    /**
+     * Sets the files on the composers file input, which puts them into the
+     * composer's attachment tray.
      * @param location Should the main room input or the thread view input be used.
      */
     public setComposerInputFiles(
@@ -207,9 +217,9 @@ export class ElementAppPage {
     }
 
     /**
-     * Sets the files on the composers file input, causing it to open the file
-     * upload dialog, and then automaticlly submits the dialog that pops up which
-     * causes the file to be uploaded.
+     * Sets the files on the composers file input, which puts them into the
+     * composer's attachment tray, and then sends them, which causes the file
+     * to be uploaded.
      * @param location Should the main room input or the thread view input be used.
      */
     public async composerUploadFiles(
@@ -217,7 +227,7 @@ export class ElementAppPage {
         ...params: Parameters<Locator["setInputFiles"]>
     ): Promise<void> {
         await this.setComposerInputFiles(location, ...params);
-        await this.page.locator(".mx_Dialog").getByRole("button", { name: "Upload" }).click();
+        await this.sendComposerAttachments(location);
     }
 
     /**
@@ -251,7 +261,7 @@ export class ElementAppPage {
         await this.page.dispatchEvent(location === "room" ? ".mx_RoomView_body" : ".mx_ThreadPanel", "drop", {
             dataTransfer,
         });
-        await this.page.locator(".mx_Dialog").getByRole("button", { name: "Upload" }).click();
+        await this.sendComposerAttachments(location);
     }
 
     /**
@@ -291,7 +301,7 @@ export class ElementAppPage {
             },
             [buffer.toString("base64"), name, type],
         );
-        await this.page.locator(".mx_Dialog").getByRole("button", { name: "Upload" }).click();
+        await this.sendComposerAttachments(location);
     }
 
     /**

@@ -34,7 +34,7 @@ import {
 import type { ComposerApiFileUploadOption } from "@element-hq/element-web-module-api";
 import { useScopedRoomContext } from "../../contexts/ScopedRoomContext";
 import { useMatrixClientContext } from "../../contexts/MatrixClientContext";
-import ContentMessages from "../../ContentMessages";
+import { AttachmentTrayStore } from "../../intercom/attachments/AttachmentTrayStore";
 import { TimelineRenderingType } from "../../contexts/RoomContext";
 import { chromeFileInputFix } from "../../utils/BrowserWorkarounds";
 import type { MatrixDispatcher } from "../../dispatcher/dispatcher";
@@ -139,11 +139,11 @@ export class RoomUploadViewModel
         logger.info("initiateViaInputFiles for", roomId);
         if (!files?.length) return;
         try {
-            await ContentMessages.sharedInstance().sendContentListToRoom(
+            // The files wait in the composer's tray and are sent with its next message
+            await AttachmentTrayStore.instance.addFiles(
                 Array.from(files),
                 roomId,
                 this.threadRelation,
-                this.replyToEvent,
                 this.client,
                 this.timelineRenderingType,
             );
@@ -161,11 +161,11 @@ export class RoomUploadViewModel
         if (!dataTransfer.files?.length) return;
 
         try {
-            await ContentMessages.sharedInstance().sendContentListToRoom(
+            // The files wait in the composer's tray and are sent with its next message
+            await AttachmentTrayStore.instance.addFiles(
                 Array.from(dataTransfer.files),
                 roomId,
                 this.threadRelation,
-                this.replyToEvent,
                 this.client,
                 this.timelineRenderingType,
             );

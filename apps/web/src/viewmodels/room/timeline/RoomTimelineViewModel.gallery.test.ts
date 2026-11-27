@@ -36,8 +36,8 @@ const T0 = new Date(2026, 10, 24, 14, 19, 0).getTime();
 
 /**
  * The room timeline the new timeline (labs "feature_new_timeline") draws: pictures sent together
- * are one row, as in the old one. These events have the shape of what InterCom's batch dialog sends
- * into an encrypted conversation.
+ * are one row, as in the old one. These events have the shape of what the composer's attachment
+ * tray sends into an encrypted conversation.
  */
 describe("RoomTimelineViewModel galleries", () => {
     let client: MatrixClient;

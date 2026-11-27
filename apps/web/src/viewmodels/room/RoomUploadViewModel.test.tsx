@@ -22,7 +22,7 @@ import { getRoomContext, mkEvent, mkStubRoom, stubClient, tearDownAfterTest } fr
 import { RoomUploadContextProvider, RoomUploadViewModel } from "./RoomUploadViewModel";
 import { TimelineRenderingType } from "../../contexts/RoomContext";
 import defaultDispatcher, { MatrixDispatcher } from "../../dispatcher/dispatcher";
-import ContentMessages from "../../ContentMessages";
+import { AttachmentTrayStore } from "../../intercom/attachments/AttachmentTrayStore";
 import { ComposerApi } from "../../modules/ComposerApi";
 import type { ComposerInsertFilesPayload } from "../../dispatcher/payloads/ComposerInsertFilePayload";
 import { ScopedRoomContextProvider } from "../../contexts/ScopedRoomContext";
@@ -30,7 +30,8 @@ import { Action } from "../../dispatcher/actions";
 import MatrixClientContext from "../../contexts/MatrixClientContext";
 import { PosthogAnalytics } from "../../PosthogAnalytics";
 
-const sendContentListToRoomSpy = vi.spyOn(ContentMessages.sharedInstance(), "sendContentListToRoom");
+// Files chosen in the composer wait in its attachment tray instead of being asked about and sent
+const addFilesSpy = vi.spyOn(AttachmentTrayStore.instance, "addFiles");
 
 describe("RoomUploadViewModel", () => {
     let client: MockedObject<MatrixClient>;
@@ -137,7 +138,7 @@ describe("RoomUploadViewModel", () => {
             expect(dis.dispatch).not.toHaveBeenCalled();
         });
         it("uploads with correct context", async () => {
-            sendContentListToRoomSpy.mockResolvedValue(undefined);
+            addFilesSpy.mockResolvedValue(1);
             const vm = new RoomUploadViewModel(
                 room,
                 client,
@@ -160,11 +161,10 @@ describe("RoomUploadViewModel", () => {
                 },
             ] as unknown as FileList;
             await vm.initiateViaInputFiles(fileList);
-            expect(sendContentListToRoomSpy).toHaveBeenCalledWith(
+            expect(addFilesSpy).toHaveBeenCalledWith(
                 fileList,
                 room.roomId,
                 threadRelation,
-                replyEvent,
                 client,
                 TimelineRenderingType.Thread,
             );
@@ -202,7 +202,7 @@ describe("RoomUploadViewModel", () => {
             expect(dis.dispatch).not.toHaveBeenCalled();
         });
         it("uploads with correct context", async () => {
-            sendContentListToRoomSpy.mockResolvedValue(undefined);
+            addFilesSpy.mockResolvedValue(1);
             const vm = new RoomUploadViewModel(
                 room,
                 client,
@@ -225,11 +225,10 @@ describe("RoomUploadViewModel", () => {
                 },
             ] as unknown as FileList;
             await vm.initiateViaDataTransfer({ files } as DataTransfer);
-            expect(sendContentListToRoomSpy).toHaveBeenCalledWith(
+            expect(addFilesSpy).toHaveBeenCalledWith(
                 files,
                 room.roomId,
                 threadRelation,
-                replyEvent,
                 client,
                 TimelineRenderingType.Thread,
             );
@@ -238,7 +237,7 @@ describe("RoomUploadViewModel", () => {
 
     describe("RoomUploadContextProvider", () => {
         it("uploads when called via module API", async () => {
-            sendContentListToRoomSpy.mockResolvedValue(undefined);
+            addFilesSpy.mockResolvedValue(1);
             render(
                 <MatrixClientContext.Provider value={client}>
                     <ScopedRoomContextProvider {...getRoomContext(room, {})}>
@@ -263,14 +262,7 @@ describe("RoomUploadViewModel", () => {
                 } satisfies ComposerInsertFilesPayload,
                 true,
             );
-            expect(sendContentListToRoomSpy).toHaveBeenCalledWith(
-                files,
-                room.roomId,
-                undefined,
-                undefined,
-                client,
-                TimelineRenderingType.Room,
-            );
+            expect(addFilesSpy).toHaveBeenCalledWith(files, room.roomId, undefined, client, TimelineRenderingType.Room);
         });
     });
 

@@ -26,6 +26,8 @@ import {
 import { addTextToComposerRTL } from "./__mocks__/composer.ts";
 
 import MessageComposer from "./MessageComposer";
+import ContentMessages from "../../../ContentMessages";
+import { AttachmentTrayStore, attachmentTrayKey } from "../../../intercom/attachments/AttachmentTrayStore";
 import MatrixClientContext from "../../../contexts/MatrixClientContext";
 import { MatrixClientPeg } from "../../../MatrixClientPeg";
 import ResizeNotifier from "../../../utils/ResizeNotifier";
@@ -266,6 +268,78 @@ describe("MessageComposer", () => {
 
             it("should render the send button", () => {
                 expect(screen.getByLabelText("Send message")).toBeInTheDocument();
+            });
+        });
+
+        describe("when files wait in the attachment tray", () => {
+            const tray = AttachmentTrayStore.instance;
+
+            beforeEach(() => {
+                // No draft of an earlier test: the composer is to be empty
+                localStorage.clear();
+                vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:preview");
+                vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+            });
+
+            afterEach(() => {
+                act(() => tray.reset());
+            });
+
+            it("shows them above the text, with the send button although nothing is typed", () => {
+                wrapAndRender({ room });
+                expect(screen.queryByRole("list", { name: "Attachments" })).not.toBeInTheDocument();
+
+                act(() => {
+                    tray.add(room.roomId, [
+                        new File([new Uint8Array(10)], "cat.png", { type: "image/png" }),
+                        new File([new Uint8Array(10)], "notes.pdf", { type: "application/pdf" }),
+                    ]);
+                });
+
+                const list = screen.getByRole("list", { name: "Attachments" });
+                expect(list.querySelectorAll("li")).toHaveLength(2);
+                expect(list.querySelector("img")).toHaveAttribute("src", "blob:preview");
+                expect(screen.getByLabelText("Send message")).toBeInTheDocument();
+            });
+
+            it("takes a file out with its button", async () => {
+                wrapAndRender({ room });
+                act(() => tray.add(room.roomId, [new File([new Uint8Array(10)], "cat.png", { type: "image/png" })]));
+
+                await userEvent.click(screen.getByRole("button", { name: "Remove attachment cat.png" }));
+
+                expect(tray.getAttachments(room.roomId)).toEqual([]);
+                expect(screen.queryByRole("list", { name: "Attachments" })).not.toBeInTheDocument();
+                expect(screen.queryByLabelText("Send message")).not.toBeInTheDocument();
+            });
+
+            it("sends them with the send button", async () => {
+                const sendAttachments = vi
+                    .spyOn(ContentMessages.sharedInstance(), "sendAttachments")
+                    .mockImplementation((files) => files.map(() => new Promise(() => {})));
+                wrapAndRender({ room });
+                act(() => tray.add(room.roomId, [new File([new Uint8Array(10)], "cat.png", { type: "image/png" })]));
+
+                await userEvent.click(screen.getByLabelText("Send message"));
+
+                expect(sendAttachments).toHaveBeenCalledTimes(1);
+                expect(sendAttachments.mock.calls[0][0].map((file) => file.name)).toEqual(["cat.png"]);
+                // The file stays while it is uploaded, and is not offered to be sent again
+                expect(screen.getByRole("progressbar", { name: "Uploading cat.png" })).toBeInTheDocument();
+                expect(screen.queryByLabelText("Send message")).not.toBeInTheDocument();
+                sendAttachments.mockRestore();
+            });
+
+            it("does not show the files of another room or of a thread", () => {
+                wrapAndRender({ room });
+                act(() => {
+                    tray.add("!other:example.org", [new File(["x"], "elsewhere.txt")]);
+                    tray.add(
+                        attachmentTrayKey(room.roomId, { rel_type: THREAD_RELATION_TYPE.name, event_id: "$root" }),
+                        [new File(["x"], "thread.txt")],
+                    );
+                });
+                expect(screen.queryByRole("list", { name: "Attachments" })).not.toBeInTheDocument();
             });
         });
 

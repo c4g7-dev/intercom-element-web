@@ -9,7 +9,7 @@ Please see LICENSE files in the repository root for full details.
 // @vitest-environment happy-dom
 
 import React from "react";
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll, type MockInstance } from "vitest";
 import { fireEvent, render, waitFor } from "test-utils-rtl";
 import { type MatrixClient, MsgType } from "matrix-js-sdk/src/matrix";
 import userEvent from "@testing-library/user-event";
@@ -33,6 +33,8 @@ import { MessageComposerUrlPreviewViewModel } from "../../../viewmodels/composer
 import { SDKContext } from "../../../contexts/SDKContext.ts";
 import { UrlPreviewApi } from "../../../modules/UrlPreviewApi.ts";
 import { attachUrlPreviews } from "../../../utils/messages";
+import ContentMessages, { type AttachmentOutcome } from "../../../ContentMessages";
+import { AttachmentTrayStore, attachmentTrayKey } from "../../../intercom/attachments/AttachmentTrayStore";
 
 vi.mock("../../../utils/local-room", () => ({
     doMaybeLocalRoomAction: vi.fn(),
@@ -467,6 +469,186 @@ describe("<SendMessageComposer/>", () => {
             );
 
             expect(defaultDispatcher.dispatch).not.toHaveBeenCalledWith({ action: `effects.confetti` });
+        });
+
+        describe("with files in the attachment tray", () => {
+            const tray = AttachmentTrayStore.instance;
+            const picture = (name: string): File => new File([new Uint8Array(10)], name, { type: "image/png" });
+            const doc = (name: string): File => new File([new Uint8Array(10)], name, { type: "application/pdf" });
+            /** Ends the files of the batch that was sent */
+            let settle: (outcome: AttachmentOutcome) => void;
+            let sendAttachments: MockInstance<ContentMessages["sendAttachments"]>;
+
+            beforeEach(() => {
+                tray.reset();
+                vi.mocked(mockClient.sendMessage).mockClear();
+                vi.mocked(doMaybeLocalRoomAction).mockImplementation(
+                    <T,>(roomId: string, fn: (actualRoomId: string) => Promise<T>, _client?: MatrixClient) => {
+                        return fn(roomId);
+                    },
+                );
+                mockPlatformPeg({ overrideBrowserShortcuts: vi.fn().mockReturnValue(false) });
+                vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:preview");
+                vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+                sendAttachments = vi
+                    .spyOn(ContentMessages.sharedInstance(), "sendAttachments")
+                    .mockImplementation((files) => {
+                        const resolvers: ((outcome: AttachmentOutcome) => void)[] = [];
+                        settle = (outcome) => resolvers.forEach((resolve) => resolve(outcome));
+                        return files.map(() => new Promise<AttachmentOutcome>((resolve) => resolvers.push(resolve)));
+                    });
+            });
+
+            afterEach(() => {
+                tray.reset();
+                sendAttachments.mockRestore();
+            });
+
+            const pressEnter = (container: HTMLElement): void => {
+                fireEvent.keyDown(container.querySelector(".mx_SendMessageComposer")!, { key: "Enter" });
+            };
+
+            it("sends pictures as one batch with the text as their caption, and no message", async () => {
+                tray.add("myfakeroom", [picture("a.png"), picture("b.png")]);
+                const { container } = getComponent();
+
+                addTextToComposer(container, "our trip");
+                pressEnter(container);
+
+                expect(sendAttachments).toHaveBeenCalledExactlyOnceWith(
+                    [expect.objectContaining({ name: "a.png" }), expect.objectContaining({ name: "b.png" })],
+                    "myfakeroom",
+                    undefined,
+                    undefined,
+                    mockClient,
+                    { "body": "our trip", "format": undefined, "formatted_body": undefined, "m.mentions": {} },
+                    expect.any(Function),
+                );
+                // The composer is emptied as after any message
+                expect(container.querySelector(".mx_BasicMessageComposer_input")!.textContent).toBe("");
+
+                settle("sent");
+                await waitFor(() => expect(tray.getAttachments("myfakeroom")).toEqual([]));
+                expect(mockClient.sendMessage).not.toHaveBeenCalled();
+            });
+
+            it("sends the text as a message after files that are no pictures", async () => {
+                tray.add("myfakeroom", [doc("a.pdf"), doc("b.pdf")]);
+                const { container } = getComponent();
+
+                addTextToComposer(container, "the papers");
+                pressEnter(container);
+
+                expect(sendAttachments).toHaveBeenCalledTimes(1);
+                expect(sendAttachments.mock.calls[0][0].map((file) => file.name)).toEqual(["a.pdf", "b.pdf"]);
+                // No caption
+                expect(sendAttachments.mock.calls[0][5]).toBeUndefined();
+
+                // The message waits for the files
+                await waitFor(() => expect(attachUrlPreviews).toHaveBeenCalled());
+                expect(mockClient.sendMessage).not.toHaveBeenCalled();
+
+                settle("sent");
+                await waitFor(() =>
+                    expect(mockClient.sendMessage).toHaveBeenCalledExactlyOnceWith("myfakeroom", null, {
+                        "body": "the papers",
+                        "msgtype": MsgType.Text,
+                        "m.mentions": {},
+                    }),
+                );
+            });
+
+            it("sends the text as a message after a mixed set too", async () => {
+                tray.add("myfakeroom", [picture("a.png"), doc("b.pdf")]);
+                const { container } = getComponent();
+
+                addTextToComposer(container, "both");
+                pressEnter(container);
+                expect(sendAttachments.mock.calls[0][5]).toBeUndefined();
+
+                // A file that failed does not hold the text back
+                settle("failed");
+                await waitFor(() =>
+                    expect(mockClient.sendMessage).toHaveBeenCalledWith(
+                        "myfakeroom",
+                        null,
+                        expect.objectContaining({ body: "both" }),
+                    ),
+                );
+            });
+
+            it("sends the files when nothing is typed", () => {
+                tray.add("myfakeroom", [picture("a.png")]);
+                const { container } = getComponent();
+
+                pressEnter(container);
+
+                expect(sendAttachments).toHaveBeenCalledTimes(1);
+                expect(sendAttachments.mock.calls[0][5]).toBeUndefined();
+                expect(mockClient.sendMessage).not.toHaveBeenCalled();
+            });
+
+            it("sends the files of the thread's tray from the thread's composer", () => {
+                const relation = { rel_type: "m.thread", event_id: "$root" };
+                tray.add("myfakeroom", [picture("room.png")]);
+                tray.add(attachmentTrayKey("myfakeroom", relation), [picture("thread.png")]);
+                const { container } = getComponent({ relation });
+
+                pressEnter(container);
+
+                expect(sendAttachments).toHaveBeenCalledTimes(1);
+                expect(sendAttachments.mock.calls[0][0].map((file) => file.name)).toEqual(["thread.png"]);
+                expect(sendAttachments.mock.calls[0][2]).toBe(relation);
+                expect(tray.getAttachments("myfakeroom").map((a) => a.status)).toEqual(["pending"]);
+            });
+
+            it("sends text alone as it always did when the tray is empty", async () => {
+                const { container } = getComponent();
+                addTextToComposer(container, "just text");
+                pressEnter(container);
+
+                await waitFor(() =>
+                    expect(mockClient.sendMessage).toHaveBeenCalledWith(
+                        "myfakeroom",
+                        null,
+                        expect.objectContaining({ body: "just text" }),
+                    ),
+                );
+                expect(sendAttachments).not.toHaveBeenCalled();
+            });
+
+            it("empties the tray on Escape before it cancels a reply", () => {
+                tray.add("myfakeroom", [picture("a.png"), doc("b.pdf")]);
+                const { container } = getComponent({}, { ...defaultRoomContext, replyToEvent: mockEvent });
+                const composer = container.querySelector(".mx_SendMessageComposer")!;
+                const cancelReply = { action: "reply_to_event", event: null, context: TimelineRenderingType.Room };
+
+                fireEvent.keyDown(composer, { key: "Escape" });
+                expect(tray.getAttachments("myfakeroom")).toEqual([]);
+                expect(defaultDispatcher.dispatch).not.toHaveBeenCalledWith(cancelReply);
+
+                // With nothing in the tray Escape means what it always meant
+                fireEvent.keyDown(composer, { key: "Escape" });
+                expect(defaultDispatcher.dispatch).toHaveBeenCalledWith(cancelReply);
+            });
+
+            it("takes the last file out on Backspace when nothing is typed", () => {
+                tray.add("myfakeroom", [picture("a.png"), doc("b.pdf")]);
+                const { container } = getComponent();
+                const composer = container.querySelector(".mx_SendMessageComposer")!;
+
+                fireEvent.keyDown(composer, { key: "Backspace" });
+                expect(tray.getAttachments("myfakeroom").map((a) => a.file.name)).toEqual(["a.png"]);
+
+                // A key held down is deleting text, not files
+                fireEvent.keyDown(composer, { key: "Backspace", repeat: true });
+                expect(tray.getAttachments("myfakeroom").map((a) => a.file.name)).toEqual(["a.png"]);
+
+                // With text in the composer Backspace is for the text
+                addTextToComposer(container, "typed");
+                fireEvent.keyDown(composer, { key: "Backspace" });
+                expect(tray.getAttachments("myfakeroom").map((a) => a.file.name)).toEqual(["a.png"]);
+            });
         });
     });
 

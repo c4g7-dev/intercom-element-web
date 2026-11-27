@@ -30,7 +30,8 @@ test.describe("Composer API", () => {
         await app.viewRoomById(room.roomId);
         await app.getComposer().getByRole("button", { name: "Attachment" }).click();
         await page.getByRole("menuitem", { name: "Example uploader" }).click({ noWaitAfter: true });
-        await page.locator(".mx_Dialog").getByRole("button", { name: "Upload" }).click();
+        // The file waits in the composer's attachment tray until the message is sent
+        await app.sendComposerAttachments("room");
         // The timeline renders the uploaded file as a preview tile with its name and a download button
         const fileTile = page.getByRole("listitem").filter({ hasText: "testfile.txt" });
         await expect(fileTile.getByText("testfile.txt")).toBeVisible();

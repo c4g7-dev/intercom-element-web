@@ -47,6 +47,11 @@ import RoomContext from "../../../contexts/RoomContext";
 import { type SettingUpdatedPayload } from "../../../dispatcher/payloads/SettingUpdatedPayload";
 import MessageComposerButtons from "./MessageComposerButtons";
 import { ComposerUploadButton } from "../../../intercom/ComposerUploadButton";
+import { ComposerAttachmentTray, useHasPendingAttachments } from "../../../intercom/attachments/ComposerAttachmentTray";
+import { AttachmentTrayStore, attachmentTrayKey } from "../../../intercom/attachments/AttachmentTrayStore";
+import { createMessageContent as createWysiwygMessageContent } from "./wysiwyg_composer/utils/createMessageContent";
+import { getKeyBindingsManager } from "../../../KeyBindingsManager";
+import { KeyBindingAction } from "../../../accessibility/KeyboardShortcuts";
 import AccessibleButton, { type ButtonEvent } from "../elements/AccessibleButton";
 import { type ViewRoomPayload } from "../../../dispatcher/payloads/ViewRoomPayload";
 import { isLocalRoom } from "../../../utils/localRoom/isLocalRoom";
@@ -98,6 +103,8 @@ interface IProps extends MatrixClientProps {
     e2eStatus?: E2EStatus;
     compact?: boolean;
     urlPreviewVm: MessageComposerUrlPreviewViewModel;
+    /** Whether the composer's attachment tray has files waiting to be sent */
+    hasPendingAttachments?: boolean;
 }
 
 interface IState {
@@ -401,6 +408,19 @@ export class MessageComposer extends React.Component<IProps, IState> {
         return true;
     };
 
+    /**
+     * Escape empties the attachment tray of the rich text composer, before anything else it
+     * means. The plain text composer does the same in SendMessageComposer.
+     */
+    private onWysiwygKeyDown = (event: React.KeyboardEvent): void => {
+        if (getKeyBindingsManager().getMessageComposerAction(event) !== KeyBindingAction.CancelReplyOrEdit) return;
+        const trayKey = attachmentTrayKey(this.props.room.roomId, this.props.relation);
+        if (AttachmentTrayStore.instance.clear(trayKey)) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    };
+
     private sendMessage = async (): Promise<void> => {
         // snapshot need to be captured before the composer is cleared
         // otherwise the send message function will think there are no URLs in
@@ -424,6 +444,35 @@ export class MessageComposer extends React.Component<IProps, IState> {
                 action: Action.ClearAndFocusSendMessageComposer,
                 timelineRenderingType: this.context.timelineRenderingType,
             });
+            // The files of the attachment tray go with the message. In the plain text composer
+            // SendMessageComposer sees to that; this is the same for the rich text one.
+            const trayKey = attachmentTrayKey(this.props.room.roomId, relation);
+            if (AttachmentTrayStore.instance.hasSendable(trayKey)) {
+                // A command is run as it always was, after the files
+                const isCommand = composerContent.startsWith("/") && !composerContent.startsWith("//");
+                const text =
+                    composerContent.trim() && !isCommand
+                        ? await createWysiwygMessageContent(composerContent, this.state.isRichTextEnabled, {})
+                        : undefined;
+                const { textSent, finished } = AttachmentTrayStore.instance.send(trayKey, {
+                    roomId: this.props.room.roomId,
+                    relation,
+                    replyToEvent,
+                    client: this.props.mxClient,
+                    text,
+                });
+                if (replyToEvent) {
+                    dis.dispatch({
+                        action: "reply_to_event",
+                        event: null,
+                        context: this.context.timelineRenderingType,
+                    });
+                }
+                // The text went as the caption of the pictures
+                if (textSent) return;
+                // Otherwise it follows the files as a message of its own
+                await finished;
+            }
             await sendMessage(composerContent, this.state.isRichTextEnabled, {
                 mxClient: this.props.mxClient,
                 roomContext: this.context,
@@ -686,7 +735,9 @@ export class MessageComposer extends React.Component<IProps, IState> {
             />,
         );
 
-        const showSendButton = canSendMessages && (!this.state.isComposerEmpty || this.state.haveRecording);
+        const showSendButton =
+            canSendMessages &&
+            (!this.state.isComposerEmpty || this.state.haveRecording || !!this.props.hasPendingAttachments);
 
         const classes = classNames({
             "mx_MessageComposer": true,
@@ -696,7 +747,13 @@ export class MessageComposer extends React.Component<IProps, IState> {
         });
 
         return (
-            <div className={classes} ref={this.ref} role="region" aria-label={_t("a11y|message_composer")}>
+            <div
+                className={classes}
+                ref={this.ref}
+                role="region"
+                aria-label={_t("a11y|message_composer")}
+                onKeyDown={this.state.isWysiwygLabEnabled ? this.onWysiwygKeyDown : undefined}
+            >
                 <div className="mx_MessageComposer_wrapper">
                     <MessageComposerUrlPreviewWrapper urlPreviewVm={this.props.urlPreviewVm} />
                     <UserIdentityWarning room={this.props.room} key={this.props.room.roomId} />
@@ -704,6 +761,9 @@ export class MessageComposer extends React.Component<IProps, IState> {
                         replyToEvent={this.props.replyToEvent}
                         permalinkCreator={this.props.permalinkCreator}
                     />
+                    {canSendMessages && (
+                        <ComposerAttachmentTray roomId={this.props.room.roomId} relation={this.props.relation} />
+                    )}
                     <div className="mx_MessageComposer_row">
                         {/* InterCom: the upload button stands first; in the narrow layout it stays in the menu */}
                         {canSendMessages && !this.context.narrow && !this.state.haveRecording && (
@@ -769,5 +829,13 @@ export default function MessageComposerWrapper(props: Omit<IProps, "mxClient" | 
         urlPreviewVm.updateUrlPreviewVisible(showUrlPreview);
     }, [urlPreviewVm, showUrlPreview]);
 
-    return <MessageComposerWithMatrixClient {...props} urlPreviewVm={urlPreviewVm} />;
+    const hasPendingAttachments = useHasPendingAttachments(props.room.roomId, props.relation);
+
+    return (
+        <MessageComposerWithMatrixClient
+            {...props}
+            urlPreviewVm={urlPreviewVm}
+            hasPendingAttachments={hasPendingAttachments}
+        />
+    );
 }

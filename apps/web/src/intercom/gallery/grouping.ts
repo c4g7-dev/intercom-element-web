@@ -13,7 +13,7 @@ import { MediaEventHelper } from "../../utils/MediaEventHelper";
 export const GALLERY_MAX_GAP_MS = 2 * 60 * 1000;
 
 /**
- * The content field that marks the pictures confirmed together in the batch dialog:
+ * The content field that marks the pictures sent together from the composer's attachment tray:
  * `{ id, index, count }`. Pictures with the same `id` are one gallery however long their uploads
  * took; other clients ignore the field.
  */

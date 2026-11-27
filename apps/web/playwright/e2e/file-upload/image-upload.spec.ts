@@ -26,12 +26,15 @@ test.describe("Image Upload", () => {
         ).toBeVisible();
     });
 
-    test("should show image preview when uploading an image", { tag: "@screenshot" }, async ({ page, app }) => {
+    test("should show image preview when uploading an image", async ({ app }) => {
         await app.setComposerInputFiles("room", getSampleFilePath("riot.png"));
 
-        await expect(page.getByRole("button", { name: "Upload" })).toBeEnabled();
-        await expect(page.getByRole("button", { name: "Close dialog" })).toBeEnabled();
-        await expect(page.locator(".mx_Dialog")).toMatchScreenshot("image-upload-preview.png");
+        // The picture waits in the composer's attachment tray, where it can be taken out again
+        const tray = app.getComposer().getByRole("list", { name: "Attachments" });
+        await expect(tray.getByRole("listitem")).toHaveCount(1);
+        await expect(tray.getByText("riot.png")).toBeVisible();
+        await expect(tray.getByRole("button", { name: "Remove attachment riot.png" })).toBeEnabled();
+        await expect(app.getComposer().getByRole("button", { name: "Send message" })).toBeEnabled();
     });
 
     test("should allow upload via drag and drop", { tag: "@screenshot" }, async ({ page, app }) => {

@@ -16,6 +16,7 @@ import React, {
 import {
     type MatrixEvent,
     type IEventRelation,
+    type ISendEventResponse,
     type Room,
     EventType,
     MsgType,
@@ -68,6 +69,11 @@ import { attachMentions, attachRelation, attachUrlPreviews } from "../../../util
 import { type RoomUploadViewModel, useRoomUploadViewModel } from "../../../viewmodels/room/RoomUploadViewModel";
 import { type MessageComposerUrlPreviewViewModel } from "../../../viewmodels/composer/MessageComposerUrlPreviewViewModel";
 import { linksIn } from "../../../utils/UrlUtils";
+import {
+    AttachmentTrayStore,
+    attachmentTrayKey,
+    type TraySendResult,
+} from "../../../intercom/attachments/AttachmentTrayStore";
 import { type MessageComposerUrlPreviewSnapshot } from "@element-hq/web-shared-components";
 
 // The prefix used when persisting editor drafts to localstorage.
@@ -260,6 +266,12 @@ export class SendMessageComposer extends React.Component<ISendMessageComposerPro
                 }
                 break;
             case KeyBindingAction.CancelReplyOrEdit:
+                // Escape first empties the attachment tray; only with none it cancels the reply
+                if (AttachmentTrayStore.instance.clear(this.trayKey)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    break;
+                }
                 if (!!this.context.replyToEvent) {
                     dis.dispatch({
                         action: "reply_to_event",
@@ -270,8 +282,60 @@ export class SendMessageComposer extends React.Component<ISendMessageComposerPro
                     event.stopPropagation();
                 }
                 break;
+            default:
+                // Backspace with nothing typed takes the last file out of the attachment tray. Not
+                // while the key is held down: that is someone deleting their text, who would lose
+                // the files along with it.
+                if (
+                    event.key === "Backspace" &&
+                    !event.repeat &&
+                    !event.ctrlKey &&
+                    !event.metaKey &&
+                    !event.altKey &&
+                    this.model.isEmpty &&
+                    AttachmentTrayStore.instance.removeLast(this.trayKey)
+                ) {
+                    event.preventDefault();
+                }
         }
     };
+
+    /** The key of this composer's attachment tray */
+    private get trayKey(): string {
+        return attachmentTrayKey(this.props.room.roomId, this.props.relation);
+    }
+
+    /**
+     * Sends the files of the attachment tray, with the message typed beside them if there is one.
+     * @param text - The message, made into content.
+     * @returns Whether the text went with the files (as the caption of pictures), and when the
+     *     files are done: text that did not go with them is sent after that.
+     */
+    private sendAttachments(text?: RoomMessageEventContent): TraySendResult {
+        const replyToEvent = this.props.replyToEvent;
+        const result = AttachmentTrayStore.instance.send(this.trayKey, {
+            roomId: this.props.room.roomId,
+            relation: this.props.relation,
+            replyToEvent,
+            client: this.props.mxClient,
+            text,
+        });
+        if (replyToEvent) {
+            // Clear reply_to_event as the files are on their way
+            dis.dispatch({
+                action: "reply_to_event",
+                event: null,
+                context: this.context.timelineRenderingType,
+            });
+        }
+        if (SettingsStore.getValue("scrollToBottomOnMessageSent")) {
+            dis.dispatch({
+                action: "scroll_to_bottom",
+                timelineRenderingType: this.context.timelineRenderingType,
+            });
+        }
+        return result;
+    }
 
     // we keep sent messages/commands in a separate history (separate from undo history)
     // so you can alt+up/down in them
@@ -351,8 +415,12 @@ export class SendMessageComposer extends React.Component<ISendMessageComposerPro
      */
     public async sendMessage({ urlPreviewSnapshot }: ISendMessageActionProps): Promise<void> {
         const model = this.model;
+        // Files waiting in the attachment tray are sent with the message, or without one. A command
+        // that sends no message (/join, /nick, …) leaves them where they are.
+        const hasAttachments = AttachmentTrayStore.instance.hasSendable(this.trayKey);
 
         if (model.isEmpty) {
+            if (hasAttachments) this.sendAttachments();
             return;
         }
 
@@ -458,13 +526,26 @@ export class SendMessageComposer extends React.Component<ISendMessageComposerPro
             }
 
             // don't bother sending an empty message
-            if (!content.body.trim()) return;
+            if (!content.body.trim()) {
+                if (hasAttachments) this.sendAttachments();
+                return;
+            }
 
             // must be read before the composer is cleared out from under us
             const messageHasLinks = linksIn(this.model.contentPlainText).size !== 0;
 
             // clear composer first so the user doesn't actually see the delay of attach URL preview image files
             clearComposerAndPushHistory();
+
+            // Set when the message follows the files of the attachment tray: when they are done
+            let attachmentsSent: Promise<void> | undefined;
+            if (hasAttachments) {
+                const { textSent, finished } = this.sendAttachments(content);
+                // The text went with pictures, as their caption: there is no message left to send
+                if (textSent) return;
+                attachmentsSent = finished;
+            }
+
             if (
                 await attachUrlPreviews(
                     this.props.mxClient,
@@ -484,11 +565,14 @@ export class SendMessageComposer extends React.Component<ISendMessageComposerPro
             const threadId =
                 this.props.relation?.rel_type === THREAD_RELATION_TYPE.name ? this.props.relation.event_id : null;
 
-            const prom = doMaybeLocalRoomAction(
-                roomId,
-                (actualRoomId: string) => this.props.mxClient.sendMessage(actualRoomId, threadId ?? null, content!),
-                this.props.mxClient,
-            );
+            const send = (): Promise<ISendEventResponse> =>
+                doMaybeLocalRoomAction(
+                    roomId,
+                    (actualRoomId: string) => this.props.mxClient.sendMessage(actualRoomId, threadId ?? null, content!),
+                    this.props.mxClient,
+                );
+            // After files that are not all pictures the text is a message of its own, below them
+            const prom = attachmentsSent ? attachmentsSent.then(send) : send();
             if (replyToEvent) {
                 // Clear reply_to_event as we put the message into the queue
                 // if the send fails, retry will handle resending.

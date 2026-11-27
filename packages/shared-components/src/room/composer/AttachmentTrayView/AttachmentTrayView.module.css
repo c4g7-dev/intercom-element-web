@@ -1,0 +1,207 @@
+/*
+ * Copyright 2026 The InterCom contributors
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
+ */
+
+/*
+ * The tray stands on the composer's own surface and has no background: cards with a hairline
+ * border and no shadow. Radii: 12px for the cards, 8px for the small controls on them.
+ */
+.tray {
+    /* One step above the composer's surface (gray-300), so that the lines show on it in both themes */
+    --tray-hairline: var(--cpd-color-gray-400);
+    --tray-card-width: 124px;
+
+    display: flex;
+    flex-wrap: nowrap;
+    gap: var(--cpd-space-2x);
+    margin: 0;
+    padding: var(--cpd-space-2x) var(--cpd-space-1x);
+    list-style: none;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    border-bottom: var(--cpd-border-width-1) solid var(--tray-hairline);
+}
+
+.card {
+    position: relative;
+    flex: none;
+    box-sizing: border-box;
+    width: var(--tray-card-width);
+    border: var(--cpd-border-width-1) solid var(--tray-hairline);
+    border-radius: 12px;
+    background-color: var(--cpd-color-bg-canvas-default);
+    overflow: hidden;
+}
+
+.card[data-status="failed"] {
+    border-color: var(--cpd-color-border-critical-primary);
+}
+
+.preview {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 88px;
+    background-color: var(--cpd-color-bg-subtle-secondary);
+    border-bottom: var(--cpd-border-width-1) solid var(--tray-hairline);
+}
+
+.media {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.badge {
+    position: absolute;
+    inset-inline-start: var(--cpd-space-1-5x);
+    inset-block-end: var(--cpd-space-1-5x);
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
+    padding: var(--cpd-space-1x);
+    border-radius: 8px;
+    background-color: var(--cpd-color-bg-canvas-default);
+    color: var(--cpd-color-icon-primary);
+}
+
+.fileIcon {
+    width: 32px;
+    height: 32px;
+    color: var(--cpd-color-icon-secondary);
+}
+
+/* A chip's icon makes way for what is said over it */
+.card[data-kind="file"]:not([data-status="pending"]) .fileIcon {
+    visibility: hidden;
+}
+
+/* What lies over the thumbnail while the file is uploaded, or after that failed */
+.overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* The canvas colour, seen through: dims the thumbnail in the dark theme, fades it in the light one */
+    background-color: color-mix(in srgb, var(--cpd-color-bg-canvas-default) 70%, transparent);
+}
+
+.percent {
+    font: var(--cpd-font-body-sm-semibold);
+    font-variant-numeric: tabular-nums;
+    color: var(--cpd-color-text-primary);
+}
+
+.track {
+    position: absolute;
+    inset-inline: var(--cpd-space-2x);
+    inset-block-end: var(--cpd-space-2x);
+    height: 4px;
+    border-radius: 2px;
+    background-color: var(--cpd-color-alpha-gray-500);
+    overflow: hidden;
+}
+
+.fill {
+    height: 100%;
+    border-radius: inherit;
+    background-color: var(--cpd-color-bg-accent-rest);
+    transition: width 0.15s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fill {
+        transition: none;
+    }
+}
+
+.meta {
+    display: flex;
+    flex-direction: column;
+    padding: var(--cpd-space-1-5x) var(--cpd-space-2x);
+    min-width: 0;
+}
+
+.name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font: var(--cpd-font-body-xs-medium);
+    color: var(--cpd-color-text-primary);
+}
+
+.detail {
+    display: flex;
+    align-items: center;
+    gap: var(--cpd-space-1x);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font: var(--cpd-font-body-xs-regular);
+    color: var(--cpd-color-text-secondary);
+}
+
+.error {
+    color: var(--cpd-color-text-critical-primary);
+
+    svg {
+        flex: none;
+        width: 12px;
+        height: 12px;
+    }
+}
+
+.remove,
+.retry {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: var(--cpd-border-width-1) solid var(--tray-hairline);
+    border-radius: 8px;
+    background-color: var(--cpd-color-bg-canvas-default);
+    color: var(--cpd-color-icon-secondary);
+    cursor: pointer;
+
+    svg {
+        width: 16px;
+        height: 16px;
+    }
+}
+
+.remove:hover,
+.retry:hover {
+    background-color: var(--cpd-color-bg-subtle-primary);
+    color: var(--cpd-color-icon-primary);
+}
+
+.remove:focus-visible,
+.retry:focus-visible {
+    outline: 2px solid var(--cpd-color-border-focused);
+    outline-offset: 1px;
+}
+
+.remove {
+    position: absolute;
+    inset-block-start: var(--cpd-space-1x);
+    inset-inline-end: var(--cpd-space-1x);
+    width: 24px;
+    height: 24px;
+}
+
+.remove:hover {
+    color: var(--cpd-color-icon-critical-primary);
+}
+
+.retry {
+    width: 32px;
+    height: 32px;
+}
